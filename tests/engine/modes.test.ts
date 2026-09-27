@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MODES } from '@engine/missions/index';
 import { makeConfig, playGame } from './helpers';
+import { unitById } from '@data/index';
 import { MUTATORS, randomMutators } from '@engine/mutators/index';
 import { Rng } from '@engine/rng';
 
@@ -18,6 +19,8 @@ describe('game modes', () => {
     const r = playGame(makeConfig({ modeId: 'oblivion-express' }), { seed: 8, aggression: 0.1 });
     const trains = r.state.army.units.filter((u) => u.special?.train);
     expect(trains.length).toBe(3);
+    // Its own Armoured Train (18 HP, Armour 6+), never a copy of the AI's priciest unit.
+    for (const t of trains) expect([unitById(t.defId).name, unitById(t.defId).stats.hp, unitById(t.defId).stats.armour, t.models]).toEqual(['Armoured Train', 18, 6, 1]);
     expect(r.state.modeState['escaped'] as number + (r.state.modeState['killed'] as number)).toBeGreaterThan(0);
   });
   it('Void Thrashing: thrashers never respawn and the base can fall', () => {

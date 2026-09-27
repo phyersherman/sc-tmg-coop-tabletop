@@ -1,13 +1,13 @@
 import unitsJson from './units.json';
 import cardsJson from './cards.json';
 import type { CardDef, Faction, UnitDef } from '@engine/types/units';
-import { MISSION_STRUCTURES } from './missionObjects';
+import { MISSION_STRUCTURES, MISSION_TRAINS } from './missionObjects';
 
 export const UNITS: UnitDef[] = (unitsJson as unknown as { units: UnitDef[] }).units;
 export const CARDS: CardDef[] = (cardsJson as unknown as { cards: CardDef[] }).cards;
 
 // Mission structures can be looked up like any unit, but are not in UNITS: no army picker offers them.
-const byId = new Map([...UNITS, ...MISSION_STRUCTURES].map((u) => [u.id, u]));
+const byId = new Map([...UNITS, ...MISSION_STRUCTURES, ...MISSION_TRAINS].map((u) => [u.id, u]));
 
 export function unitById(id: string): UnitDef {
   const u = byId.get(id);

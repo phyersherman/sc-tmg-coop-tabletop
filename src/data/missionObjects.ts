@@ -33,3 +33,27 @@ export const MISSION_STRUCTURES: UnitDef[] = [
 ];
 
 export const missionStructureFor = (faction: Faction): UnitDef => MISSION_STRUCTURES.find((d) => d.faction === faction)!;
+
+const TRAIN_TEXT = 'This Unit runs the line: it moves straight toward the far table edge in the Movement and Assault phases and leaves the table when it reaches it. It has no weapons and never attacks, but it can be Engaged, Charged and destroyed as normal.';
+
+/**
+ * Oblivion Express's armoured trains (the players' decision, 2026-09-27: one unit of its own, 18 HP, Armour 6+):
+ * a big, slow-to-kill target that only runs the line. The same for every race; one per race so its dice and
+ * colours are the AI's own.
+ */
+export const MISSION_TRAINS: UnitDef[] = (['Terran', 'Zerg', 'Protoss'] as Faction[]).map((faction) => ({
+  id: `mission_train_${faction.toLowerCase()}`,
+  name: 'Armoured Train',
+  faction,
+  role: 'Other',
+  tags: ['Armoured', 'Mechanical', 'Ground'],
+  unique: false,
+  summoned: true,
+  stats: { speed: [6, 6], armour: 6, hp: 18, size: 3 },
+  compositions: [{ label: 'small', models: 1, cost: 0, supply: 0 }],
+  squadProfile: [{ min: 1, max: 1, supply: 0 }],
+  weapons: [],
+  abilities: [{ id: `mission_train_${faction.toLowerCase()}:train:0`, name: 'Runs the Line', phase: 'Any', kind: 'Passive', text: TRAIN_TEXT }],
+}));
+
+export const missionTrainFor = (faction: Faction): UnitDef => MISSION_TRAINS.find((d) => d.faction === faction)!;

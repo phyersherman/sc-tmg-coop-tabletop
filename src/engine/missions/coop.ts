@@ -2,6 +2,7 @@ import type { MissionMode, MissionCtx } from '../types/mission';
 import type { GameState, ScoringPrompt } from '../types/game';
 import type { AiUnitInstance } from '../types/army';
 import { unitById } from '@data/index';
+import { missionTrainFor } from '@data/missionObjects';
 import { applyMarkerControl, baseBriefing, controlled, markerPrompts, vpResult } from './framework';
 import { processReturns } from '../respawn';
 import { makeInstance, instanceCost } from '../army/builder';
@@ -89,8 +90,8 @@ export const oblivionExpress = withSideMarkers(coopMode({
   briefing: (s) => [...baseBriefing(s), 'Trains enter from the left edge at the table\'s vertical centre and move straight for the right edge every phase. They fight only if engaged.'],
   onSetup: (c) => {
     const s = c.state;
-    const src = highestCostDefs(s, 1)[0];
-    const defId = src?.defId ?? s.army.units[0]!.defId;
+    // An armoured train of its own (18 HP, Armour 6+), never a copy of whatever the AI's priciest unit is.
+    const defId = missionTrainFor(s.army.faction).id;
     for (let i = 1; i <= 3; i++) {
       const u = addSpecialUnit(s, defId, `Train ${i}`, { train: true, noRespawn: true, fixedObjective: true, trainRound: [1, 3, 5][i - 1] });
       u.objective = { kind: 'lane', toEdge: 'E' };

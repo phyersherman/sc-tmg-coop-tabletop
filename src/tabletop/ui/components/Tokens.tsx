@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { REWARDS, type RewardKind } from '@engine/missions/sideMarkers';
-import { MISSION_STRUCTURES } from '@data/missionObjects';
+import { MISSION_STRUCTURES, MISSION_TRAINS } from '@data/missionObjects';
 
 /**
  * Printable tokens for the co-op missions' side markers: one per reward, set beside its marker so the table can
@@ -9,7 +9,8 @@ import { MISSION_STRUCTURES } from '@data/missionObjects';
  */
 
 /** Simple line icons, drawn in a 100 × 100 box. */
-const ICONS: Record<RewardKind | 'structure' | 'guard', ReactNode> = {
+const ICONS: Record<RewardKind | 'structure' | 'guard' | 'train', ReactNode> = {
+  train: <g><rect x="16" y="30" width="68" height="34" rx="6" /><circle cx="32" cy="72" r="8" /><circle cx="68" cy="72" r="8" /><rect x="10" y="82" width="80" height="5" /></g>,
   reinforce: <path d="M42 18h16v24h24v16H58v24H42V58H18V42h24z" />,
   requisition: <text x="50" y="66" textAnchor="middle" fontSize="46" fontWeight="800" fontFamily="system-ui, sans-serif">+2</text>,
   firepower: <g fill="none" strokeWidth="7"><circle cx="50" cy="50" r="24" /><path d="M50 14v20M50 66v20M14 50h20M66 50h20" /></g>,
@@ -58,6 +59,7 @@ export function TokenSheet() {
       {rewards.flatMap((k) => [0, 1].map((i) => <RewardToken key={`${k}${i}`} kind={k} />))}
       {MISSION_STRUCTURES.map((d) => <Token key={d.id} icon="structure" name={d.name} line={`HP ${d.stats.hp}${d.stats.shields ? `+${d.stats.shields}` : ''} · Armour ${d.stats.armour}+`} tone="grey" />)}
       {[0, 1].map((i) => <Token key={`g${i}`} icon="guard" name="Guard" line="Holds this marker" tone="red" />)}
+      {[1, 2, 3].map((i) => <Token key={`t${i}`} icon="train" name={`Train ${i}`} line={`HP ${MISSION_TRAINS[0]!.stats.hp} · Armour ${MISSION_TRAINS[0]!.stats.armour}+`} tone="grey" />)}
     </div>
   );
 }
