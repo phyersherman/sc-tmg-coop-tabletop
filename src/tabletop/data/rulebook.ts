@@ -48,6 +48,7 @@ export const RULEBOOK: RuleSection[] = [
       'Attack: only models in range and in line of sight of the focus fire. The app rolls the dice. If nothing is in range, the card says whether the unit runs or holds.',
       'Charge: needs a Ground enemy within Speed + 6" of the leading model by path. The app rolls the distance; on a success set the models base-to-base.',
       'Hold: the unit stays where it is; it still counts as activated.',
+      'Combat (no cards): the app asks how many of the unit\'s models fight, and rolls for them. Only the Fighting Rank (models within 1" of an enemy model) and the Supporting Rank (models touching a Fighting Rank model of their own unit) strike; IMPACT after a charge counts the same models.',
       'Abilities on a card cost the AI nothing: ignore Biomass, Command Points and Psionic Energy. Everything else an ability says still happens (a Stimpack still deals its NON-LETHAL DAMAGE). When an ability asks for a choice, the card says what the AI picks.',
       'The AI never reacts. Its reaction abilities are printed on its cards as buffs (✚) that last until the End of the Round.',
       'Faction boosts (★) ride on the reshuffle cards: when one comes up, the AI uses that boost of its Faction card. A Once per Game boost is struck through after its first use.',

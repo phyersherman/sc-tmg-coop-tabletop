@@ -115,7 +115,7 @@ export function TabletopTurn({ g, dispatch }: { g: GameState; dispatch: (c: Comm
       </div>
     );
   }
-  const what = g.phase === 'movement' ? 'Move or deploy one of your units.' : g.phase === 'assault' ? 'Shoot, charge or run with one of your units.' : g.phase === 'combat' ? 'Fight with one of your engaged units.' : 'Score the round.';
+  const what = g.phase === 'movement' ? 'Move or deploy one of your units.' : g.phase === 'assault' ? 'Shoot, charge or run with one of your units.' : g.phase === 'combat' ? 'Fight with one of your engaged units: only its models within 1" of an enemy (the Fighting Rank) and those touching one of them (the Supporting Rank) roll.' : 'Score the round.';
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;

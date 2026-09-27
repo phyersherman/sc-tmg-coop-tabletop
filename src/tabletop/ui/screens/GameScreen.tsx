@@ -39,12 +39,34 @@ import { unitById as defOf } from '@data/index';
 
 const VERB: Record<AiOrder['type'], string> = { deploy: 'Deploy', move: 'Advance', run: 'Run', disengage: 'Fall back', ranged: 'Open fire', charge: 'Charge!', closeCombat: 'Melee', hold: 'Hold', pass: 'Pass', special: 'Special' };
 
+/**
+ * Before a fight's dice: how many of the unit's models strike. By the rulebook (Part 8, Close Combat, Declare
+ * Attackers) that is the Fighting Rank, every model within 1" of an enemy model, and the Supporting Rank, every
+ * model in base-to-base contact with a model of its own unit that is in the Fighting Rank. IMPACT counts the same models.
+ */
+function FightersAsk({ max, impact, onRoll }: { max: number; impact: boolean; onRoll: (n: number) => void }) {
+  const [n, setN] = useState(max);
+  return (
+    <div className="stack fighters-ask">
+      <p className="ask">How many of its models {impact ? 'roll IMPACT' : 'fight'}?</p>
+      <p className="small">Count the models in the <b>Fighting Rank</b> (within 1" of an enemy model) and the <b>Supporting Rank</b> (touching a model of the same unit that is in the Fighting Rank). The rest do not roll.</p>
+      <div className="row">
+        <Stepper value={n} onChange={setN} min={1} max={max} />
+        <Btn variant="primary" size="lg" onClick={() => onRoll(n)}>Roll for {n} model{n === 1 ? '' : 's'}</Btn>
+      </div>
+    </div>
+  );
+}
+
 function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dispatch: (c: Command) => void }) {
   const showRolls = useSettings((s) => s.appRollsAiDice);
   const [enemySupply, setEnemySupply] = useState(1);
   const [details, setDetails] = useState(false);
   const [stage, setStage] = useState<'ask' | 'roll'>('ask');
   const [rollWhat, setRollWhat] = useState<'batches' | 'impact'>('batches');
+  /** A fight: how many of its models strike (Fighting and Supporting ranks), as the table counts them. */
+  const [fighters, setFighters] = useState<number | null>(null);
+  const [askFighters, setAskFighters] = useState(false);
   const u = g.army.units.find((x) => x.id === order.unitId)!;
   const def = unitById(u.defId);
   const camLine = order.lines.find((l) => l.startsWith('Camera:'));
@@ -77,29 +99,32 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
           </div>
         </div>
       )}
-      {needsAsk && order.type === 'charge' && (
+      {needsAsk && !askFighters && order.type === 'charge' && (
         <div className="stack">
           <p className="ask">{camLine ? 'Roll the charge distance on the table.' : `Is an enemy Ground unit within ${order.charge?.max ?? '?'}" of the leading model by path? If so, roll the charge${order.charge ? ` (${order.charge.dice === '2d6high' ? '2D6 keep highest' : 'D6'} + Speed ${order.charge.speed})` : ''}.`}</p>
           <div className="row">
-            {order.impact ? <Btn variant="primary" size="lg" onClick={() => { setRollWhat('impact'); setStage('roll'); }}>Charge succeeded — roll IMPACT</Btn> : <Btn variant="primary" size="lg" onClick={() => report('charged')}>Charge succeeded</Btn>}
+            {order.impact ? <Btn variant="primary" size="lg" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge succeeded — roll IMPACT</Btn> : <Btn variant="primary" size="lg" onClick={() => report('charged')}>Charge succeeded</Btn>}
             {hasReport('chargeFailed') && <Btn size="lg" onClick={() => report('chargeFailed')}>Charge failed</Btn>}
             {hasReport('attacked') && order.batches.length > 0 && <Btn size="lg" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>No charge — fire instead</Btn>}
             {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>No target — ran</Btn>}
           </div>
         </div>
       )}
-      {needsAsk && order.type === 'closeCombat' && (
+      {needsAsk && askFighters && (
+        <FightersAsk max={u.models} impact={rollWhat === 'impact'} onRoll={(n) => { setFighters(n); setAskFighters(false); setStage('roll'); }} />
+      )}
+      {needsAsk && !askFighters && order.type === 'closeCombat' && (
         <div className="stack">
-          <p className="ask">Close Ranks, then roll the attack with the models in the Fighting and Supporting ranks.</p>
-          <div className="row"><Btn variant="primary" size="lg" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>Roll attack</Btn></div>
+          <p className="ask">Close Ranks: its leading model moves up to 3" toward the enemy it is engaged with, and the rest close in around it.</p>
+          <div className="row"><Btn variant="primary" size="lg" onClick={() => { setRollWhat('batches'); setAskFighters(true); }}>Ranks closed</Btn></div>
         </div>
       )}
       {needsAsk && order.type !== 'ranged' && order.type !== 'charge' && order.type !== 'closeCombat' && (
         <div className="row"><Btn variant="primary" size="lg" onClick={() => setStage('roll')}>Roll</Btn></div>
       )}
 
-      {stage === 'roll' && rollWhat === 'batches' && order.batches.map((b, i) => <DiceBlock key={i} batch={b} showRolls={showRolls} faction={def.faction} />)}
-      {stage === 'roll' && rollWhat === 'impact' && order.impact && <DiceBlock batch={order.impact} showRolls={showRolls} title="IMPACT" faction={def.faction} />}
+      {stage === 'roll' && rollWhat === 'batches' && order.batches.map((b, i) => <DiceBlock key={i} batch={b} showRolls={showRolls} faction={def.faction} models={order.type === 'closeCombat' ? fighters ?? undefined : undefined} />)}
+      {stage === 'roll' && rollWhat === 'impact' && order.impact && <DiceBlock batch={order.impact} showRolls={showRolls} title="IMPACT" faction={def.faction} models={fighters ?? undefined} />}
 
       <div className="row" style={{ marginTop: 6, marginBottom: 8 }}>
         <Btn size="sm" variant="ghost" onClick={() => setDetails((v) => !v)}>{details ? 'Hide the full rules' : 'Full rules for this order'}</Btn>

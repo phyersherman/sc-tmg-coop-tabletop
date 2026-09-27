@@ -5,8 +5,8 @@ import { Stepper } from './Basics';
 import { DiceRoll } from './DiceRoll';
 import type { Faction } from '@engine/types/units';
 
-export function DiceBlock({ batch, showRolls, title, faction = 'Terran' }: { batch: DiceInstruction; showRolls: boolean; title?: string; faction?: Faction }) {
-  const [models, setModels] = useState(batch.models);
+export function DiceBlock({ batch, showRolls, title, faction = 'Terran', models: fighting }: { batch: DiceInstruction; showRolls: boolean; title?: string; faction?: Faction; /** How many models attack, when the table has said (a fight: its Fighting and Supporting ranks). */ models?: number }) {
+  const [models, setModels] = useState(Math.min(batch.models, fighting ?? batch.models));
   const { dice, hits } = hitsFor(batch, models);
   const roa = batch.models ? batch.dice / batch.models : batch.dice;
   const need = batch.hit - (batch.hitMod ?? 0);
