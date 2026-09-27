@@ -135,7 +135,7 @@ export function SetupScreen() {
       modeId, difficulty, players, playerMinerals: minerals, scale, aiFaction: army.faction,
       mutators: difficulty === 'brutalPlus' ? mutators : [],
       deploymentId: deployment.id, terrainSeed, terrainMapId: mapId, seed: hashSeed(`${Date.now()}-${armySeed}`), army,
-      options: { actionDecks: true, hideAiRoster: true, appRollsAiDice: settings.appRollsAiDice, assistedSaves: settings.assistedSaves, playerHasFlying, manualSaves: true, aiDropsAnywhere: outmatched && dropAnywhere },
+      options: { actionDecks: true, noMap: true, hideAiRoster: true, appRollsAiDice: settings.appRollsAiDice, assistedSaves: settings.assistedSaves, playerHasFlying, manualSaves: true, aiDropsAnywhere: outmatched && dropAnywhere },
       playerUnits: inPlay.flatMap((f, i) => f.value.units.map((u) => ({ ...u, owner: i, models: u.maxModels, damageMarker: 0, shieldsLeft: unitById(u.defId).stats.shields ?? 0, destroyed: false }))),
       playerCards: inPlay.flatMap((f, i) => f.value.cards.map((defId) => ({ defId, owner: i }))),
     };

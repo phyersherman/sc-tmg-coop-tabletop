@@ -11,6 +11,7 @@ import { aiSegments, closestOnSegment, dist, segmentMidpoint } from '../terrain/
 import { speedFor } from '../units/speed';
 import { hasSense } from '../sense/query';
 import { currentCard } from './orderDeck';
+import { speedModFor } from './decide';
 import { playerUnitSupply } from '../sense/playerUnits';
 
 function headingPoint(state: GameState, order: AiOrder, from: Pt): Pt | null {
@@ -56,7 +57,8 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
   if (!hasSense(state)) return order;
   const unit = findUnit(state, order.unitId);
   const def = unitById(unit.defId);
-  const speed = speedFor(def, unit.models);
+  // With what its action card and the battle add (or take away).
+  const speed = speedFor(def, unit.models) + speedModFor(state, unit);
   const card = currentCard(state.orderDeck);
 
   if (order.type === 'deploy' && order.dropAt) {
@@ -135,11 +137,13 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
   }
 
   if (order.type === 'charge') {
-    const threshold = card.chargeThreshold === 'likely' ? speed + 3 : speed + 6;
+    // The charge's own reach: Speed with every bonus the order and its action card give it.
+    const reach = order.charge ? order.charge.min - 1 : speed + (card.chargeBonus ?? 0);
+    const threshold = card.chargeThreshold === 'likely' ? reach + 3 : reach + 6;
     const e = nearestEnemyByPath(state, unit, true);
-    if (e && e.pathDist <= threshold + (card.chargeBonus ?? 0)) {
+    if (e && e.pathDist <= threshold) {
       const lines = [
-        `Camera: CHARGE ${e.unit.name} — ${Math.round(e.pathDist)}" by path from the leading model. Roll ${order.charge?.dice === '2d6high' ? '2D6 (highest)' : 'D6'} + Speed ${speed}: success on ${Math.max(1, Math.ceil(e.pathDist - 1 - speed))}+ if the path is clear.`,
+        `Camera: CHARGE ${e.unit.name} — ${Math.round(e.pathDist)}" by path from the leading model. Roll ${order.charge?.dice === '2d6high' ? '2D6 (highest)' : 'D6'} + ${reach}: success on ${Math.max(1, Math.ceil(e.pathDist - 1 - reach))}+ if the path is clear.`,
         ...order.lines.filter((l) => l.startsWith('IMPACT')),
       ];
       return { ...order, lines, batches: order.batches.length ? withDice(order, unit.models).batches : [], reports: order.reports.filter((r) => r.id !== 'attacked' && r.id !== 'noTarget') };

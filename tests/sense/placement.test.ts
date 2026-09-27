@@ -383,6 +383,9 @@ describe('AI charges on the map', () => {
   it('a unit that charged into contact ends in base contact with its target: no extra move, no overlap', () => {
     const cfg = makeConfig({ modeId: 'frontlines' });
     cfg.playerUnits = [makePlayerUnit('zl', 'zealot', 'large', [], 'Zealots', 5), makePlayerUnit('mr', 'marine', 'large', [], 'Marines', 6)];
+    // This is about where a charge ends, not what the AI picks: without its action decks it charges whenever it can,
+    // which gives the test charges to check.
+    cfg.options = { ...cfg.options, actionDecks: false };
     let s = createGame(cfg, dep, flat);
     let seen = 0;
     let checked = 0;

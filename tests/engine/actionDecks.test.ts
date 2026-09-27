@@ -60,7 +60,7 @@ describe('action decks', () => {
     for (const [mode, faction] of plays) {
       {
         const cfg = makeConfig({ modeId: mode.id, aiFaction: faction, playMode: 'tabletop' });
-        cfg.options = { ...cfg.options, actionDecks: true };
+        cfg.options = { ...cfg.options, actionDecks: true, noMap: true };
         const seen = new Map<string, string>();
         let carded = 0;
         const r = playGame(cfg, {
@@ -84,7 +84,7 @@ describe('action decks', () => {
 
   it('shuffles a deck back together after its reshuffle card', () => {
     const cfg = makeConfig({ modeId: 'frontlines', aiFaction: 'Zerg', playMode: 'tabletop' });
-    cfg.options = { ...cfg.options, actionDecks: true };
+    cfg.options = { ...cfg.options, actionDecks: true, noMap: true };
     const r = playGame(cfg, { seed: 9 });
     for (const d of Object.values(r.state.aiDecks ?? {})) {
       expect(d.draw.length + d.discard.length + (d.face ? 1 : 0)).toBe(d.cards.length);
@@ -97,7 +97,7 @@ describe('action decks', () => {
 describe('action-deck play at the table', () => {
   it('never pretends to know where the players stand: attacks ask the table instead of running', () => {
     const cfg = makeConfig({ modeId: 'frontlines', aiFaction: 'Zerg', playMode: 'tabletop' });
-    cfg.options = { ...cfg.options, actionDecks: true };
+    cfg.options = { ...cfg.options, actionDecks: true, noMap: true };
     let asked = 0;
     playGame(cfg, {
       seed: 11,
@@ -111,5 +111,35 @@ describe('action-deck play at the table', () => {
       },
     });
     expect(asked).toBeGreaterThan(0);
+  });
+});
+
+describe('action decks beyond the tabletop edition', () => {
+  it('decides the AI from the decks in a simulation and a map game, with orders that read as orders', () => {
+    for (const playMode of ['video', 'tabletop'] as const) {
+      // No option set: every game plays from the decks unless it opts out.
+      const cfg = makeConfig({ modeId: 'frontlines', aiFaction: 'Zerg', playMode });
+      let carded = 0;
+      const r = playGame(cfg, {
+        seed: 7,
+        onOrder: (_s, o) => {
+          if (!o.card) return;
+          carded++;
+          // The card decides; it is not shown as a card: no card name as the title, the order's own line first.
+          expect(o.title.includes(o.card.name), `${playMode}: ${o.title}`).toBe(false);
+          expect(o.lines[0] ?? '').not.toMatch(/\(free for the AI\)/);
+        },
+      });
+      expect(r.state.status, playMode).not.toBe('playing');
+      expect(carded, playMode).toBeGreaterThan(0);
+    }
+  });
+
+  it('can be switched off for a game', () => {
+    const cfg = makeConfig({ modeId: 'frontlines', aiFaction: 'Zerg', playMode: 'video' });
+    cfg.options = { ...cfg.options, actionDecks: false };
+    let carded = 0;
+    playGame(cfg, { seed: 7, onOrder: (_s, o) => { if (o.card) carded++; } });
+    expect(carded).toBe(0);
   });
 });

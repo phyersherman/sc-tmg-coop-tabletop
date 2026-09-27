@@ -3,7 +3,7 @@ import type { AiObjective, AiUnitInstance } from '../types/army';
 import { unitById } from '@data/index';
 import { classify } from './profiles';
 import { chargeOrder, deployOrder, headingText, moveOrder, rangedOrder, report, speedModFor } from './decide';
-import { drawFor, markOnceUsed, modsOf, primaryStep, type ActionCard, type CardStep, type MoveTo } from './actionDecks';
+import { drawFor, markOnceUsed, modsOf, noMap, primaryStep, usesDecks, type ActionCard, type CardStep, type MoveTo } from './actionDecks';
 import { findUnit, onTable } from '../director/selectors';
 import { speedFor } from '../units/speed';
 import { dist } from '../terrain/geometry';
@@ -80,12 +80,16 @@ function orderFor(state: GameState, u: AiUnitInstance, base: AiOrder, card: Acti
 }
 
 /**
- * The AI plays from its action decks: the unit the AI picked draws its type's card (or follows the one its type
- * already drew this phase), and the card decides what it does. Orders the engine keeps for itself stand as they
- * are: a Siege Tank changing stance, a unit breaking away or held in place, a unit engaged in a fight.
+ * The AI plays from its action decks, in every kind of game: the unit the AI picked draws its type's card (or
+ * follows the one its type already drew this phase), and the card decides what it does. Orders the engine keeps
+ * for itself stand as they are: a Siege Tank changing stance, a unit breaking away or held in place, a unit engaged
+ * in a fight.
+ *
+ * Only tabletop without a map shows the card as a card (its name as the title, its abilities first). Everywhere
+ * else the order reads as it always has, and what the card adds follows it (see `withCardText`).
  */
 export function cardOrder(state: GameState, base: AiOrder, rng: Rng): AiOrder {
-  if (!state.config.options.actionDecks) return base;
+  if (!usesDecks(state)) return base;
   if (state.phase !== 'movement' && state.phase !== 'assault') return base;
   const u = findUnit(state, base.unitId);
   if (base.type === 'special' || base.type === 'disengage' || base.held || u.objective.kind === 'lane' || (u.engaged && base.type !== 'deploy') || u.disengagedThisRound) return base;
@@ -96,12 +100,27 @@ export function cardOrder(state: GameState, base: AiOrder, rng: Rng): AiOrder {
   // The card's buffs (the unit's reactions, as the AI never reacts) last until the End of the Round.
   for (const b of card.buffs) if (!(u.buffs ?? []).some((x) => x.name === b.name)) u.buffs = [...(u.buffs ?? []), b];
   const order = orderFor(state, u, base, card, primaryStep(card), rng);
-  const abilities = card.steps.filter((s): s is Extract<CardStep, { k: 'ability' }> => s.k === 'ability');
-  const lines = [
-    ...abilities.map((a) => `${a.name.toUpperCase()} (free for the AI): ${a.text}${a.use ? ` AI: ${a.use}` : ''}`),
-    ...order.lines,
+  // With a map, the order reads as it always has; the card's own text follows it once the camera has had its say.
+  if (!noMap(state)) return { ...order, card };
+  const [abilities, extras] = cardText(card);
+  return { ...order, card, lines: [...abilities, ...order.lines, ...extras], title: `${u.label}: ${card.name}` };
+}
+
+/** What a card adds to its order in words: the abilities it plays, then its buffs and Faction boost. */
+function cardText(card: ActionCard): [string[], string[]] {
+  const abilities = card.steps
+    .filter((s): s is Extract<CardStep, { k: 'ability' }> => s.k === 'ability')
+    .map((a) => `${a.name.toUpperCase()} (free for the AI): ${a.text}${a.use ? ` AI: ${a.use}` : ''}`);
+  const extras = [
     ...card.buffs.map((b) => `Until the End of the Round: ${b.name} — ${b.text}`),
     ...(card.boost ? [`Faction boost — ${card.boost.name}: ${card.boost.text}${card.boost.use ? ` AI: ${card.boost.use}` : ''}`] : []),
   ];
-  return { ...order, card, lines, title: `${u.label}: ${card.name}` };
+  return [abilities, extras];
+}
+
+/** A map game's card-driven order, finished: the card's abilities, buffs and boost follow its instructions. */
+export function withCardText(state: GameState, order: AiOrder): AiOrder {
+  if (!order.card || noMap(state)) return order;
+  const [abilities, extras] = cardText(order.card);
+  return { ...order, lines: [...order.lines, ...abilities, ...extras] };
 }

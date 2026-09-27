@@ -19,8 +19,8 @@ import { aiAlive, aiSupplyInReserves, aiSupplyOnTable, availableNow, findUnit, o
 import { defaultSupply } from '../missions/framework';
 import type { PlayerUnit, Pt, SenseSnapshot } from '../sense/types';
 import { applySense } from '../ai/senseDecide';
-import { cardOrder } from '../ai/cardOrders';
-import { reshuffleDecks } from '../ai/actionDecks';
+import { cardOrder, withCardText } from '../ai/cardOrders';
+import { noMap, reshuffleDecks } from '../ai/actionDecks';
 import { aiModels, engagedWith } from '../sense/query';
 import { aiSegments, closestOnSegment, dist, segmentMidpoint, settleRamps } from '../terrain/geometry';
 import { clearMarkerSpot } from '../terrain/markers';
@@ -317,7 +317,7 @@ function advanceTurn(state: GameState, mode: MissionMode): void {
       // Passing early is for when nothing is waiting to come on: with anything deployable, the AI deploys instead.
       if (!(state.phase === 'movement' && shouldPassEarly(state) && !deployable(state, mode, ctx).length)) order = decideAi(state, mode, ctx, ctx.rng);
       if (order) order = cardOrder(state, order, ctx.rng);
-      if (order) order = applySense(state, order, ctx.rng);
+      if (order) order = withCardText(state, applySense(state, order, ctx.rng));
       commitRng(state, ctx.rng);
       if (order && (order.type === 'ranged' || order.type === 'charge' || order.type === 'closeCombat')) {
         // Check now whether the attack can happen, so the player is never asked to resolve an attack that cannot.
@@ -587,8 +587,8 @@ function applyOrderReport(state: GameState, mode: MissionMode, report: string, e
     advanceEstimate(state, u, order, report);
     // Only a unit that actually went somewhere is set again: a failed charge or a unit that held stays put.
     const moved = !before || !u.est || Math.hypot(u.est.x - before.x, u.est.y - before.y) > 0.01 || !state.sense?.ai[u.id]?.length;
-    // Action-deck play knows no positions: the table is the map, so a guess is never set down as if seen.
-    if (u.est && u.location === 'table' && !order.placed && moved && !state.config.options.actionDecks) {
+    // With no map in play the table is the only picture, so a guess is never set down as if seen.
+    if (u.est && u.location === 'table' && !order.placed && moved && !noMap(state)) {
       const snap: SenseSnapshot = state.sense ?? { at: 0, calibrated: true, ai: {}, players: {}, terrain: {}, unknown: [], manual: true };
       if (snap.manual || !snap.calibrated) {
         snap.calibrated = true;

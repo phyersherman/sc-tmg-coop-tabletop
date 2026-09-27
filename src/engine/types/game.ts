@@ -45,8 +45,16 @@ export interface GameOptions {
    * than 6" from the players' models — from the opening deployment on, not only at its entry edge.
    */
   aiDropsAnywhere?: boolean;
-  /** The AI plays from action decks (one Movement and one Assault deck per unit type), as at a real table. */
+  /**
+   * The AI decides from action decks (one Movement and one Assault deck per unit type), in every kind of game.
+   * On unless set to false.
+   */
   actionDecks?: boolean;
+  /**
+   * Tabletop, AI only (the tabletop edition): no map in play, the table is the only picture, and the action cards
+   * are shown as cards. Older saves of that edition carry only `actionDecks: true`, which meant the same then.
+   */
+  noMap?: boolean;
 }
 
 export interface GameConfig {

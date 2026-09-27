@@ -51,7 +51,7 @@ export default function App() {
           {navBtn('Tokens', '◎', screen === 'tokens', () => go('tokens'))}
           {navBtn('Learn to play', '?', screen === 'tutorial', () => go('tutorial'))}
           {navBtn('Settings', '⚙', settingsOpen, () => setSettingsOpen((v) => !v))}
-          {host.toFullApp && navBtn('Simulation version', '⇄', false, host.toFullApp)}
+          {host.toFullApp && navBtn('Map and simulation', '⇄', false, host.toFullApp)}
         </nav>
       </aside>}
       <main className="content">

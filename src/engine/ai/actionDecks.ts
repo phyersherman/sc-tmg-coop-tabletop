@@ -281,6 +281,15 @@ export function buildDeck(def: UnitDef, upgrades: string[], phase: DeckPhase, fa
 
 // ------------------------------------------------------------------------------------------------ drawing
 
+/** Every game's AI decides from its action decks, unless the game says otherwise. */
+export const usesDecks = (state: GameState) => state.config.options.actionDecks !== false;
+
+/**
+ * Tabletop, AI only: no map in play and the cards shown as cards. (Before `noMap`, the tabletop edition was the only
+ * game that set `actionDecks`.)
+ */
+export const noMap = (state: GameState) => state.config.options.noMap ?? state.config.options.actionDecks === true;
+
 export const deckKey = (defId: string, phase: DeckPhase) => `${defId}:${phase}`;
 
 /** The upgrades of every AI unit of a type: one deck serves them all. */
