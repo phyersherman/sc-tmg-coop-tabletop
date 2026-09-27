@@ -1,0 +1,133 @@
+{
+ "note": "Pictures of the Lost Temple terrain pieces from the core rulebook terrain key: a top-down footprint and a photo of each piece.",
+ "images": {
+  "head-statue--footprint": [
+   240,
+   159
+  ],
+  "head-statue--render": [
+   298,
+   126
+  ],
+  "lost-temple-ramp--footprint": [
+   496,
+   270
+  ],
+  "lost-temple-ramp--render": [
+   693,
+   355
+  ],
+  "protoss-banner--footprint": [
+   58,
+   127
+  ],
+  "protoss-banner--render": [
+   154,
+   314
+  ],
+  "shrubs-a--footprint": [
+   220,
+   106
+  ],
+  "shrubs-a--render": [
+   222,
+   190
+  ],
+  "shrubs-b--footprint": [
+   226,
+   110
+  ],
+  "shrubs-b--render": [
+   248,
+   193
+  ],
+  "statue-shard--footprint": [
+   201,
+   139
+  ],
+  "statue-shard--render": [
+   245,
+   90
+  ],
+  "temple-obelisk--footprint": [
+   109,
+   107
+  ],
+  "temple-obelisk--render": [
+   133,
+   351
+  ],
+  "vespene-geyser--footprint": [
+   186,
+   147
+  ],
+  "vespene-geyser--render": [
+   246,
+   135
+  ],
+  "wall-set-1--footprint": [
+   499,
+   93
+  ],
+  "wall-set-1--render": [
+   537,
+   385
+  ],
+  "wall-set-2--footprint": [
+   557,
+   152
+  ],
+  "wall-set-2--render": [
+   618,
+   389
+  ],
+  "wall-set-3--footprint": [
+   338,
+   117
+  ],
+  "wall-set-3--render": [
+   362,
+   311
+  ],
+  "wall-set-4--footprint": [
+   434,
+   200
+  ],
+  "wall-set-4--render": [
+   533,
+   344
+  ],
+  "wall-set-5--footprint": [
+   459,
+   197
+  ],
+  "wall-set-5--render": [
+   513,
+   343
+  ],
+  "wall-set-6--footprint": [
+   242,
+   84
+  ],
+  "wall-set-6--render": [
+   239,
+   304
+  ],
+  "wall-set-4-long--footprint": [
+   401,
+   56
+  ],
+  "wall-set-4-short--footprint": [
+   185,
+   56
+  ],
+  "wall-set-5-long--footprint": [
+   429,
+   56
+  ],
+  "wall-set-5-short--footprint": [
+   187,
+   56
+  ]
+ }
+}

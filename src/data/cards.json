@@ -1,0 +1,983 @@
+{
+  "version": "2026-09-16",
+  "takenAt": "2026-09-16",
+  "source": "https://sc.starcraft-tmg.com (Command Center beta v1.4, guest access)",
+  "cards": [
+    {
+      "id": "daelaam",
+      "name": "Daelaam",
+      "faction": "Protoss",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Core": 3,
+        "Support": 1,
+        "Elite": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Mass Recall",
+          "text": "Once per Game. Set a Faction Indicator anywhere on the battlefield. All Friendly Protoss Units Within 6\" of this Faction Indicator are removed from the battlefield and returned to Reserves."
+        },
+        {
+          "name": "Dae’Uhl",
+          "text": "When a Friendly Unit receives Damage, reduce the Total Damage by 2 (to a minimum of 1)."
+        }
+      ]
+    },
+    {
+      "id": "forge",
+      "name": "Forge",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 30,
+      "resource": 1,
+      "slots": {
+        "Elite": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Ground Weapons",
+          "text": "The active Ground Unit’s first Ranged Weapon used gains CRITICAL HIT (1)."
+        },
+        {
+          "name": "Ground Armor",
+          "text": "Use before a Friendly Ground Unit makes an Armour Roll. That Unit gains TOUGH (1) for this roll."
+        }
+      ]
+    },
+    {
+      "id": "gate_chronoboosted",
+      "name": "Gate Chronoboosted",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Core": 1,
+        "Elite": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Quick Strikes",
+          "text": "The active Unit’s first Close Combat Weapon used gains PRECISION (2)."
+        },
+        {
+          "name": "Zealous Charge",
+          "text": "The active Unit gains BUFF Speed (2)."
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "name": "Gateway",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 25,
+      "resource": 1,
+      "slots": {
+        "Core": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Quick Strikes",
+          "text": "The active Unit’s first Close Combat Weapon used gains PRECISION (2)."
+        }
+      ]
+    },
+    {
+      "id": "khalai",
+      "name": "Khalai",
+      "faction": "Protoss",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Elite": 2,
+        "Hero": 1,
+        "Core": 3
+      },
+      "factionTags": [
+        "Khalai"
+      ],
+      "boosts": [
+        {
+          "name": "Pylon Warp-In",
+          "text": "If there is no Friendly Pylon on the battlefield, set a Friendly Pylon Unit anywhere on the GROUND LEVEL of the battlefield more than 10\" away from any Enemy model. This Round, the Pylon is not eligible to use its Special Abilities (excluding Structure)."
+        },
+        {
+          "name": "Bound by the Khala",
+          "text": "At the end of the active Unit’s Activation, select one other Friendly Unit eligible to Activate in the current Phase. Immediately Activate that Unit."
+        }
+      ]
+    },
+    {
+      "id": "nerazim",
+      "name": "Nerazim",
+      "faction": "Protoss",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Hero": 1,
+        "Elite": 3,
+        "Core": 2
+      },
+      "factionTags": [
+        "Nerazim"
+      ],
+      "boosts": [
+        {
+          "name": "Might Of The Nerazim",
+          "text": "If a Friendly Unit loses the HIDDEN Status, it gains Buff Speed (2) and its first Weapon used CRITICAL HIT (2)."
+        },
+        {
+          "name": "Darkness Descends",
+          "text": "The active Biological Unit gains the HIDDEN Status until the End of the Round."
+        }
+      ]
+    },
+    {
+      "id": "nexus",
+      "name": "Nexus",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Core": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Ancient Pride",
+          "text": "The active Unit’s first Weapon used gains INSTANT."
+        },
+        {
+          "name": "Strategic Recall",
+          "text": "The active, Unengaged Ground Unit is returned to Reserves instead of performing an action."
+        }
+      ]
+    },
+    {
+      "id": "observer",
+      "name": "Observer",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 25,
+      "resource": 1,
+      "slots": {
+        "Support": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Surveillance",
+          "text": "Set a Faction Indicator anywhere on the battlefield. While Enemy Units are Within 6\" of this Faction Indicator, they lose HIDDEN Status."
+        },
+        {
+          "name": "Gravitic Boosters",
+          "text": "Use after a Friendly Unit rolls a D6 for Charge Distance. Add 1 to the Charge Distance for this Unit."
+        }
+      ]
+    },
+    {
+      "id": "overcharged_nexus",
+      "name": "Overcharged Nexus",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Core": 1,
+        "Elite": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Photon Overcharge",
+          "text": "Use when an Enemy Unit enters the battlefield from Reserves via a location other than its own Entry Edge. That Unit immediately suffers HITS 3 (1)."
+        },
+        {
+          "name": "Strategic Recall",
+          "text": "The active, Unengaged Ground Unit is returned to Reserves instead of performing an action."
+        }
+      ]
+    },
+    {
+      "id": "power_field",
+      "name": "Power Field",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 40,
+      "resource": 1,
+      "slots": {
+        "Hero": 1,
+        "Elite": 1,
+        "Core": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Guardian Shell",
+          "text": "Use before a Friendly Ground Unit makes an Armour Roll. That Unit gains DODGE (2) for this roll."
+        }
+      ]
+    },
+    {
+      "id": "robotics_facility",
+      "name": "Robotics Facility",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Elite": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Plasma Shields",
+          "text": "Use before a Friendly Mechanical Ground Unit makes an Armour Roll. If this Unit has the Shielded Status, it gains TOUGH (1) and DODGE (1) for this roll."
+        }
+      ]
+    },
+    {
+      "id": "twilight_council",
+      "name": "Twilight Council",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 45,
+      "resource": 1,
+      "slots": {
+        "Elite": 1,
+        "Support": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Weapons of the Firstborn",
+          "text": "The active Ground Unit’s first Ranged Weapon used gains BUFF Range (4)."
+        },
+        {
+          "name": "Veil of Shadows",
+          "text": "Use after a Friendly Unit resolves a PLACE effect. That Unit immediately resolves the HEAL (2) effect."
+        }
+      ]
+    },
+    {
+      "id": "void_seeker",
+      "name": "Void Seeker",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 40,
+      "resource": 1,
+      "slots": {
+        "Core": 1
+      },
+      "factionTags": [
+        "Nerazim"
+      ],
+      "boosts": [
+        {
+          "name": "Personal Transport",
+          "text": "Instead of performing an action, the active, Unengaged Ground Unit is returned to Reserves. Then, it performs a Deploy action."
+        },
+        {
+          "name": "Anakh Su'n",
+          "text": "This Unit gains the HIDDEN Status until it performs another action."
+        }
+      ]
+    },
+    {
+      "id": "warp_gate",
+      "name": "Warp Gate",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 40,
+      "resource": 1,
+      "slots": {
+        "Core": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Quick Strikes",
+          "text": "The active Unit’s first Close Combat Weapon used gains PRECISION (2)."
+        },
+        {
+          "name": "Warp In",
+          "text": "The active Ground Unit Deploys from any table edge that is not a player’s Entry Edge. This deployment must end more than 10\" away from any Enemy model. The controlling player cannot use this ability if another Friendly Ground Unit has already Deployed this Round."
+        }
+      ]
+    },
+    {
+      "id": "warp_prism",
+      "name": "Warp Prism",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Core": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Phase",
+          "text": "The active Unit resolves the PLACE (3) effect."
+        },
+        {
+          "name": "Warp Conduit",
+          "text": "Set a Faction Indicator anywhere on the battlefield more than 10\" away from any Enemy model. At the End of the Round, the controlling player may Deploy one Ground Unit from Reserves in base-to-base contact with this Faction Indicator."
+        }
+      ]
+    },
+    {
+      "id": "academy",
+      "name": "Academy",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Support": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Advanced Training",
+          "text": "Once per Round, when a Friendly Support Unit activates a Special Ability that costs CP, resolve that ability with its CP cost reduced by 1 (to a minimum of 0). Do not Exhaust this card."
+        }
+      ]
+    },
+    {
+      "id": "armory",
+      "name": "Armory",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 30,
+      "resource": 1,
+      "slots": {
+        "Elite": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Vehicle Weapons",
+          "text": "The active Mechanical Unit’s first Ranged Weapon used gain CRITICAL HIT (1)."
+        },
+        {
+          "name": "Vehicle Plating",
+          "text": "Use before a Friendly Mechanical Unit makes an Armour Roll. That Unit gains TOUGH (1) for this roll."
+        }
+      ]
+    },
+    {
+      "id": "barracks",
+      "name": "Barracks",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 25,
+      "resource": 1,
+      "slots": {
+        "Core": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Go! Go! Go!",
+          "text": "The active Biological Unit performs a 2\" Move action. This does not count towards its action limit."
+        }
+      ]
+    },
+    {
+      "id": "barracks__proxy_",
+      "name": "Barracks (Proxy)",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 40,
+      "resource": 2,
+      "slots": {
+        "Core": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Go! Go! Go!",
+          "text": "The active Biological Unit performs a 2\" Move action. This does not count towards its action limit."
+        },
+        {
+          "name": "Armed and Ready",
+          "text": "The active Biological Unit Deploys from any table edge that is not a player's Entry Edge. No model may be set up Within 10\" of any Enemy model. This ability cannot be used if another Friendly Biological Unit has already been Deployed this Round."
+        }
+      ]
+    },
+    {
+      "id": "barracks__tech_lab_",
+      "name": "Barracks (Tech Lab)",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 45,
+      "resource": 2,
+      "slots": {
+        "Core": 1,
+        "Elite": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Go! Go! Go!",
+          "text": "The active Biological Unit performs a 2\" Move action. This does not count towards its action limit."
+        },
+        {
+          "name": "Let's Have a Blast!",
+          "text": "The active Biological Unit’s first Ranged Weapon used gain ANTI-EVADE (1)."
+        }
+      ]
+    },
+    {
+      "id": "dropship",
+      "name": "Dropship",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 40,
+      "resource": 1,
+      "slots": {
+        "Support": 1,
+        "Core": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Strap in!",
+          "text": "The active, Unengaged Ground Unit is returned to Reserves instead of performing an action."
+        },
+        {
+          "name": "Ready For Dust-off",
+          "text": "Set a Faction Indicator anywhere on the battlefield more than 10\" away from any Enemy model. At the End of the Round, the controlling player may Deploy one Ground Unit from Reserves in base-to-base contact with this Faction Indicator."
+        }
+      ]
+    },
+    {
+      "id": "engineering_bay",
+      "name": "Engineering Bay",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 25,
+      "resource": 1,
+      "slots": {
+        "Core": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Infantry Weapons",
+          "text": "The active Biological Unit’s first Ranged Weapon used gains CRITICAL HIT (1)."
+        },
+        {
+          "name": "Infantry Armor",
+          "text": "Use before a Friendly Biological Unit makes an Armour Roll. That Unit gains TOUGH (1) for this roll."
+        }
+      ]
+    },
+    {
+      "id": "factory",
+      "name": "Factory",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Elite": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Field Repair",
+          "text": "The active Mechanical Unit resolves the HEAL (2) effect."
+        }
+      ]
+    },
+    {
+      "id": "factory__tech_lab_",
+      "name": "Factory (Tech Lab)",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 40,
+      "resource": 1,
+      "slots": {
+        "Elite": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Field Repair",
+          "text": "The active Mechanical Unit resolves the HEAL (2) effect."
+        },
+        {
+          "name": "Pound 'em Flat!",
+          "text": "If the active Mechanical Unit has the Stationary Status, its first Ranged Weapon used gains PRECISION (2)."
+        }
+      ]
+    },
+    {
+      "id": "orbital_command",
+      "name": "Orbital Command",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 25,
+      "resource": 1,
+      "slots": {
+        "Core": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "ComSat Station",
+          "text": "Select one table edge that is not a player’s Entry Edge. Until the End of the Round, Enemy Units cannot Deploy from that edge."
+        },
+        {
+          "name": "Scanner Sweep",
+          "text": "Set a Faction Indicator anywhere on the battlefield. While Enemy Units are Within 6\" of this Faction Indicator, they lose HIDDEN Status."
+        }
+      ]
+    },
+    {
+      "id": "raynor_s_raiders",
+      "name": "Raynor's Raiders",
+      "faction": "Terran",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Core": 3,
+        "Hero": 1,
+        "Support": 1
+      },
+      "factionTags": [
+        "Raynor's Raiders"
+      ],
+      "boosts": [
+        {
+          "name": "Rapid Ingress",
+          "text": "Set a Friendly Point Defence Drone Unit anywhere on the battlefield, more than 1\" away from any Enemy model. Remove this Unit at the End of the Round."
+        },
+        {
+          "name": "Ready for Pickup?",
+          "text": "Once per Game. The active Unit resolves the PLACE (12) effect. Models set by this effect cannot be set up Within the Engagement Range of any Enemy Unit. This resolves instead of performing a standard action."
+        }
+      ]
+    },
+    {
+      "id": "supply_depot",
+      "name": "Supply Depot",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 40,
+      "resource": 1,
+      "slots": {
+        "Core": 1,
+        "Elite": 1,
+        "Hero": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Additional Supply Depots",
+          "text": "The active Unit’s Supply Value is improved by 1 for Controlling and Contesting Mission Markers and completing objectives."
+        }
+      ]
+    },
+    {
+      "id": "terran_armed_forces",
+      "name": "Terran Armed Forces",
+      "faction": "Terran",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Elite": 1,
+        "Support": 1,
+        "Core": 3
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Tactical Retreat",
+          "text": "The active Unit ignores the Disengage penalty for the remainder of the Round."
+        },
+        {
+          "name": "Terran Tenacity",
+          "text": "Once per Game. Immediately claim the First Player Marker. No other player may claim the First Player Marker for the remainder of this Phase."
+        }
+      ]
+    },
+    {
+      "id": "accelerating_creep",
+      "name": "Accelerating Creep",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 0,
+      "resource": 0,
+      "slots": {},
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Speed on Creep",
+          "text": "If the active Friendly Zerg Unit is ON CREEP, increase its Speed characteristic by 1."
+        },
+        {
+          "name": "Living Glob of Tissue",
+          "text": "Creep Tumor tokens have STAY IN PLAY and DISPLACEMENT."
+        },
+        {
+          "name": "Creep Removal",
+          "text": "If an Enemy Unit ends a Move, Deploy, Run, Charge or Disengage action Within 1\" of a Friendly Creep Tumor token, remove that token from the battlefield."
+        }
+      ]
+    },
+    {
+      "id": "cocoon",
+      "name": "Cocoon",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 30,
+      "resource": 0,
+      "slots": {
+        "Elite": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Spawn Larva",
+          "text": "The active Friendly non-Unique Biological Unit with a Size Characteristic of 1 resolves the RESPAWN (2) effect."
+        },
+        {
+          "name": "Ravager Morph",
+          "text": "Once per Game. The active Friendly Roach Unit performs MORPH (Ravager) 1."
+        }
+      ]
+    },
+    {
+      "id": "evolution_chamber",
+      "name": "Evolution Chamber",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 30,
+      "resource": 1,
+      "slots": {
+        "Core": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Extended Claws",
+          "text": "The active Unit gains a +1 Modifier to all IMPACT Hit Rolls."
+        },
+        {
+          "name": "Carapace",
+          "text": "Use before a Friendly Unit makes an Armour Roll. That Unit gains TOUGH (1) for this roll."
+        }
+      ]
+    },
+    {
+      "id": "hatchery",
+      "name": "Hatchery",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 30,
+      "resource": 1,
+      "slots": {
+        "Support": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Lie in Wait",
+          "text": "The active, Unengaged Ground Unit gains the Burrowed Status."
+        },
+        {
+          "name": "Creep Spread",
+          "text": "Set a Creep Tumor token on the battlefield Within 6\" (Line of Sight is not required) of either a Friendly Entry Edge or an existing Friendly Creep Tumor token."
+        }
+      ]
+    },
+    {
+      "id": "hydralisk_den",
+      "name": "Hydralisk Den",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Elite": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Missile Attacks",
+          "text": "The active Unit’s first Ranged Weapon used gains PRECISION (1)."
+        }
+      ]
+    },
+    {
+      "id": "kerrigan_s_swarm",
+      "name": "Kerrigan's Swarm",
+      "faction": "Zerg",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Elite": 2,
+        "Hero": 1,
+        "Core": 3
+      },
+      "factionTags": [
+        "Kerrigan's Swarm"
+      ],
+      "boosts": [
+        {
+          "name": "Omega Network",
+          "text": "If there is no Friendly Omega Worm on the battlefield, set a Friendly Omega Worm Unit anywhere on GROUND LEVEL of the battlefield, more than 10\" away from any Enemy model. This Round, the Omega Worm is not eligible to use its Special Abilities (excluding Structure)."
+        },
+        {
+          "name": "Wild Mutation",
+          "text": "If the active unit is ON CREEP, the Unit gains BUFF Speed (1) and its first Weapon used gains PRECISION (1)."
+        },
+        {
+          "name": "Zerg Creep",
+          "text": "During Army Building, select exactly one Creep Card and add it to their Army List, paying its listed cost (if any)."
+        }
+      ]
+    },
+    {
+      "id": "lair",
+      "name": "Lair",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Core": 1,
+        "Elite": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Predation",
+          "text": "The active Unit’s Close Combat Weapons gain INSTANT."
+        },
+        {
+          "name": "Creep Spread",
+          "text": "Set a Creep Tumor token on the battlefield Within 6\" (Line of Sight is not required) of either a Friendly Entry Edge or an existing Friendly Creep Tumor token."
+        }
+      ]
+    },
+    {
+      "id": "malignant_creep",
+      "name": "Malignant Creep",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 10,
+      "resource": 0,
+      "slots": {},
+      "factionTags": [
+        "Kerrigan's Swarm"
+      ],
+      "boosts": [
+        {
+          "name": "Malevolent Matriarch",
+          "text": "If the active Friendly Zerg Unit declares a Charge action while ON CREEP, it gains +1 Modifier to IMPACT Hit Rolls."
+        },
+        {
+          "name": "Living Glob of Tissue",
+          "text": "Creep Tumor tokens have STAY IN PLAY and DISPLACEMENT."
+        },
+        {
+          "name": "Creep Removal",
+          "text": "If an Enemy Unit ends a Move, Deploy, Run, Charge or Disengage action Within 1\" of a Friendly Creep Tumor token, remove that token from the battlefield."
+        }
+      ]
+    },
+    {
+      "id": "overlord",
+      "name": "Overlord",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Core": 1,
+        "Hero": 1,
+        "Elite": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Excrete Creep",
+          "text": "Set a Creep Tumor token on the battlefield Within 6\" (Line of Sight is not required) of either a Friendly Entry Edge or an existing Friendly Creep Tumor token."
+        },
+        {
+          "name": "Ventral Sacs",
+          "text": "Set a Faction Indicator anywhere on the battlefield more than 10\" away from any Enemy model. At the End of the Round, the controlling player may Deploy one Ground Unit from Reserves in base-to-base contact with this Faction Indicator."
+        }
+      ]
+    },
+    {
+      "id": "overseer",
+      "name": "Overseer",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 25,
+      "resource": 1,
+      "slots": {
+        "Support": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Pneumatized Carapace",
+          "text": "Use after a Friendly Unit rolls a D6 for Charge Distance. Roll an additional D6 and use the higher result to calculate the total Charge Distance."
+        },
+        {
+          "name": "Oversight Mode",
+          "text": "Set a Faction Indicator anywhere on the battlefield. While Enemy Units are Within 6\" of this Faction Indicator, they lose HIDDEN Status."
+        }
+      ]
+    },
+    {
+      "id": "roach_warren",
+      "name": "Roach Warren",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 25,
+      "resource": 1,
+      "slots": {
+        "Core": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Nasty Surprise",
+          "text": "The active Ground Unit loses the Burrowed Status."
+        }
+      ]
+    },
+    {
+      "id": "spawning_pool",
+      "name": "Spawning Pool",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 25,
+      "resource": 1,
+      "slots": {
+        "Core": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Feral Rage",
+          "text": "The active Unit’s first Close Combat Weapon used gains PRECISION (2)."
+        }
+      ]
+    },
+    {
+      "id": "spawning_pool__six_pool_",
+      "name": "Spawning Pool (Six Pool)",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 40,
+      "resource": 2,
+      "slots": {
+        "Core": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Feral Rage",
+          "text": "The active Unit’s first Close Combat Weapon used gains PRECISION (2)."
+        },
+        {
+          "name": "Timing Push",
+          "text": "The active Zergling Unit Deploys from any table edge that is not a Player’s Entry Edge. This action must end more than 10\" away from any Enemy model."
+        }
+      ]
+    },
+    {
+      "id": "zerg_swarm",
+      "name": "Zerg Swarm",
+      "faction": "Zerg",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Core": 3,
+        "Elite": 1,
+        "Support": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Rapid Burrowing",
+          "text": "Select one Friendly, Unengaged Ground Zerg Unit on the battlefield. That Unit gains the Burrowed Status, even if it has already been Activated this Round."
+        },
+        {
+          "name": "Brood Instinct",
+          "text": "Use before a Friendly Unit makes an Evade Roll. Apply a +1 Modifier to that roll."
+        },
+        {
+          "name": "Zerg Creep",
+          "text": "During Army Building, select exactly one Creep Card and add it to their Army List, paying its listed cost (if any)."
+        }
+      ]
+    }
+  ]
+}
