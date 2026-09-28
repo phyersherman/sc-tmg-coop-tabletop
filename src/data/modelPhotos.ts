@@ -12,3 +12,7 @@ const WITH_PHOTO = new Set([
 export function modelPhoto(defId: string): string | null {
   return WITH_PHOTO.has(defId) ? `${import.meta.env.BASE_URL}models/${defId}.webp` : null;
 }
+
+/** A race's face when no one Unit stands for the army: its hero. */
+const HERO: Record<string, string> = { Terran: 'jim_raynor', Zerg: 'kerrigan', Protoss: 'artanis' };
+export const factionPhoto = (faction: string): string | null => (HERO[faction] ? modelPhoto(HERO[faction]!) : null);

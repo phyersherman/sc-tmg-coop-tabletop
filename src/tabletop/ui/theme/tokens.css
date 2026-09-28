@@ -200,6 +200,8 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .hud-tip b { display: flex; justify-content: space-between; gap: 10px; font-family: var(--font-head); font-size: 12px; color: var(--cyan); }
 .hud-tip-meta { color: var(--warn); font-size: 12px; margin: 2px 0 4px; }
 .hud-tip-body { line-height: 1.35; }
+.army-photo { flex: none; overflow: hidden; border: 1px solid var(--line-2); background: #05060f; }
+.army-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; display: block; }
 .hud-icon-fallback { border: 1px solid var(--line-2); background: rgba(95, 211, 245, 0.08); color: var(--text); font-family: var(--font-head); font-size: 10px; letter-spacing: 0.04em; flex: none; display: flex; align-items: center; justify-content: center; }
 .toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 8px 14px; background: rgba(14, 19, 28, 0.97); border: 1px solid var(--red-edge); color: var(--text); font-size: 14px; z-index: 60; }
 .toast.info { border-color: var(--cyan); bottom: auto; top: 14px; }
@@ -430,6 +432,8 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .ct-portrait { width: 84px; height: 76px; overflow: hidden; border: 1px solid var(--line-2); background: #05060f; }
 .ct-portrait.ct-emblem { display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.35); }
 .ct-portrait.ct-emblem img { width: 60%; height: auto; }
+.ct-portrait.ct-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; display: block; }
+.ct-side.ai .ct-portrait.ct-photo { border-color: rgba(226, 59, 59, 0.6); } .ct-side.you .ct-portrait.ct-photo { border-color: rgba(96, 165, 250, 0.6); }
 .ct-side-name { display: flex; flex-direction: column; line-height: 1.15; font-size: 12px; }
 .ct-side-name b { font-family: var(--font-head); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
 .ct-role { font-family: var(--font-head); font-size: 11px; letter-spacing: 0.12em; color: var(--blue-side); }
@@ -636,6 +640,9 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .eb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); grid-auto-flow: row dense; gap: 16px; align-items: start; }
 /* Rank is depth: the acting card is lifted and lit; the rest sit one step back and still. */
 .eb-tile { display: flex; flex-direction: column; opacity: 0.78; transition: opacity 0.2s, transform 0.2s, border-color 0.2s, box-shadow 0.2s; }
+/* Under the pointer a card comes up to full strength and takes the cyan edge: this is the one a click opens. */
+.eb-tile:hover, .eb-tile:focus-within { opacity: 1; border-color: rgba(95, 211, 245, 0.6); }
+.eb-tile:hover .eb-tile-top { background: rgba(95, 211, 245, 0.05); }
 .eb-tile.active { opacity: 1; transform: translateY(-6px); border-color: rgba(226, 59, 59, 0.75); box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55); }
 .eb-tile.last { opacity: 1; border-color: rgba(226, 59, 59, 0.55); }
 .eb-tile.selected { opacity: 1; --bracket: var(--cyan); border-color: rgba(95, 211, 245, 0.6); }

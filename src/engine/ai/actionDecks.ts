@@ -110,7 +110,7 @@ const AI_USE: Record<string, string> = {
   'Crushing Grip': 'Target: the enemy unit within 12" with the highest Supply that has not activated.',
   'Mutating Carapace': 'Target: the enemy unit within 18" with the most ranged dice.',
   'Domineering Presence': 'On the friendly unit nearest to a Mission Marker.',
-  'Corrosive Bile': 'On the enemy models nearest to it, one token per model.',
+  'Corrosive Bile': 'One token for each of its models, each Within 14" of that model: on the enemy model nearest to it, or, when that one already has a token, the next nearest. With no enemy model Within 14", set it on the nearest Mission Marker the players hold Within 14"; with none, it is not set.',
   'Deep Tunnel': 'Burrow token: 12" toward its objective.',
   'Spawn Creep Tumor': 'Beside the unit, toward its objective.',
   'Burrow': 'Burrows. A unit already Burrowed surfaces instead.',

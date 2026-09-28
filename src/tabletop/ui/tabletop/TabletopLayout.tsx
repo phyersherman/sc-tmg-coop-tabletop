@@ -443,7 +443,7 @@ function HitsBattle({ g, dispatch }: { g: GameState; dispatch: (c: Command) => v
           </div>
         </div>
       </div>
-      <Side name={u.label} role="AI" faction={aiFaction} right />
+      <Side name={u.label} role="AI" faction={aiFaction} defId={u.defId} right />
       <div className="ct-command">
         {settled ? (
           <>

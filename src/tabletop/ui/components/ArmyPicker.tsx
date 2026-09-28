@@ -11,10 +11,14 @@ import type { RecentArmy } from '@tt/store/settingsStore';
 import { Btn, Stepper } from './Basics';
 import { UnitSheet } from './UnitCard';
 import { configCost, configLabel, type UnitConfig } from './UnitBuilder';
+import { modelPhoto } from '@data/modelPhotos';
 
 /** The buildings each faction trains its units from, as the game's command card lays them out. */
 /** A unit, card or building shown by its initials ("SIE" for a Siege Tank, "RF" for a two-word card). */
 function Icon({ name, size = 40 }: { name: string; size?: number }) {
+  // A Unit is shown by its painted model from the official card.
+  const photo = name.startsWith('u_') ? modelPhoto(name.slice(2)) : null;
+  if (photo) return <span className="army-photo" style={{ width: size, height: size }}><img src={photo} alt="" loading="lazy" draggable={false} /></span>;
   const words = name.replace(/^[a-z]_/, '').split(/[_\W]+/).filter(Boolean);
   const initials = (words.length > 1 ? words.map((w) => w[0]).join('') : words[0] ?? name).slice(0, 3).toUpperCase();
   return <span className="hud-icon-fallback" style={{ width: size, height: size }}>{initials}</span>;

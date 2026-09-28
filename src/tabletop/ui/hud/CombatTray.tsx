@@ -9,6 +9,7 @@ import { Stepper } from '../components/Basics';
 import { DieFace, DieTumble } from '../components/DiceRoll';
 import { buildPools, chargeAckId, commandFor, facesFromCount, planAttack, planCharge, resultItem, saveOptions, type CombatItem, type Pool, type PoolId } from './combatPools';
 import { StepIcon } from '../tabletop/StepIcon';
+import { factionPhoto, modelPhoto } from '@data/modelPhotos';
 
 /** Whether the tray is open and what its main button does, so the command card can mirror it. */
 /** The fight in words, for the turn line while the tray is open: who hits whom, and what it waits on now. */
@@ -308,7 +309,7 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
   const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   return (
     <div className={`combat-tray side-${cur.side} ${className}`} style={style} role="region" aria-label="Combat">
-      <Side name={cur.meta.attacker} role={cur.side === 'ai' ? 'AI' : 'YOU'} faction={cur.meta.attackerFaction} talkKey={cur.key} weapon={cur.meta.weapon} />
+      <Side name={cur.meta.attacker} role={cur.side === 'ai' ? 'AI' : 'YOU'} faction={cur.meta.attackerFaction} talkKey={cur.key} weapon={cur.meta.weapon} defId={defOf(g, cur.side === 'ai' ? 'ai' : 'players', cur.attackerId)} />
       <div className="ct-pools">
         {pools.map((p, i) => {
           const state = i < cursor ? 'done' : i === cursor ? (p.faces === null ? 'waiting' : 'active') : 'hidden';
@@ -334,7 +335,7 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
           );
         })}
       </div>
-      <Side name={cur.meta.defender} role={cur.side === 'ai' ? 'YOU' : 'AI'} faction={cur.meta.defenderFaction} talkKey="" right />
+      <Side name={cur.meta.defender} role={cur.side === 'ai' ? 'YOU' : 'AI'} faction={cur.meta.defenderFaction} talkKey="" right defId={defOf(g, cur.side === 'ai' ? 'players' : 'ai', cur.defenderId)} />
       <div className="ct-command">
         {enter && pool ? (
           <div className="ct-entry">
@@ -374,10 +375,21 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
   );
 }
 
-export function Side({ name, role, faction, weapon, right = false }: { name: string; role: string; faction: Faction; talkKey?: string; weapon?: string; right?: boolean }) {
+/**
+ * One side of a roll: the painted model of the Unit (from its official card), or, for your side when the Unit is
+ * not named, your army's hero; the race's die only when there is neither.
+ */
+/** The unit definition behind a side's unit id, when the app knows the Unit. */
+const defOf = (g: GameState, side: 'ai' | 'players', id: string): string | null =>
+  (side === 'ai' ? g.army.units.find((u) => u.id === id)?.defId : g.playerUnits.find((p) => p.id === id)?.defId) ?? null;
+
+export function Side({ name, role, faction, weapon, defId = null, right = false }: { name: string; role: string; faction: Faction; talkKey?: string; weapon?: string; /** The Unit whose model stands for this side. */ defId?: string | null; right?: boolean }) {
+  const photo = (defId ? modelPhoto(defId) : null) ?? (role === 'YOU' ? factionPhoto(faction) : null);
   return (
     <div className={`ct-side ${right ? 'right' : ''} ${role === 'AI' ? 'ai' : 'you'}`}>
-      <div className="ct-portrait ct-emblem" aria-hidden="true"><DieFace faction={faction} value={6} /></div>
+      {photo
+        ? <div className="ct-portrait ct-photo" aria-hidden="true"><img src={photo} alt="" draggable={false} /></div>
+        : <div className="ct-portrait ct-emblem" aria-hidden="true"><DieFace faction={faction} value={6} /></div>}
       <div className="ct-side-name">
         <span className="ct-role">{role}</span>
         <b>{name}</b>

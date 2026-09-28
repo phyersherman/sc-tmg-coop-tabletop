@@ -48,7 +48,8 @@ export function stepText(g: GameState, card: ActionCard, s: CardStep, u?: AiUnit
       const extra = [s.twoDice ? 'roll 2D6, keep the higher' : '', s.bonus ? `+${s.bonus}"` : ''].filter(Boolean).join(', ');
       return { title: `Charge ${FOCUS[s.focus ?? 'nearest']}${extra ? ` (${extra})` : ''}`, detail: `${s.orFire ? 'Out of reach: fire instead. ' : ''}Nothing to charge: ${s.otherwise === 'run' ? 'run toward its objective' : 'hold'}.` };
     }
-    case 'ability': return { title: s.name, detail: `${s.text}${s.use ? ` AI: ${s.use}` : ''}` };
+    // Tokens set one per model say how many, so the table counts them out before reading the rest.
+    case 'ability': return { title: s.name === 'Corrosive Bile' && u ? `Corrosive Bile: set ${u.models} token${u.models === 1 ? '' : 's'}` : s.name, detail: `${s.text}${s.use ? ` AI: ${s.use}` : ''}` };
   }
 }
 
