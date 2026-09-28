@@ -37,7 +37,7 @@ export const missionStructureFor = (faction: Faction): UnitDef => MISSION_STRUCT
 const TRAIN_TEXT = 'This Unit runs the line: it moves straight toward the far table edge in the Movement and Assault phases and leaves the table when it reaches it. It has no weapons and never attacks, but it can be Engaged, Charged and destroyed as normal.';
 
 /**
- * Oblivion Express's armoured trains (the players' decision, 2026-09-27: one unit of its own, 18 HP, Armour 6+):
+ * Oblivion Express's armoured trains (the players' decision, 2026-09-27: one unit of its own, 18 HP, Armour 5+):
  * a big, slow-to-kill target that only runs the line. The same for every race; one per race so its dice and
  * colours are the AI's own.
  */
@@ -49,7 +49,7 @@ export const MISSION_TRAINS: UnitDef[] = (['Terran', 'Zerg', 'Protoss'] as Facti
   tags: ['Armoured', 'Mechanical', 'Ground'],
   unique: false,
   summoned: true,
-  stats: { speed: [6, 6], armour: 6, hp: 18, size: 3 },
+  stats: { speed: [6, 6], armour: 5, hp: 18, size: 3 },
   compositions: [{ label: 'small', models: 1, cost: 0, supply: 0 }],
   squadProfile: [{ min: 1, max: 1, supply: 0 }],
   weapons: [],

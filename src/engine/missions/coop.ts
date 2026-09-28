@@ -99,7 +99,7 @@ export const oblivionExpress = withSideMarkers(coopMode({
   ],
   onSetup: (c) => {
     const s = c.state;
-    // An armoured train of its own (18 HP, Armour 6+), never a copy of whatever the AI's priciest unit is.
+    // An armoured train of its own (18 HP, Armour 5+), never a copy of whatever the AI's priciest unit is.
     const defId = missionTrainFor(s.army.faction).id;
     for (let i = 1; i <= 3; i++) {
       const u = addSpecialUnit(s, defId, `Train ${i}`, { train: true, noRespawn: true, fixedObjective: true, trainRound: [1, 3, 5][i - 1] });

@@ -769,10 +769,12 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
    the order on the left, the enemy on the right. */
 .tt-stage { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .tt-stage:not(:has(> .tt-last, > .tt-tray, > .combat-tray, .tt-now > *)) { display: none; }
-.tt-stage .tt-tray { position: static; width: auto; }
-.tt-stage .combat-tray { flex-wrap: wrap; justify-content: space-between; margin: 0; animation: tt-in 0.2s ease-out; }
-.tt-stage .combat-tray .ct-pools { order: 3; flex-basis: 100%; flex-wrap: wrap; justify-content: center; }
-.tt-stage .combat-tray .ct-command { order: 4; flex-basis: 100%; flex-direction: row; justify-content: flex-end; align-items: center; }
+/* A dice tray inside the page, on the stage (the AI's attacks) or in the operator's panel (your hits on an AI
+   Unit): the two sides face each other, the dice run beneath them, then the button. */
+.tt-stage .tt-tray, .tt-panel .tt-tray { position: static; width: auto; }
+.tt-stage .combat-tray, .tt-panel .combat-tray { flex-wrap: wrap; justify-content: space-between; margin: 0; animation: tt-in 0.2s ease-out; }
+.tt-stage .combat-tray .ct-pools, .tt-panel .combat-tray .ct-pools { order: 3; flex-basis: 100%; flex-wrap: wrap; justify-content: center; }
+.tt-stage .combat-tray .ct-command, .tt-panel .combat-tray .ct-command { order: 4; flex-basis: 100%; flex-direction: row; justify-content: flex-end; align-items: center; }
 .tt-now { display: flex; flex-direction: column; gap: 14px; }
 .tt-now:empty { display: none; }
 .tt-card { background: var(--panel); border: 1px solid var(--line-2); padding: 14px 16px; }

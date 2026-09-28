@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Rng, hashSeed } from '@engine/rng';
 import type { Faction } from '@engine/types/units';
 
 const FACTION_KEY: Record<Faction, string> = { Terran: 'terran', Zerg: 'zerg', Protoss: 'protoss' };
@@ -71,10 +72,11 @@ export function DiceRoll({ faction, rolls, need, surge, size = 44 }: { faction: 
 
 /**
  * The AI's charge distance, rolled by the app as it rolls the AI's attack dice: the die (the higher of two when the
- * AI rolls 2D6), then how far that takes the charge. Rolled once, when the order comes up.
+ * AI rolls 2D6), then how far that takes the charge. The roll comes from `seed` (the game, the round, the phase and
+ * the Unit), so it stays the same however often the order is drawn again, a reload included.
  */
-export function ChargeRoll({ faction, dice, speed, bonus = 0 }: { faction: Faction; dice: '1d6' | '2d6high'; speed: number; bonus?: number }) {
-  const [rolls] = useState(() => Array.from({ length: dice === '2d6high' ? 2 : 1 }, () => 1 + Math.floor(Math.random() * 6)));
+export function ChargeRoll({ faction, dice, speed, bonus = 0, seed }: { faction: Faction; dice: '1d6' | '2d6high'; speed: number; bonus?: number; seed: string }) {
+  const rolls = useMemo(() => { const rng = Rng.from(hashSeed(seed)); return Array.from({ length: dice === '2d6high' ? 2 : 1 }, () => rng.d6()); }, [seed, dice]);
   const roll = Math.max(...rolls);
   const reach = speed + roll + bonus;
   return (

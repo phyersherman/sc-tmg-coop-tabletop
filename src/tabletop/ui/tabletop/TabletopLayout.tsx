@@ -174,7 +174,7 @@ function useStageKeys(undoLast: () => void): void {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoLast(); return; }
-      if (e.key !== ' ' || document.querySelector('.tt-stage .combat-tray')) return;
+      if (e.key !== ' ' || document.querySelector('.combat-tray')) return;
       const primary = document.querySelector<HTMLButtonElement>('.tt-now .tt-primary:not(:disabled)');
       if (!primary) return;
       e.preventDefault();

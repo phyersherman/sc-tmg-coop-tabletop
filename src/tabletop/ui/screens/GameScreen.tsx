@@ -106,7 +106,7 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
           {/* The charge die goes the way the attack dice go: rolled by the app when it rolls the AI's dice, by the table
               otherwise. */}
           {!camLine && order.charge && (showRolls
-            ? <ChargeRoll key={order.unitId} faction={def.faction} dice={order.charge.dice} speed={order.charge.speed} bonus={order.charge.min - 1 - order.charge.speed} />
+            ? <ChargeRoll faction={def.faction} dice={order.charge.dice} speed={order.charge.speed} bonus={order.charge.min - 1 - order.charge.speed} seed={`${g.config.seed}:${g.round}:${g.phase}:${order.unitId}:charge`} />
             : <p className="ask">Roll the AI's charge on the table. {chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>)}
           <div className="row">
             {order.impact ? <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge made, roll IMPACT</Btn> : <Btn variant="primary" size="lg" className="tt-primary" onClick={() => report('charged')}>Charge made</Btn>}

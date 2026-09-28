@@ -20,7 +20,7 @@ describe('game modes', () => {
     const trains = r.state.army.units.filter((u) => u.special?.train);
     expect(trains.length).toBe(3);
     // Its own Armoured Train (18 HP, Armour 6+), never a copy of the AI's priciest unit.
-    for (const t of trains) expect([unitById(t.defId).name, unitById(t.defId).stats.hp, unitById(t.defId).stats.armour, t.models]).toEqual(['Armoured Train', 18, 6, 1]);
+    for (const t of trains) expect([unitById(t.defId).name, unitById(t.defId).stats.hp, unitById(t.defId).stats.armour, t.models]).toEqual(['Armoured Train', 18, 5, 1]);
     expect(r.state.modeState['escaped'] as number + (r.state.modeState['killed'] as number)).toBeGreaterThan(0);
   });
   it('Void Thrashing: thrashers never respawn and the base can fall', () => {
