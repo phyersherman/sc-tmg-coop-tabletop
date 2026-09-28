@@ -89,8 +89,8 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .panel::after, .tt-card::after, .eb-tile::after, .home-deck::after, .tut-page::after, .banner::after { right: -1px; bottom: -1px; border-bottom: 2px solid var(--bracket); border-right: 2px solid var(--bracket); }
 .panel { padding: 16px 18px; margin-bottom: 14px; }
 .panel.accent { border-color: rgba(95, 211, 245, 0.55); }
-.panel .panel-title { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.panel .panel-title h3 { margin: 0; }
+.panel .panel-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 10px; }
+.panel .panel-title h3 { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .panel .panel-title .tag { margin-left: auto; }
 .tt-you { --bracket: var(--blue-side); }
 .tt-enemy, .eb-tile, .cmd-ai, .tt-pass { --bracket: var(--red-edge); }

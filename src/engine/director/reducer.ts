@@ -31,7 +31,7 @@ import { completeSaves, resolveAttack, rollCharge, type AttackParams } from '../
 import { suggestedMarkerControl } from '../sense/query';
 import { missionOutcome } from '../missions/stakes';
 import { useReward } from '../missions/sideMarkers';
-import { adjustModelDisplacing, closeRanksPositions, shapeAt, combatRanks, pathOptionsFor, placeUnit, unitShapes, edgeDistance, contactPointAlong, syncModelPositions, unitGap, ENGAGEMENT_IN, type PlaceOptions, type Shape } from '../sense/placement';
+import { adjustModelDisplacing, closeRanksPositions, shapeAt, combatRanks, pathOptionsFor, placeUnit, standingPieces, unitShapes, edgeDistance, contactPointAlong, syncModelPositions, unitGap, ENGAGEMENT_IN, type PlaceOptions, type Shape } from '../sense/placement';
 import { abilityGap, abilityGapToPoint, aiEvadeReason, aiPos, checkAttack, checkCharge, checkCloseRanks, checkDeploy, checkMove, chargeOptions, playerMoveReach, damageHelpers, playerAvailable, playerPos, playerWeapons } from '../player/rules';
 import { visibleEnemies, engagedWith as aiEngagedWith } from '../sense/query';
 import { availableWeapons, weaponModels } from '../units/weapons';
@@ -1100,8 +1100,8 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       if (!from) return state;
       const bm = playerMoveReach(state, pu, cmd.point, pu.bonusMove);
       if (bm.reach > pu.bonusMove + 0.05) return reject(state, `The free move is only ${pu.bonusMove}". The whole base must end within ${pu.bonusMove}" of where it started.`);
-      if (!passable(cmd.point, state.terrain.pieces)) return reject(state, 'Cannot end on terrain (Size 1 and up).');
-      setPlayerPosition(state, pu, cmd.point, { avoidEngaging: true, facing: bm.facing });
+      if (!passable(cmd.point, standingPieces(state, 'players', pu.id))) return reject(state, 'Cannot end on terrain (Size 1 and up).');
+      setPlayerPosition(state, pu, cmd.point, { avoidEngaging: true, facing: bm.facing, path: bm.path });
       pushLog(state, 'players', `${pu.name} makes a free ${pu.bonusMove}" move.`);
       pu.bonusMove = 0;
       pu.statuses = (pu.statuses ?? []).filter((x) => x !== 'Hidden' && x !== 'Burrowed');
@@ -1120,7 +1120,8 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
         const theirs = pu.engagedWith.reduce((a, id) => { const u = state.army.units.find((x) => x.id === id); return a + (u ? currentSupply(unitById(u.defId), u.models) : 0); }, 0);
         pu.disengagedThisRound = !(mine > theirs);
       }
-      setPlayerPosition(state, pu, cmd.point, { avoidEngaging: true, facing: playerMoveReach(state, pu, cmd.point, effectiveSpeed(pu)).facing });
+      const reach = playerMoveReach(state, pu, cmd.point, effectiveSpeed(pu));
+      setPlayerPosition(state, pu, cmd.point, { avoidEngaging: true, facing: reach.facing, path: reach.path });
       pushLog(state, 'players', `${pu.name} ${cmd.kind === 'run' ? 'runs' : cmd.kind === 'disengage' ? 'disengages' : 'moves'}.`);
       finishPlayerAction(state, mode, pu, state.phase === 'assault' ? 'assault' : 'movement', cmd.kind);
       return state;

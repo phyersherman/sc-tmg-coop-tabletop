@@ -4,6 +4,7 @@
  * Rules 4.4: after any repositioning, models are set Wholly Within 3" of the Leading Model.
  */
 import type { GameState } from '../types/game';
+import type { TerrainPiece } from '../types/terrain';
 import type { Pt, PlayerUnit } from './types';
 import type { AiUnitInstance } from '../types/army';
 import { unitById } from '@data/index';
@@ -135,16 +136,27 @@ export function unitGap(state: GameState, sideA: Side, idA: string, sideB: Side,
 /** How far a base reaches from its centre in any direction. */
 const extent = (s: Shape) => s.r + s.half;
 
-function clearOfTerrain(state: GameState, s: Shape): boolean {
+/** How a Unit's base meets terrain: what it crushes, and how much of the base terrain has to clear. */
+interface TerrainFit { crusher: boolean; /** Half the gap the Unit passes: a base wider than that clips walls, as the rules let it through. */ r: number }
+const terrainFit = (state: GameState, side: Side, id: string): TerrainFit => ({ crusher: crushesTerrain(state, side, id), r: passableGapFor(state, side, id) / 2 });
+
+/**
+ * A base clear of impassable terrain. The rules let a Unit through any gap its Size (or Large) allows, so a base
+ * wider than that gap is measured as if it were that wide: a Siege Tank on a 150mm base sits in a 3" gap.
+ */
+function clearOfTerrain(state: GameState, s: Shape, fit: TerrainFit = { crusher: false, r: s.r }): boolean {
   const [p1, p2] = segment(s);
+  const r = Math.min(s.r, fit.r);
   for (const t of state.terrain.pieces) {
+    // Large (Siege Tank): it may end on Size 0 or 1 terrain, which is then removed (see `crushTerrain`).
+    if (fit.crusher && crushable(t)) continue;
     // A base never sits across the edge of high ground (only on its ramp or wholly on or off it).
     if (isHighGround(t)) {
-      if (rampBlocks({ x: s.x, y: s.y }, t, s.r - 0.02) || rampBlocks(p1, t, s.r - 0.02) || rampBlocks(p2, t, s.r - 0.02)) return false;
+      if (rampBlocks({ x: s.x, y: s.y }, t, r - 0.02) || rampBlocks(p1, t, r - 0.02) || rampBlocks(p2, t, r - 0.02)) return false;
       continue;
     }
     if (!blocksStanding(t)) continue;
-    if (distToPiece(p1, t) < s.r - 0.02 || distToPiece(p2, t) < s.r - 0.02 || distToPiece({ x: s.x, y: s.y }, t) < s.r - 0.02) return false;
+    if (distToPiece(p1, t) < r - 0.02 || distToPiece(p2, t) < r - 0.02 || distToPiece({ x: s.x, y: s.y }, t) < r - 0.02) return false;
   }
   return true;
 }
@@ -171,7 +183,7 @@ export function otherBases(state: GameState, side: Side, id: string): { side: Si
 
 /** Whether a single base could stand here: on the table, clear of terrain and not overlapping any other base. */
 export function baseFits(state: GameState, side: Side, id: string, s: Shape, extra: Shape[] = []): boolean {
-  if (!onTable(state, s) || !clearOfTerrain(state, s)) return false;
+  if (!onTable(state, s) || !clearOfTerrain(state, s, terrainFit(state, side, id))) return false;
   for (const o of otherBases(state, side, id)) if (edgeDistance(s, o.shape) < -0.01) return false;
   for (const o of extra) if (edgeDistance(s, o) < -0.01) return false;
   return true;
@@ -188,6 +200,8 @@ export interface PlaceOptions {
   avoidEngaging?: boolean;
   /** How many models to set (defaults to the unit's model count). */
   count?: number;
+  /** The Leading Model's path here: a Large Unit removes the small terrain it drove through. */
+  path?: Pt[];
 }
 
 /**
@@ -360,6 +374,11 @@ export function placeUnit(state: GameState, side: Side, id: string, leader: Pt, 
     if (u) u.est = { x: pts[0]!.x, y: pts[0]!.y };
   } else snap.players[id] = pts;
   displaceTokens(state, side, id, pts[0]!);
+  const crushed = crushTerrain(state, side, id, opts.path);
+  if (crushed.length) {
+    const name = side === 'ai' ? state.army.units.find((u) => u.id === id)?.label : state.playerUnits.find((p) => p.id === id)?.name;
+    state.log.push({ round: state.round, phase: state.phase, side, text: `${name ?? 'The Unit'} crushes ${crushed.join(', ')}: removed from the game.` });
+  }
   return pts;
 }
 
@@ -422,7 +441,7 @@ function adjustContext(state: GameState, side: Side, id: string, shapes: Shape[]
   const engagedBefore = unit?.engaged
     ? new Set(enemies.filter((e) => shapes.some((m) => edgeDistance(m, e.shape) <= ENGAGEMENT_IN)).map((e) => e.id))
     : new Set<string>();
-  return { others, enemies, coh: coherencyOf(defId), engaged: !!unit?.engaged, engagedBefore };
+  return { others, enemies, coh: coherencyOf(defId), engaged: !!unit?.engaged, engagedBefore, fit: terrainFit(state, side, id) };
 }
 
 /**
@@ -433,7 +452,7 @@ function spotProblem(state: GameState, ctx: ReturnType<typeof adjustContext>, in
   const lead = squad[0]!;
   if (whollyWithinGap(moved, lead) > ctx.coh + 0.01) return `Models must stay Wholly Within ${ctx.coh}" of the Leading Model.`;
   if (!onTable(state, moved)) return 'Stay on the table.';
-  if (!clearOfTerrain(state, moved)) return 'The base would overlap impassable terrain.';
+  if (!clearOfTerrain(state, moved, ctx.fit)) return 'The base would overlap impassable terrain.';
   if (ctx.others.some((o) => edgeDistance(moved, o.shape) < -0.01)) return 'Bases cannot overlap.';
   for (let i = 0; i < squad.length; i++) {
     if (i === index || edgeDistance(moved, squad[i]!) >= -0.01) continue;
@@ -496,7 +515,42 @@ export function adjustModelDisplacing(state: GameState, side: Side, id: string, 
 export function passableGapFor(state: GameState, side: Side, id: string): number {
   const unit = side === 'ai' ? state.army.units.find((u) => u.id === id) : state.playerUnits.find((p) => p.id === id);
   const size = unit ? (side === 'ai' ? aiUnitSize(unit as AiUnitInstance) : playerUnitSize(unit as PlayerUnit)) : 1;
-  return size >= 3 ? 3 : 1;
+  // Large: it cannot pass through gaps narrower than 3", whatever its Size.
+  return size >= 3 || crushesTerrain(state, side, id) ? 3 : 1;
+}
+
+/** Large (Siege Tank): the Unit ends on, and removes, Size 0 or Size 1 Impassible Terrain. */
+export function crushesTerrain(state: GameState, side: Side, id: string): boolean {
+  const defId = defIdOf(state, side, id);
+  return !!defId && unitById(defId).abilities.some((a) => a.name === 'Large');
+}
+
+/** A piece the Large rule removes: Size 0 or 1 Impassible Terrain, not a token, not grass. */
+const crushable = (t: TerrainPiece) => blocksStanding(t) && t.size <= 1 && !t.catalogId.startsWith('token:');
+
+/** The terrain a Unit may not end its move on: for a Large Unit, the Size 0 and 1 pieces are not among it. */
+export function standingPieces(state: GameState, side: Side, id: string): TerrainPiece[] {
+  return crushesTerrain(state, side, id) ? state.terrain.pieces.filter((t) => !crushable(t)) : state.terrain.pieces;
+}
+
+/**
+ * Large: every Size 0 or 1 Impassible Terrain piece the Leading Model's path passed through, or any model of the
+ * Unit ends on, is removed from the game. Returns the labels of the pieces removed.
+ */
+export function crushTerrain(state: GameState, side: Side, id: string, path: Pt[] = []): string[] {
+  if (!crushesTerrain(state, side, id)) return [];
+  const models = unitShapes(state, side, id);
+  const r = models[0]?.r ?? 0.5;
+  const walked: Pt[] = [];
+  for (let i = 0; i + 1 < path.length; i++) {
+    const a = path[i]!, b = path[i + 1]!;
+    const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 0.25));
+    for (let k = 0; k <= steps; k++) walked.push({ x: a.x + (b.x - a.x) * (k / steps), y: a.y + (b.y - a.y) * (k / steps) });
+  }
+  const gone = state.terrain.pieces.filter((t) => crushable(t) && (models.some((m) => distToPiece(m, t) < m.r - 0.02) || walked.some((p) => distToPiece(p, t) < r - 0.02)));
+  if (!gone.length) return [];
+  state.terrain.pieces = state.terrain.pieces.filter((t) => !gone.includes(t));
+  return gone.map((t) => t.label);
 }
 
 export function pathOptionsFor(state: GameState, side: Side, id: string): PathOptions {

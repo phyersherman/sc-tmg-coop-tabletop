@@ -1669,7 +1669,11 @@
           ],
           "text": "RANGE: 12 | TARGET: All | RoA: 6 | HIT: 3+ | DMG: 1\nSURGE: Light (D3+1)\n\nBURST FIRE 8\" (3)",
           "surgeDie": "D3+1",
-          "replaces": "Commando Rifle"
+          "replaces": "Commando Rifle",
+          "upgradeCost": {
+            "small": 0,
+            "large": 0
+          }
         },
         {
           "id": "jim_raynor:justice-revolver:5",

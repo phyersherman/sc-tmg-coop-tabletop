@@ -21,8 +21,11 @@ import { makeInstance } from '@engine/army/builder';
 import { physicalModelId } from '@engine/army/collection';
 import { mapsFor, piecesNeeded } from '@data/terrainMaps';
 import { mapLayout, remixId } from '@engine/terrain/remix';
+import { host, type TableHow } from '@tt/host';
+import { TableHowChoice } from '../components/TableHowChoice';
 
 const STEPS = ['Mission', 'Battle', 'Your army', 'AI army', 'Table', 'Launch'];
+const HOW_NAME: Record<TableHow, string> = { aiOnly: 'tabletop, AI only', map: 'tabletop, map', camera: 'tabletop, camera', simulation: 'simulation' };
 
 export function SetupScreen() {
   const settings = useSettings();
@@ -30,6 +33,11 @@ export function SetupScreen() {
   const go = useUi((s) => s.go);
   const setBriefingSeen = useUi((s) => s.setBriefingSeen);
   const [step, setStep] = useState(0);
+  // How the app follows the table. On its own this edition plays AI only; the full app offers a map, the camera
+  // and a battle on screen.
+  const sim = host.simulation;
+  const [how, setHow] = useState<TableHow>(() => sim?.defaultHow() ?? 'aiOnly');
+  const playMode = how === 'simulation' ? 'video' : 'tabletop';
   // A new battle starts from the mission you last played.
   const lastMode = useGame((s) => s.game?.config.modeId);
   const [modeId, setModeId] = useState(() => (lastMode && MODES.some((m) => m.id === lastMode) ? lastMode : 'frontlines'));
@@ -62,7 +70,7 @@ export function SetupScreen() {
   const issues = army ? validateArmy(army, UNITS, CARDS) : [];
   // What the collection could not field, in minerals: with a real shortfall the AI is offered another way in.
   const shortfall = army ? Math.max(0, budget - army.spent) : 0;
-  const outmatched = !!modelLimit('ai') && shortfall >= Math.max(100, budget * 0.1);
+  const outmatched = !!modelLimit('ai', playMode) && shortfall >= Math.max(100, budget * 0.1);
   const mutatorPoints = mutators.reduce((a, id) => a + (MUTATORS.find((m) => m.id === id)?.cost ?? 0), 0);
 
   const setScaleAnd = (s: Scale) => {
@@ -78,7 +86,7 @@ export function SetupScreen() {
     const opponents = theirs.map((u) => ({ defId: u.defId, models: u.maxModels }));
     const reserved: Record<string, number> = {};
     for (const u of theirs) reserved[u.defId] = (reserved[u.defId] ?? 0) + u.maxModels;
-    const a = buildAiArmy({ faction: f, factions: ['Terran', 'Zerg', 'Protoss'], budget, ownership: availableModels('ai'), heroAllowed: diff.heroAllowed, seed, units: UNITS, cards: CARDS, opponents, reserved });
+    const a = buildAiArmy({ faction: f, factions: ['Terran', 'Zerg', 'Protoss'], budget, ownership: availableModels('ai', playMode), heroAllowed: diff.heroAllowed, seed, units: UNITS, cards: CARDS, opponents, reserved });
     setArmy(a);
   };
   // Coming to the AI's army: a hidden army is built at once, from any race's unused models.
@@ -114,7 +122,7 @@ export function SetupScreen() {
   // Unit types the AI could still field once the players' own models are taken off the shelf.
   const taken: Record<string, number> = {};
   for (const f of inPlay) for (const u of f.value.units) taken[physicalModelId(u.defId)] = (taken[physicalModelId(u.defId)] ?? 0) + u.maxModels;
-  const unusedCount = UNITS.filter((u) => !u.summoned && (availableModels('ai')[u.id] ?? 0) - (taken[physicalModelId(u.id)] ?? 0) > 0).length;
+  const unusedCount = UNITS.filter((u) => !u.summoned && (availableModels('ai', playMode)[u.id] ?? 0) - (taken[physicalModelId(u.id)] ?? 0) > 0).length;
   const me = inPlay[whose]!;
   // Functional updates: a race change and an army change can land in the same tick, and each must see the other.
   const setMine = (value: ArmyValue) => setForces((cur) => cur.map((f, i) => (i === whose ? { ...f, byRace: { ...f.byRace, [f.faction]: value } } : f)));
@@ -131,11 +139,12 @@ export function SetupScreen() {
   const launch = () => {
     if (!army) return;
     const config: GameConfig = {
-      playMode: 'tabletop',
+      playMode,
+      camera: how === 'camera',
       modeId, difficulty, players, playerMinerals: minerals, scale, aiFaction: army.faction,
       mutators: difficulty === 'brutalPlus' ? mutators : [],
       deploymentId: deployment.id, terrainSeed, terrainMapId: mapId, seed: hashSeed(`${Date.now()}-${armySeed}`), army,
-      options: { actionDecks: true, noMap: true, hideAiRoster: true, appRollsAiDice: settings.appRollsAiDice, assistedSaves: settings.assistedSaves, playerHasFlying, manualSaves: true, aiDropsAnywhere: outmatched && dropAnywhere },
+      options: { actionDecks: true, noMap: how === 'aiOnly' || !sim, hideAiRoster: true, appRollsAiDice: settings.appRollsAiDice, assistedSaves: settings.assistedSaves, playerHasFlying, manualSaves: true, aiDropsAnywhere: outmatched && dropAnywhere },
       playerUnits: inPlay.flatMap((f, i) => f.value.units.map((u) => ({ ...u, owner: i, models: u.maxModels, damageMarker: 0, shieldsLeft: unitById(u.defId).stats.shields ?? 0, destroyed: false }))),
       playerCards: inPlay.flatMap((f, i) => f.value.cards.map((defId) => ({ defId, owner: i }))),
     };
@@ -144,9 +153,10 @@ export function SetupScreen() {
       if (f.value.units.length) settings.pushRecentArmy({ name: f.value.name ?? '', faction: f.faction, scale, cost: costOf(f.value), units: f.value.units, cards: f.value.cards });
     }
     settings.setMyArmy(inPlay[0]!.value.units);
+    const next = sim?.onLaunch(config, how) ?? 'game';
     start(config);
     setBriefingSeen(false);
-    go('game');
+    (go as (screen: string) => void)(next);
   };
 
   const canNext = step !== 3 || (army && issues.every((i) => i.level !== 'error'));
@@ -155,7 +165,7 @@ export function SetupScreen() {
   const planValue = (i: number): string => {
     if (i > step) return '';
     switch (i) {
-      case 0: return mode.name;
+      case 0: return sim ? `${mode.name} · ${HOW_NAME[how]}` : mode.name;
       case 1: return `${scale} · ${diff.name}${players > 1 ? ` · ${players} players` : ''} · ${minerals} minerals`;
       case 3: return army ? `hidden · ${army.spent} minerals` : 'not built';
       case 2: return inPlay.map((f, k) => `${players > 1 ? `P${k + 1} ` : ''}${f.faction} ${costOf(f.value)}`).join(' · ');
@@ -179,6 +189,12 @@ export function SetupScreen() {
 
       {step === 0 && (
         <div>
+          {sim && (
+            <>
+              <h2>How you play</h2>
+              <TableHowChoice value={how} onChange={(h) => { if (h !== how) setArmy(null); setHow(h); }} />
+            </>
+          )}
           <h2>Choose a mission</h2>
           <h3>Co-op missions</h3>
           <div className="grid grid-3">
@@ -299,7 +315,7 @@ export function SetupScreen() {
               ))}
             </div>
             <p className="small muted">{map.name}.</p>
-            <p className="small">Needs: {piecesNeeded(map).map((p) => `${p.count}× ${p.label}`).join(', ')}.</p>
+            {playMode === 'tabletop' && <p className="small">Needs: {piecesNeeded(map).map((p) => `${p.count}× ${p.label}`).join(', ')}.</p>}
           </Panel>
           <Panel title="Table preview">
             <TableMap deployment={deployment} terrain={terrain} aiFaction={faction} />
@@ -316,7 +332,8 @@ export function SetupScreen() {
           <p>{diff.name}, {players} player{players > 1 ? 's' : ''}{players > 1 ? ` (${inPlay.map((f, i) => `P${i + 1} ${f.faction} ${costOf(f.value)}`).join(', ')})` : ''}, {minerals} minerals each vs a hidden AI army of {army?.spent} minerals. {deployment.name}, {map.name}{map.page ? ` (rulebook p. ${map.page})` : ''}.</p>
           {difficulty === 'brutalPlus' && <p>Mutators: {mutators.map((id) => MUTATORS.find((m) => m.id === id)?.name).join(', ')}</p>}
           {outmatched && dropAnywhere && <p>The AI is {shortfall} minerals short of models. Destroyed Units return to make it up, and its Units may be set down anywhere more than 6" from yours.</p>}
-          {<p className="small muted">AI dice: {settings.appRollsAiDice ? 'rolled by the app' : 'rolled on the table'} (change in Settings).</p>}
+          {sim && <p className="small">Playing as: <b>{HOW_NAME[how]}</b>{how === 'camera' ? '. Next, put a tag on each Unit and check that the camera sees the table.' : ''}</p>}
+          {playMode === 'tabletop' && <p className="small muted">AI dice: {settings.appRollsAiDice ? 'rolled by the app' : 'rolled on the table'} (change in Settings).</p>}
           <Btn variant="primary" size="lg" onClick={launch} disabled={!army}>Start the battle</Btn>
         </Panel>
       )}

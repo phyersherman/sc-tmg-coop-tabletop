@@ -135,6 +135,30 @@ export function losBlocked(a: Pt, sizeA: number, b: Pt, sizeB: number, pieces: T
   return false;
 }
 
+/** A model's base for Line of Sight: a circle, or an oval (a capsule `half` long each way along its facing `a`). */
+export interface LosBase { x: number; y: number; r: number; half?: number; a?: number }
+
+/** Points around the edge of a base: both caps of an oval, eight each; the centre too, for a thin base. */
+function baseEdge(b: LosBase): Pt[] {
+  const half = b.half ?? 0, a = b.a ?? 0;
+  const ends = half > 0 ? [{ x: b.x - Math.cos(a) * half, y: b.y - Math.sin(a) * half }, { x: b.x + Math.cos(a) * half, y: b.y + Math.sin(a) * half }] : [{ x: b.x, y: b.y }];
+  const out: Pt[] = [{ x: b.x, y: b.y }];
+  for (const e of ends) for (let k = 0; k < 8; k++) out.push({ x: e.x + Math.cos((k * Math.PI) / 4) * b.r, y: e.y + Math.sin((k * Math.PI) / 4) * b.r });
+  return out;
+}
+
+/**
+ * Line of Sight between two models as the rules draw it (7.1): from any point of the firing model's base to any
+ * point of the target's, seen from above, with only terrain of their Size or more in the way blocking it.
+ */
+export function losBetweenBases(a: LosBase, sizeA: number, b: LosBase, sizeB: number, pieces: TerrainPiece[]): boolean {
+  const from = baseEdge(a), to = baseEdge(b);
+  // Centre to centre first: the common case, and the cheapest.
+  if (!losBlocked(from[0]!, sizeA, to[0]!, sizeB, pieces)) return true;
+  for (const p of from) for (const q of to) if (!losBlocked(p, sizeA, q, sizeB, pieces)) return true;
+  return false;
+}
+
 /** A Lost Temple Ramp: high ground models stand on, reached up its ramp. */
 export const isHighGround = (t: TerrainPiece) => t.catalogId.includes('ramp');
 /**

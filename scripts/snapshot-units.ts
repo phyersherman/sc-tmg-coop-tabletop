@@ -242,6 +242,9 @@ for (const u of units) {
   for (const t of u.squadProfile) for (let m = t.min; m <= t.max; m++) covered.add(m);
   for (let m = 1; m <= maxModels; m++) if (!covered.has(m)) errors.push(`${u.name}: squad profile does not cover ${m} models`);
 }
+// Jim Raynor carries one rifle: the C-14 is chosen when the army is built, for nothing, in place of the Commando Rifle.
+for (const u of units as any[]) if (u.id === 'jim_raynor') for (const w of u.weapons) if (w.name === 'C-14 rifle') { w.upgradeCost = { small: 0, large: 0 }; w.replaces = 'Commando Rifle'; }
+
 if (errors.length) {
   console.error('VALIDATION ERRORS:\n' + errors.join('\n'));
   process.exit(1);

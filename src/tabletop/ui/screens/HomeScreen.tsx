@@ -3,14 +3,16 @@ import { useUi } from '@tt/store/uiStore';
 import { Btn } from '../components/Basics';
 import { modeById } from '@engine/missions/index';
 import { DIFFICULTIES } from '@engine/difficulty';
+import { host } from '@tt/host';
 
 /** What to do before a battle, in the order a game night needs it. */
-const PREP: { screen: 'collection' | 'armies' | 'terrain' | 'rulebook' | 'tokens' | 'tutorial'; name: string; what: string }[] = [
+const PREP: { screen: string; name: string; what: string; /** Only with the full app: the camera reads these. */ host?: true }[] = [
   { screen: 'tutorial', name: 'Learn to play', what: 'How a battle runs, from setup to the last Scoring phase.' },
   { screen: 'collection', name: 'Collection', what: 'The miniatures you own. The enemy is built from these.' },
   { screen: 'armies', name: 'Armies', what: 'Your forces, saved for game night, with a sheet to print.' },
   { screen: 'terrain', name: 'Terrain Lab', what: 'A fair terrain layout for any deployment card.' },
   { screen: 'tokens', name: 'Side-marker tokens', what: 'Tokens to print for the guards, Structures and rewards on side markers.' },
+  { screen: 'tags', name: 'Camera tags', what: 'Tags to print for each Unit, for a game the camera follows.', host: true },
   { screen: 'rulebook', name: 'AI Rulebook', what: 'How the enemy moves, picks its targets and fights.' },
 ];
 
@@ -22,7 +24,8 @@ export function HomeScreen() {
   const game = useGame((s) => s.game);
   const savedAt = useGame((s) => s.savedAt);
   const abandon = useGame((s) => s.abandon);
-  const go = useUi((s) => s.go);
+  const go = useUi((s) => s.go) as (screen: string) => void;
+  const sim = host.simulation;
   const playing = game?.status === 'playing';
   return (
     <div className="home">
@@ -47,6 +50,7 @@ export function HomeScreen() {
           )}
           <div className="row home-actions">
             <Btn variant={game ? '' : 'primary'} size="lg" onClick={() => go('setup')}>Set up a battle</Btn>
+            {sim && <Btn variant="ghost" size="lg" onClick={() => go('campaign')}>Campaigns</Btn>}
             <Btn variant="ghost" size="lg" onClick={() => go('tutorial')}>Learn to play</Btn>
           </div>
           <p className="home-note small muted">A battle is one mission against an enemy built from your own collection. Play a co-op mission or one of the official mission cards, alone or with a friend.</p>
@@ -56,7 +60,7 @@ export function HomeScreen() {
       <section className="home-prep">
         <h2>Before the battle</h2>
         <ul className="home-list">
-          {PREP.map((p) => (
+          {PREP.filter((p) => !p.host || sim).map((p) => (
             <li key={p.screen}>
               <button type="button" onClick={() => go(p.screen)}>
                 <b>{p.name}</b>

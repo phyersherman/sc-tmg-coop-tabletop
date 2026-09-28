@@ -2,10 +2,11 @@ import type { GameState } from '../types/game';
 import type { PlayerUnit, Pt } from '../sense/types';
 import type { AiUnitInstance } from '../types/army';
 import type { WeaponProfile } from '../types/units';
+import type { TerrainPiece } from '../types/terrain';
 import { unitById } from '@data/index';
 import { closestOnSegment, dist, playerSegments, zoiRect, aiSegments, pointInRect, rampLevel } from '../terrain/geometry';
-import { losBlocked, passable, shortestPath } from '../sense/geometry2d';
-import { CONTACT_IN, pinnedModels, pathOptionsFor, baseFits, closestBases, edgeDistance, edgeToPoint, ENGAGEMENT_IN, moveReach, shapeAt, unitShapes, type Shape } from '../sense/placement';
+import { losBlocked, losBetweenBases, passable, shortestPath } from '../sense/geometry2d';
+import { CONTACT_IN, pinnedModels, pathOptionsFor, baseFits, standingPieces, closestBases, edgeDistance, edgeToPoint, ENGAGEMENT_IN, moveReach, shapeAt, unitShapes, type Shape } from '../sense/placement';
 import { playerUnitDef, playerUnitFlying, playerUnitSize, playerUnitSupply } from '../sense/playerUnits';
 import { currentSupply, poolForRound } from '../units/supply';
 import { effectiveSpeed, extraEntryPoints, hasAbility, isBurrowed, ownerOf } from '../abilities/index';
@@ -110,7 +111,7 @@ export function checkDeploy(state: GameState, pu: PlayerUnit, pt: Pt): RuleCheck
     else return no(`Too far from your entry edge: ${d.toFixed(1)}" (max ${speed}").${extraEntryPoints(state, pu).length ? ' Or deploy within Speed of your Pylon / Omega Worm.' : ''}`);
   }
   if (!via) for (const seg of aiSegments(state.deployment)) if (pointInRect(pt, zoiRect(seg, t))) return no("That is inside the AI's Zone of Influence.");
-  if (!passable(pt, state.terrain.pieces) && !playerUnitFlying(pu)) return no('Cannot end on terrain (Size 1 and up).');
+  if (!passable(pt, standingPieces(state, 'players', pu.id)) && !playerUnitFlying(pu)) return no('Cannot end on terrain (Size 1 and up).');
   const e = nearEnemy(state, pu, pt);
   if (e) return no(`Cannot end within 1" of ${e.label}.`);
   const blocked = baseBlocked(state, pu, pt);
@@ -141,7 +142,7 @@ export function checkMove(state: GameState, pu: PlayerUnit, pt: Pt, kind: 'move'
   // No part of the Leading Model's base may move more than Speed (Part 8.5.2): the base ends Wholly Within Speed of
   // where it started, measured from its edge along the path it takes.
   if (m.reach > speed + 0.05) return no(`Too far: ${m.reach.toFixed(1)}" of ${speed}". The whole base must end within ${speed}" of where it started.`);
-  if (!passable(pt, state.terrain.pieces) && !flying) return no('Cannot end on terrain (Size 1 and up).');
+  if (!passable(pt, standingPieces(state, 'players', pu.id)) && !flying) return no('Cannot end on terrain (Size 1 and up).');
   const e = nearEnemy(state, pu, pt);
   if (e && !flying) return no(`Cannot end within 1" of ${e.label}${kind === 'disengage' ? ' when disengaging' : ''}.`);
   const blocked = baseBlocked(state, pu, pt, m.facing);
@@ -274,13 +275,26 @@ export function validTargets(state: GameState, pu: PlayerUnit, weapon: WeaponPro
     const r = weapon.range;
     const lr = maxRange(weapon);
     if (d > lr) continue;
-    const a = near.from ?? from;
-    const b = near.to ?? p;
-    const visible = flying || !losBlocked(a, playerUnitSize(pu), b, tdef.stats.size, state.terrain.pieces) || weapon.keywords.some((k) => k.k === 'INDIRECT FIRE');
+    const visible = flying || unitSees(state, pu, u) || weapon.keywords.some((k) => k.k === 'INDIRECT FIRE');
     if (!visible) continue;
     out.push({ unit: u, distance: d, longRange: d > r, visible });
   }
   return out.sort((a, b) => a.distance - b.distance);
+}
+
+/**
+ * Whether any model of the player's Unit has Line of Sight to any model of the AI Unit: drawn from any point of a
+ * base's edge to any point of the target's, over terrain smaller than either of them.
+ */
+export function unitSees(state: GameState, pu: PlayerUnit, u: AiUnitInstance, pieces: TerrainPiece[] = state.terrain.pieces): boolean {
+  const mine = unitShapes(state, 'players', pu.id);
+  const theirs = unitShapes(state, 'ai', u.id);
+  const sizeA = playerUnitSize(pu), sizeB = unitById(u.defId).stats.size;
+  if (!mine.length || !theirs.length) return true;
+  // Nearest pair first: it is the likeliest to see, and the search stops at the first that does.
+  const near = closestBases(mine, theirs);
+  if (near.from && near.to && losBetweenBases(near.from, sizeA, near.to, sizeB, pieces)) return true;
+  return mine.some((m) => theirs.some((t) => losBetweenBases(m, sizeA, t, sizeB, pieces)));
 }
 
 /** Every AI unit on the table with whether this weapon can target it, and why not. */
@@ -303,8 +317,8 @@ export function targetReport(state: GameState, pu: PlayerUnit, weapon: WeaponPro
     else if (pu.engaged && !pu.engagedWith.includes(u.id)) reason = `${pu.name} is Engaged. It can only shoot units it is fighting`;
     else if (!pu.engaged && u.engaged && !weapon.keywords.some((k) => k.k === 'PINPOINT')) reason = `${u.label} is Engaged. Only a PINPOINT weapon can target it`;
     else if (d !== null && d > maxRange(weapon)) reason = `Out of range: ${d.toFixed(1)}" (range ${maxRange(weapon)}")`;
-    else if (!flying && losBlocked(near.from ?? from, playerUnitSize(pu), near.to ?? p, tdef.stats.size, state.terrain.pieces)) {
-      const blocker = state.terrain.pieces.find((t) => t.size >= 1 && !t.catalogId.startsWith('token:') && losBlocked(near.from ?? from, playerUnitSize(pu), near.to ?? p, tdef.stats.size, [t]));
+    else if (!flying && !unitSees(state, pu, u)) {
+      const blocker = state.terrain.pieces.find((t) => t.size >= 1 && !t.catalogId.startsWith('token:') && !unitSees(state, pu, u, [t]));
       reason = `No Line of Sight${blocker ? ` (${blocker.label ?? 'terrain'} #${blocker.n})` : ''}`;
     }
     return { unit: u, ok: false, reason, distance: d };

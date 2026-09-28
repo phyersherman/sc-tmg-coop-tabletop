@@ -71,14 +71,16 @@ export default defineConfig(({ mode, command }) => {
       }),
     ],
     resolve: {
-      alias: {
-        '@engine': src('engine'),
-        '@data': src('data'),
-        // In the tabletop edition alone, its own screens and stores are the app's.
-        '@ui': tabletop ? src('tabletop/ui') : src('ui'),
-        '@store': tabletop ? src('tabletop/store') : src('store'),
-        '@tt': src('tabletop'),
-      },
+      alias: [
+        { find: '@engine', replacement: src('engine') },
+        { find: '@data', replacement: src('data') },
+        // In the tabletop edition alone, its own screens and stores are the app's. Inside the full app the
+        // edition's screens run on the full app's stores (one game, one settings), which carry more.
+        { find: '@ui', replacement: tabletop ? src('tabletop/ui') : src('ui') },
+        { find: '@store', replacement: tabletop ? src('tabletop/store') : src('store') },
+        { find: /^@tt\/store\//, replacement: `${tabletop ? src('tabletop/store') : src('store')}/` },
+        { find: '@tt', replacement: src('tabletop') },
+      ],
     },
     test: {
       include: ['tests/**/*.test.ts'],

@@ -69,9 +69,10 @@ describe('a wall with one gap in it', () => {
     expect(through(pocket(0.7, 'marine', 3))).toBe(false);
   });
 
-  it('a Size 2 Siege Tank on a 150mm base still passes an inch, but three once dug in', () => {
+  it('a Siege Tank is Large: it needs three inches whatever its Size, and its base is never a further bar', () => {
     expect(baseOf('siege_tank').r * 2).toBeGreaterThan(5);
-    expect(through(pocket(1, 'siege_tank', 1))).toBe(true);
+    expect(through(pocket(3, 'siege_tank', 1))).toBe(true);
+    expect(through(pocket(2.5, 'siege_tank', 1))).toBe(false);
     const dug = pocket(2.5, 'siege_tank', 1);
     dug.army.units[0]!.statuses = ['Siege Mode'];
     expect(through(dug)).toBe(false);

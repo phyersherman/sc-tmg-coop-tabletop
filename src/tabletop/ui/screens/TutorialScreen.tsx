@@ -8,6 +8,7 @@ import { Btn } from '../components/Basics';
 import { RewardToken, Token } from '../components/Tokens';
 import { ActionCardView } from '../tabletop/ActionCardView';
 import { StepIcon } from '../tabletop/StepIcon';
+import { host } from '@tt/host';
 
 /** A card to show, outside any battle: the Marines' Stimpack card from their Movement deck. */
 function SampleCard() {
@@ -151,7 +152,7 @@ export function TutorialScreen() {
         <div className="row tut-nav">
           <Btn variant="ghost" onClick={() => (i === 0 ? go('home') : setI(i - 1))}>{i === 0 ? 'Home' : 'Back'}</Btn>
           {last
-            ? <><Btn onClick={() => go('tokens')}>Print the tokens</Btn><Btn variant="primary" onClick={() => go('setup')}>Set up a battle</Btn></>
+            ? <>{host.simulation?.startPractice && <Btn onClick={host.simulation.startPractice}>Practice battle on screen</Btn>}<Btn onClick={() => go('tokens')}>Print the tokens</Btn><Btn variant="primary" onClick={() => go('setup')}>Set up a battle</Btn></>
             : <Btn variant="primary" onClick={() => setI(i + 1)}>Next</Btn>}
         </div>
       </article>

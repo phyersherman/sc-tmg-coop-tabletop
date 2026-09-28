@@ -4,7 +4,7 @@ import type { PlayerUnit, Pt } from './types';
 import { unitById } from '@data/index';
 import { currentSupply } from '../units/supply';
 import { dist } from '../terrain/geometry';
-import { alongPath, bestEffortToward, losBlocked, shortestPath, type PathOptions } from './geometry2d';
+import { alongPath, bestEffortToward, losBetweenBases, losBlocked, shortestPath, type PathOptions } from './geometry2d';
 import { centroid } from './homography';
 import { aiUnitSize, playerUnitFlying, playerUnitSize, playerUnitSupply } from './playerUnits';
 import { pathOptionsFor, closestBases, edgeDistance, edgeToPoint, ENGAGEMENT_IN, moveReach, shapeAt, unitGap, unitShapes } from './placement';
@@ -78,7 +78,7 @@ export function visibleEnemies(state: GameState, unit: AiUnitInstance, range: nu
     const myBases = unitShapes(state, 'ai', unit.id);
     const theirBases = unitShapes(state, 'players', pu.id);
     for (const m of myBases) {
-      const ok = theirBases.some((t) => edgeDistance(m, t) <= range && (flying || !losBlocked(m, aiUnitSize(unit), t, playerUnitSize(pu), state.terrain.pieces)));
+      const ok = theirBases.some((t) => edgeDistance(m, t) <= range && (flying || losBetweenBases(m, aiUnitSize(unit), t, playerUnitSize(pu), state.terrain.pieces)));
       if (ok) firing++;
     }
     if (firing === 0) continue;

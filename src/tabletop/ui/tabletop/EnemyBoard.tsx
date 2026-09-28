@@ -19,8 +19,9 @@ const STAT_DEBUFFS = ['speed', 'hit', 'armour', 'evade'] as const;
  * Picking a card opens its damage entry.
  */
 export function EnemyBoard({ g, selected, lastId = null, onPick, extra, dealt = null }: { g: GameState; selected: string | null; /** The Unit whose order the table carried out last: it stays lit, not dimmed. */ lastId?: string | null; onPick: (id: string) => void; /** What opens on a Unit's own card: its damage entry, the dice for it. */ extra?: (unitId: string) => ReactNode; /** The AI's order, dealt onto the Unit it belongs to. */ dealt?: { unitId: string; node: ReactNode } | null }) {
-  const onTable = g.army.units.filter((u) => u.location === 'table' && u.models > 0);
-  const reserves = g.army.units.filter((u) => u.location === 'reserves' && u.models > 0);
+  // A Unit the AI is deploying is still in Reserves: its card comes to the table with the order dealt onto it.
+  const onTable = g.army.units.filter((u) => u.models > 0 && (u.location === 'table' || u.id === dealt?.unitId));
+  const reserves = g.army.units.filter((u) => u.location === 'reserves' && u.models > 0 && u.id !== dealt?.unitId);
   const activeId = g.step.kind === 'AI_ORDER' ? g.step.order.unitId : null;
   return (
     <section className="eb" aria-label="Enemy units">

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { host } from '@tt/host';
 import { DEPLOYMENTS, unitById } from '@data/index';
 import { RULEBOOK } from '@tt/data/rulebook';
 import { mapLayout, remixId } from '@engine/terrain/remix';
@@ -89,6 +90,7 @@ export function SettingsScreen() {
         <p className="small muted">Off: orders show only dice counts and target numbers. Roll the AI's dice on the table.</p>
         <Toggle on={s.confirmPass !== false} onChange={(v) => s.set({ confirmPass: v })}>Warn before passing while Units can still act</Toggle>
         <Toggle on={!s.skipPhaseBanners} onChange={(v) => s.set({ skipPhaseBanners: !v })}>Announce each round and phase</Toggle>
+        {host.simulation?.Settings && <host.simulation.Settings />}
         <div className="row">
           <Btn disabled={!game} onClick={() => { const blob = new Blob([exportSave()], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sctmg-coop-save.json'; a.click(); }}>Export save</Btn>
           <label className="btn" style={{ cursor: 'pointer' }}>
@@ -105,9 +107,12 @@ export function DebriefScreen() {
   const g = useGame((s) => s.game);
   const go = useUi((s) => s.go);
   const rematch = useRematch();
+  const sim = host.simulation;
+  useEffect(() => { if (g) sim?.onDebrief?.(g); }, [g, sim]);
   if (!g) return <Panel title="No game"><Btn onClick={() => go('home')}>Home</Btn></Panel>;
   const mode = modeById(g.config.modeId);
   const tally = battleTally(g);
+  const hostActions = sim?.debriefActions?.(g, go as (screen: string) => void);
   const killed = g.attackLog.filter((a) => a.destroyed && a.attacker.side === 'players').map((a) => a.defender.label);
   const lost = g.playerUnits.filter((p) => p.destroyed).map((p) => p.name);
   const share = btoa(JSON.stringify({ modeId: g.config.modeId, difficulty: g.config.difficulty, players: g.config.players, playerMinerals: g.config.playerMinerals, scale: g.config.scale, aiFaction: g.config.aiFaction, mutators: g.config.mutators, deploymentId: g.config.deploymentId, terrainSeed: g.config.terrainSeed, seed: g.config.seed }));
@@ -136,7 +141,7 @@ export function DebriefScreen() {
           <summary className="small muted">Scenario code for this setup</summary>
           <code className="small">{share}</code>
         </details>
-        <div className="row"><Btn variant="primary" onClick={() => rematch(g)}>Same setup again</Btn><Btn onClick={() => go('setup')}>New battle</Btn><Btn variant="ghost" onClick={() => go('home')}>Home</Btn></div>
+        {hostActions ?? <div className="row"><Btn variant="primary" onClick={() => rematch(g)}>Same setup again</Btn><Btn onClick={() => go('setup')}>New battle</Btn><Btn variant="ghost" onClick={() => go('home')}>Home</Btn></div>}
       </Panel>
       <Panel title="Log">
         <div className="log">{g.log.map((e, i) => <div key={i} className={e.side}>R{e.round} {e.phase} · {e.text}</div>)}</div>
