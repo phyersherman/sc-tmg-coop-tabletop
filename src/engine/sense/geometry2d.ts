@@ -2,6 +2,80 @@ import type { Pt } from './types';
 import type { Rect, TerrainPiece } from '../types/terrain';
 import { dist, distToPiece, distToRect, pieceLocal, rampBlocks, rampLevel } from '../terrain/geometry';
 
+/**
+ * A binary min-heap of lattice keys by priority. The path searches used to scan their whole open list for the
+ * cheapest node on every step, which on the quarter-inch lattice cost long enough to lock the page on a slow
+ * machine; ties still come out oldest first, so the paths found are the same.
+ */
+class KeyHeap {
+  private keys: number[] = [];
+  private pri: number[] = [];
+  private seq: number[] = [];
+  private n = 0;
+  get size(): number { return this.keys.length; }
+  /** The priority the next pop() was pushed with. */
+  get topPriority(): number { return this.pri[0]!; }
+  /** `order` breaks ties (lowest first); by default, the order pushed. */
+  push(k: number, p: number, order = this.n++): void {
+    this.keys.push(k); this.pri.push(p); this.seq.push(order);
+    let i = this.keys.length - 1;
+    while (i > 0) {
+      const up = (i - 1) >> 1;
+      if (!this.less(i, up)) break;
+      this.swap(i, up);
+      i = up;
+    }
+  }
+  pop(): number {
+    const top = this.keys[0]!;
+    const last = this.keys.length - 1;
+    this.swap(0, last);
+    this.keys.pop(); this.pri.pop(); this.seq.pop();
+    let i = 0;
+    for (;;) {
+      const l = 2 * i + 1;
+      const r = l + 1;
+      let m = i;
+      if (l < this.keys.length && this.less(l, m)) m = l;
+      if (r < this.keys.length && this.less(r, m)) m = r;
+      if (m === i) break;
+      this.swap(i, m);
+      i = m;
+    }
+    return top;
+  }
+  private less(a: number, b: number): boolean {
+    return this.pri[a]! < this.pri[b]! || (this.pri[a] === this.pri[b] && this.seq[a]! < this.seq[b]!);
+  }
+  private swap(a: number, b: number): void {
+    [this.keys[a], this.keys[b]] = [this.keys[b]!, this.keys[a]!];
+    [this.pri[a], this.pri[b]] = [this.pri[b]!, this.pri[a]!];
+    [this.seq[a], this.seq[b]] = [this.seq[b]!, this.seq[a]!];
+  }
+}
+
+/**
+ * Which lattice points are shut, worked out only for the points a search actually reaches (testing every point
+ * of the quarter-inch lattice against the terrain up front was most of a search's cost), and the tie order the
+ * searches break equal costs by: the order each point was first queued in.
+ */
+function lattice(W: number, H: number, cell: number, open: (p: Pt) => boolean, alwaysOpen: number[]) {
+  const state = new Uint8Array((W + 1) * (H + 1));
+  for (const k of alwaysOpen) state[k] = 1;
+  const first = new Int32Array((W + 1) * (H + 1)).fill(-1);
+  let n = 0;
+  return {
+    blocked(k: number): boolean {
+      if (!state[k]) state[k] = open({ x: (k % (W + 1)) * cell, y: Math.floor(k / (W + 1)) * cell }) ? 1 : 2;
+      return state[k] === 2;
+    },
+    order(k: number): number {
+      if (first[k]! < 0) first[k] = n++;
+      return first[k]!;
+    },
+  };
+}
+
 /** Does segment a-b cross rectangle r? */
 export function segmentHitsRect(a: Pt, b: Pt, r: Rect): boolean {
   // Liang–Barsky clipping.
@@ -149,18 +223,19 @@ function bestEffortOnGrid(from: Pt, to: Pt, pieces: TerrainPiece[], table: { wid
   const at = (x: number, y: number) => ({ x: x * cell, y: y * cell });
   const sx = Math.max(0, Math.min(W, Math.round(from.x / cell)));
   const sy = Math.max(0, Math.min(H, Math.round(from.y / cell)));
-  const blocked = new Uint8Array((W + 1) * (H + 1));
-  for (let y = 0; y <= H; y++) for (let x = 0; x <= W; x++) if (!free(at(x, y))) blocked[key(x, y)] = 1;
-  blocked[key(sx, sy)] = 0;
+  const lat = lattice(W, H, cell, free, [key(sx, sy)]);
+  const blocked = (k: number) => lat.blocked(k);
   // Dijkstra out to `speed`, keeping the node that ends nearest the goal.
   const g = new Float64Array((W + 1) * (H + 1)).fill(Infinity);
   g[key(sx, sy)] = 0;
-  const queue: number[] = [key(sx, sy)];
+  const queue = new KeyHeap();
+  queue.push(key(sx, sy), 0, lat.order(key(sx, sy)));
   let best = { k: key(sx, sy), d: dist(from, to) };
-  while (queue.length) {
-    let bi = 0;
-    for (let i = 1; i < queue.length; i++) if (g[queue[i]!]! < g[queue[bi]!]!) bi = i;
-    const k = queue.splice(bi, 1)[0]!;
+  while (queue.size) {
+    const pri = queue.topPriority;
+    const k = queue.pop();
+    // A node reached more cheaply since this entry was queued has already been expanded from its better entry.
+    if (pri > g[k]!) continue;
     const x = k % (W + 1);
     const y = Math.floor(k / (W + 1));
     const d = dist(at(x, y), to);
@@ -172,12 +247,12 @@ function bestEffortOnGrid(from: Pt, to: Pt, pieces: TerrainPiece[], table: { wid
         const ny = y + dy;
         if (nx < 0 || ny < 0 || nx > W || ny > H) continue;
         const nk = key(nx, ny);
-        if (blocked[nk]) continue;
-        if (dx && dy && (blocked[key(x + dx, y)] || blocked[key(x, y + dy)]) && !clearWith(at(x, y), at(nx, ny), free)) continue;
+        if (blocked(nk)) continue;
+        if (dx && dy && (blocked(key(x + dx, y)) || blocked(key(x, y + dy))) && !clearWith(at(x, y), at(nx, ny), free)) continue;
         const ng = g[k]! + (dx && dy ? Math.SQRT2 : 1) * cell;
         if (ng <= speed + 1e-9 && ng < g[nk]!) {
           g[nk] = ng;
-          queue.push(nk);
+          queue.push(nk, ng, lat.order(nk));
         }
       }
   }
@@ -210,28 +285,17 @@ function gridPath(from: Pt, to: Pt, open: (p: Pt) => boolean, clear: (a: Pt, b: 
   const sy = Math.max(0, Math.min(H, Math.round(from.y / cell)));
   const tx = Math.max(0, Math.min(W, Math.round(to.x / cell)));
   const ty = Math.max(0, Math.min(H, Math.round(to.y / cell)));
-  const blocked = new Uint8Array((W + 1) * (H + 1));
-  for (let y = 0; y <= H; y++) for (let x = 0; x <= W; x++) if (!open(at(x, y))) blocked[key(x, y)] = 1;
-  blocked[key(sx, sy)] = 0;
-  blocked[key(tx, ty)] = 0;
+  const lat = lattice(W, H, cell, open, [key(sx, sy), key(tx, ty)]);
+  const blocked = (k: number) => lat.blocked(k);
   const g = new Float64Array((W + 1) * (H + 1)).fill(Infinity);
   const prev = new Int32Array((W + 1) * (H + 1)).fill(-1);
-  const queue: number[] = [key(sx, sy)];
   g[key(sx, sy)] = 0;
   const h = (x: number, y: number) => Math.hypot(x - tx, y - ty);
+  const queue = new KeyHeap();
+  queue.push(key(sx, sy), h(sx, sy), lat.order(key(sx, sy)));
   const closed = new Uint8Array((W + 1) * (H + 1));
-  while (queue.length) {
-    let bi = 0;
-    let bf = Infinity;
-    for (let i = 0; i < queue.length; i++) {
-      const k = queue[i]!;
-      const f = g[k]! + h(k % (W + 1), Math.floor(k / (W + 1)));
-      if (f < bf) {
-        bf = f;
-        bi = i;
-      }
-    }
-    const k = queue.splice(bi, 1)[0]!;
+  while (queue.size) {
+    const k = queue.pop();
     if (closed[k]) continue;
     closed[k] = 1;
     const x = k % (W + 1);
@@ -244,15 +308,15 @@ function gridPath(from: Pt, to: Pt, open: (p: Pt) => boolean, clear: (a: Pt, b: 
         const ny = y + dy;
         if (nx < 0 || ny < 0 || nx > W || ny > H) continue;
         const nk = key(nx, ny);
-        if (blocked[nk] || closed[nk]) continue;
+        if (closed[nk] || blocked(nk)) continue;
         // A diagonal step past a blocked corner is allowed only when the straight line between the two spots
         // really is clear: that is what lets a base through a gap the lattice's corners would shut.
-        if (dx && dy && (blocked[key(x + dx, y)] || blocked[key(x, y + dy)]) && !clear(at(x, y), at(nx, ny))) continue;
+        if (dx && dy && (blocked(key(x + dx, y)) || blocked(key(x, y + dy))) && !clear(at(x, y), at(nx, ny))) continue;
         const ng = g[k]! + (dx && dy ? Math.SQRT2 : 1) * cell;
         if (ng < g[nk]!) {
           g[nk] = ng;
           prev[nk] = k;
-          queue.push(nk);
+          queue.push(nk, ng + h(nx, ny), lat.order(nk));
         }
       }
   }
