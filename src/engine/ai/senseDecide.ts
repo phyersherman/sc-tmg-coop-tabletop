@@ -11,7 +11,7 @@ import { aiSegments, closestOnSegment, dist, segmentMidpoint } from '../terrain/
 import { speedFor } from '../units/speed';
 import { hasSense } from '../sense/query';
 import { currentCard } from './orderDeck';
-import { speedModFor } from './decide';
+import { chargeRollText, speedModFor } from './decide';
 import { playerUnitSupply } from '../sense/playerUnits';
 
 function headingPoint(state: GameState, order: AiOrder, from: Pt): Pt | null {
@@ -143,7 +143,7 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
     const e = nearestEnemyByPath(state, unit, true);
     if (e && e.pathDist <= threshold) {
       const lines = [
-        `Camera: CHARGE ${e.unit.name}, ${Math.round(e.pathDist)}" from the Leading Model along its path. Roll ${order.charge?.dice === '2d6high' ? '2D6 (keep the highest)' : 'D6'} + ${reach}. It needs ${Math.max(1, Math.ceil(e.pathDist - 1 - reach))}+ on the die if the path is clear.`,
+        `Camera: CHARGE ${e.unit.name}, ${Math.round(e.pathDist)}" from the Leading Model along its path. ${chargeRollText(order.charge?.dice ?? '1d6', speed, reach - speed)} It reaches on a ${Math.max(1, Math.ceil(e.pathDist - 1 - reach))}+ if the path is clear.`,
         ...order.lines.filter((l) => l.startsWith('IMPACT')),
       ];
       return { ...order, lines, batches: order.batches.length ? withDice(order, unit.models).batches : [], reports: order.reports.filter((r) => r.id !== 'attacked' && r.id !== 'noTarget') };

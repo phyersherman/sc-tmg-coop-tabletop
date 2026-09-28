@@ -9,7 +9,7 @@ import { modeById } from '@engine/missions/index';
 import { DIFFICULTIES } from '@engine/difficulty';
 import { currentCard } from '@engine/ai/orderDeck';
 import { aiOrderKey, availableNow, onTable, poolNow } from '@engine/director/selectors';
-import { focusText } from '@engine/ai/decide';
+import { chargeRollText, focusText } from '@engine/ai/decide';
 import { tenacityOffer } from '@engine/abilities/index';
 import type { AiOrder, GameState, MarkerControl, ScoringAnswers, ScoringPrompt, Step } from '@engine/types/game';
 import type { Command } from '@engine/director/reducer';
@@ -92,16 +92,18 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
 
       {needsAsk && order.type === 'ranged' && (
         <div className="stack">
-          <p className="ask">{camLine ? 'Roll the attack.' : `Is an enemy unit visible within ${range}"${main?.longRange ? ` (or ${main.longRange + (main.rangeMod ?? 0)}" at -1 to hit)` : ''} of at least one model?`}</p>
+          <p className="ask">{camLine ? 'Roll the attack.' : `Fire at the nearest enemy Unit in Line of Sight within ${range}" of any of its models. Otherwise, do not fire.`}</p>
+          {!camLine && main?.longRange ? <p className="ask">{`LONG RANGE: if no enemy Unit is that close, fire at one within ${main.longRange + (main.rangeMod ?? 0)}" instead, at -1 to hit.`}</p> : null}
           <div className="row">
-            <Btn variant="primary" size="lg" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>{camLine ? 'Roll' : 'Yes, open fire'}</Btn>
+            <Btn variant="primary" size="lg" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>{camLine ? 'Roll' : 'Open fire'}</Btn>
             {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>{order.reports.find((r) => r.id === 'noTarget')?.label ?? 'No target'}</Btn>}
           </div>
         </div>
       )}
       {needsAsk && !askFighters && order.type === 'charge' && (
         <div className="stack">
-          <p className="ask">{camLine ? 'Roll the charge distance on the table.' : `Charge the nearest enemy Ground Unit within ${order.charge?.max ?? '?'}" of the Leading Model by path.${order.charge ? ` Roll ${order.charge.dice === '2d6high' ? '2D6 and keep the higher' : 'D6'} and add ${order.charge.speed}.` : ''} Nothing that close: it does not charge.`}</p>
+          <p className="ask">{camLine ? 'Roll the AI\'s charge distance on the table.' : `Charge the nearest enemy Ground Unit within ${order.charge?.max ?? '?'}" of the Leading Model. Otherwise, do not charge.`}</p>
+          {!camLine && order.charge && <p className="ask">{chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>}
           <div className="row">
             {order.impact ? <Btn variant="primary" size="lg" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge made, roll IMPACT</Btn> : <Btn variant="primary" size="lg" onClick={() => report('charged')}>Charge made</Btn>}
             {hasReport('chargeFailed') && <Btn size="lg" onClick={() => report('chargeFailed')}>Charge failed</Btn>}

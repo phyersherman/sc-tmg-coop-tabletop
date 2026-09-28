@@ -378,6 +378,15 @@ export function rangedOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
   return { type: 'ranged', unitId: unit.id, title: `${unit.label}: Ranged Attack`, lines, focus, heading: unit.objective, headingText: headingText(state, unit.objective), batches, reports };
 }
 
+/**
+ * How far an AI charge goes, in the words the players read it: they roll for the AI on the table. `speed` is the
+ * unit's Speed; `bonus` what its cards add.
+ */
+export function chargeRollText(dice: '1d6' | '2d6high', speed: number, bonus = 0): string {
+  const roll = dice === '2d6high' ? 'roll 2D6 for the AI and keep the higher' : 'roll a D6 for the AI';
+  return `Charge distance: ${roll}, then add its Speed of ${speed}${bonus ? ` and ${bonus} from its card` : ''}.`;
+}
+
 export function chargeOrder(state: GameState, unit: AiUnitInstance, rng: Rng, profile: Profile, alsoRanged: boolean): AiOrder {
   const d = def(unit);
   const card = currentCard(state.orderDeck);
@@ -390,7 +399,7 @@ export function chargeOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
   const focus = focusFor(state, unit);
   const lines: string[] = [];
   lines.push(`CHARGE an enemy Ground Unit within ${threshold}" of the Leading Model, measured along its path. Target ${focusText(focus)}`);
-  lines.push(`${dice === '2d6high' ? `Roll 2D6, keep the highest and add ${speed}` : `Roll D6 + ${speed}`}${bonus ? ` + ${bonus}` : ''}. The charge succeeds if the Leading Model can end within 1" of the target. Set the models base-to-base, then the rest in Coherency.`);
+  lines.push(`${chargeRollText(dice, speed, bonus)} The charge succeeds if the Leading Model can end within 1" of the target. Set the models base-to-base, then the rest in Coherency.`);
   const batches: DiceInstruction[] = [];
   let impact: DiceInstruction | undefined;
   if (d.impact) {
