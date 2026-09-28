@@ -46,7 +46,7 @@ export function PendingAbilityCard({ g }: { g: GameState }) {
   return (
     <div className="panel accent action-card">
       <div className="row between"><h3 style={{ margin: 0 }}>{pu ? `${pu.name}: ` : ''}{pa.name}</h3><Btn size="sm" variant="ghost" onClick={() => ui.setPendingAbility(null)}>Cancel</Btn></div>
-      <p className="ask">Click {pa.target === 'point' ? (pa.hint ?? 'a spot on the map') : pa.target === 'enemy' ? 'a highlighted enemy unit' : `a highlighted friendly unit${pa.hint ? ` (${pa.hint})` : ''}`}{pa.range ? `, within ${pa.range}" (shown on the map)` : ''}.</p>
+      <p className="ask">Click {pa.target === 'point' ? (pa.hint ?? 'a spot on the map') : pa.target === 'enemy' ? 'a highlighted enemy Unit' : `a highlighted friendly Unit${pa.hint ? ` (${pa.hint})` : ''}`}{pa.range ? `, within ${pa.range}"` : ''}.</p>
     </div>
   );
 }

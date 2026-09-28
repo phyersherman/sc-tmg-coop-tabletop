@@ -93,7 +93,7 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
         <Rewards g={g} dispatch={dispatch} />
         {/* Nothing to decide here while a result waits above: the tray's Continue is the one button. */}
         <div className="tt-now">{now ?? (pendingEvent ? <p className="tt-hint small muted">Apply the result on the table, then Continue above.</p> : null)}</div>
-        {!inspected && <p className="tt-hint small muted">Did your attack land? Pick the enemy unit on the left to enter its damage.</p>}
+        {!inspected && <p className="tt-hint small muted">To enter damage, pick the enemy Unit on the left.</p>}
       </aside>
 
       {overlays}
@@ -112,11 +112,11 @@ export function TabletopTurn({ g, dispatch }: { g: GameState; dispatch: (c: Comm
       <div className="tt-card tt-you">
         <span className="tt-kicker">Your saves · {g.phase}</span>
         <p>{a.attacker.label} hit {a.defender.label} {a.hits} time{a.hits === 1 ? '' : 's'}. Roll your saves in the tray above.</p>
-        <Btn size="sm" variant="ghost" onClick={() => dispatch(autoSaves(g, a))}>Let the app roll my saves</Btn>
+        <Btn size="sm" variant="ghost" onClick={() => dispatch(autoSaves(g, a))}>Roll my saves for me</Btn>
       </div>
     );
   }
-  const what = g.phase === 'movement' ? 'Move or deploy one of your units.' : g.phase === 'assault' ? 'Shoot, charge or run with one of your units.' : g.phase === 'combat' ? 'Fight with one of your engaged units: only its models within 1" of an enemy (the Fighting Rank) and those touching one of them (the Supporting Rank) roll.' : 'Score the round.';
+  const what = g.phase === 'movement' ? 'Move or deploy one of your Units.' : g.phase === 'assault' ? 'Shoot, charge or run with one of your Units.' : g.phase === 'combat' ? 'Fight with one of your Engaged Units. Only its Fighting Rank and Supporting Rank roll.' : 'Score the round.';
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -142,12 +142,12 @@ export function TabletopTurn({ g, dispatch }: { g: GameState; dispatch: (c: Comm
       )}
       <div className="tt-card tt-you">
         <span className="tt-kicker">Your turn · {g.phase}</span>
-        <h2>{aiPassed ? 'Finish your activations' : 'Activate a unit on the table'}</h2>
+        <h2>{aiPassed ? 'Finish your activations' : 'Activate a Unit on the table'}</h2>
         <p>{what}</p>
-        {aiPassed && <p className="small warn">The AI has passed: activate your remaining units one after another, then pass to end the phase.</p>}
+        {aiPassed && <p className="small warn">The AI has passed. Activate your remaining Units one after another, then pass to end the phase.</p>}
         <div className="row">
-          <Btn variant="primary" size="lg" onClick={() => dispatch({ t: 'playersDone' })}>{aiPassed ? 'Done — next unit' : "Done — AI's turn"} <kbd>Space</kbd></Btn>
-          <Btn variant={aiPassed ? 'primary' : undefined} onClick={() => dispatch({ t: 'playersPass' })}>{aiPassed ? 'Pass — end phase' : 'Pass'} <kbd>P</kbd></Btn>
+          <Btn variant="primary" size="lg" onClick={() => dispatch({ t: 'playersDone' })}>{aiPassed ? 'Done: next Unit' : "Done: AI's turn"} <kbd>Space</kbd></Btn>
+          <Btn variant={aiPassed ? 'primary' : undefined} onClick={() => dispatch({ t: 'playersPass' })}>{aiPassed ? 'Pass: end phase' : 'Pass'} <kbd>P</kbd></Btn>
         </div>
         {!aiPassed && <p className="small muted">Pass when you have nothing left to activate this phase.</p>}
       </div>
@@ -193,7 +193,7 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
   return (
     <div className="tt-card tt-enemy">
       <div className="row between">
-        <span className="tt-kicker red">AI unit</span>
+        <span className="tt-kicker red">AI Unit</span>
         <button type="button" className="tt-close" onClick={onClose} aria-label="Close">×</button>
       </div>
       <h2>{u.label}</h2>
@@ -201,7 +201,7 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
       {u.damageMarker > 0 && <p className="small">Damage marker: <b>{u.damageMarker}</b></p>}
 
       <div className="tt-seg" role="radiogroup">
-        <button type="button" className={entry === 'hits' ? 'active' : ''} onClick={() => setEntry('hits')}>Hits — the AI rolls saves</button>
+        <button type="button" className={entry === 'hits' ? 'active' : ''} onClick={() => setEntry('hits')}>Hits (AI saves)</button>
         <button type="button" className={entry === 'damage' ? 'active' : ''} onClick={() => setEntry('damage')}>Damage</button>
       </div>
       <div className="row">
@@ -211,7 +211,7 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
       </div>
       {entry === 'hits' && def.stats.evade ? (
         <p className="small muted" style={{ margin: '4px 0 0' }}>
-          {evadeReason ? <>Evade <b>{evadeValue}+</b> is rolled on what gets past the Armour ({evadeReason}).</> : <>No Evade roll: not engaged, burrowed or on high ground over the attacker.</>}
+          {evadeReason ? <>The AI rolls Evade <b>{evadeValue}+</b> against hits that get past Armour ({evadeReason}).</> : <>No Evade roll. It is not Engaged, Burrowed or on high ground above the attacker.</>}
           {' '}<label className="row small" style={{ display: 'inline-flex', gap: 4 }}>ANTI-EVADE <Stepper value={anti} onChange={setAnti} min={0} max={3} /></label>
         </p>
       ) : null}
@@ -366,7 +366,7 @@ function HitsBattle({ g, dispatch }: { g: GameState; dispatch: (c: Command) => v
 /** Supply on the table against this round's pool, as a small bar. `used` null: not tracked (your side). */
 function SupplyMeter({ label, used, pool, side }: { label: string; used: number | null; pool: number; side: 'red' | 'blue' }) {
   const inf = pool === Infinity;
-  const title = used === null ? `${label}: ${inf ? 'unlimited' : pool} Supply this round (your models are not on the app in AI only mode)` : `${label}: ${used} Supply on the table of ${inf ? 'unlimited' : pool} this round${inf ? '' : `, ${Math.max(0, pool - used)} free`}`;
+  const title = used === null ? `${label}: ${inf ? 'unlimited' : pool} Supply this round. Your models are tracked on the table only.` : `${label}: ${used} Supply on the table of ${inf ? 'unlimited' : pool} this round${inf ? '' : `, ${Math.max(0, pool - used)} free`}`;
   return (
     <span className={`tt-supply ${side}`} title={title}>
       {label} <b>{used === null ? '' : `${used}/`}{inf ? '∞' : pool}</b>

@@ -90,10 +90,10 @@ function AbilityUse({ g, pu, item, dispatch, onClose }: { g: GameState; pu: Play
               <label key={c.id} className="row small card-chip"><input type="checkbox" checked={pay.includes(c.id)} onChange={() => setPay(pickForPay(g, pay, c.id, cost))} /> {cardDef(c.defId)?.name} ({cardDef(c.defId)?.resource})</label>
             ))}
           </div>
-          {payTotal < cost && <span className="small danger-text">Picked cards give {payTotal}; the cost is {cost}.</span>}
+          {payTotal < cost && <span className="small danger-text">Picked cards give {payTotal} of {cost}.</span>}
         </div>
       )}
-      {!spec.automated && <p className="small muted">The app records this; resolve it on the table.</p>}
+      {!spec.automated && <p className="small muted">Resolve this on the table.</p>}
       <div className="row" style={{ gap: 6, marginTop: 6 }}>
         {(spec.target === 'self' || spec.target === 'none') && <Btn variant="primary" disabled={payTotal < cost} onClick={() => go({})}>Use {item.ability.name}</Btn>}
         {spec.target === 'friendly' && friendlies.map((f) => <Btn key={f.id} variant="primary" disabled={payTotal < cost} onClick={() => go({ friendlyId: f.id })}>{f.name}</Btn>)}

@@ -48,7 +48,7 @@ export function scheduleRespawns(state: GameState): string[] {
     if (!ok) continue;
     used++;
     state.respawnQueue.push({ unitId: u.id, returnRound: state.round + delay, modelsPct: pct });
-    lines.push(`${u.label} will return to Reserves ${delay === 0 ? 'immediately' : `in round ${state.round + delay}`}.`);
+    lines.push(`${u.label} returns to Reserves ${delay === 0 ? 'now' : `in Round ${state.round + delay}`}.`);
   }
   return lines;
 }
@@ -67,7 +67,7 @@ export function fairnessFloor(state: GameState): string | null {
   if (!cand) return null;
   state.lowSupplyRounds = 0;
   state.respawnQueue.push({ unitId: cand.id, returnRound: state.round + 1, modelsPct: 1 });
-  return `Reinforcements: ${cand.label} returns to Reserves next round (the AI was under-strength).`;
+  return `Reinforcements: the AI is under strength, so ${cand.label} returns to Reserves next round.`;
 }
 
 /** Bring back units whose return round has come. */

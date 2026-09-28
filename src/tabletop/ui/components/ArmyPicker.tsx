@@ -50,7 +50,7 @@ function upgradeOptions(def: UnitDef) {
   return [
     ...def.weapons.filter((w) => w.upgradeCost).map((w) => {
       const rivals = w.replaces ? def.weapons.filter((o) => o !== w && o.upgradeCost && o.replaces?.toLowerCase() === w.replaces!.toLowerCase()).map((o) => o.name) : [];
-      return { id: w.id, name: w.name, cost: w.upgradeCost!, note: w.replaces ? `Replaces ${w.replaces}${rivals.length ? ` — one of ${[w.name, ...rivals].join(' / ')}` : ''}.` : w.keywords.some((k) => k.k === 'SPECIALIST') ? 'One model carries it.' : '', text: w.text };
+      return { id: w.id, name: w.name, cost: w.upgradeCost!, note: w.replaces ? `Replaces ${w.replaces}.${rivals.length ? ` Take one of ${[w.name, ...rivals].join(' / ')}.` : ''}` : w.keywords.some((k) => k.k === 'SPECIALIST') ? 'One model carries it.' : '', text: w.text };
     }),
     ...def.abilities.filter((a) => a.upgradeCost).map((a) => ({ id: a.id, name: a.name, cost: a.upgradeCost!, note: `${a.kind} ability.`, text: a.text })),
   ];
@@ -227,13 +227,13 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
           {(['Terran', 'Zerg', 'Protoss'] as Faction[]).map((f) => (
             <Btn key={f} size="sm" variant={faction === f ? 'primary' : ''} onClick={() => { if (f === faction) return; onFaction?.(f); setSel(null); }}>{f}</Btn>
           ))}
-          <span className="small muted">Each race keeps its own army: switch back and it is here again.</span>
+          <span className="small muted">Each race keeps its own army.</span>
         </div>
       )}
 
       <div className="grid grid-2">
         <div className="stack">
-          <h3>Train units</h3>
+          <h3>Train Units</h3>
           <div className="army-buildings">
             {buildings.map((b) => (
               <div key={b.name} className="army-building">
@@ -274,7 +274,7 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
                     </span>
                   );
                 })}
-                {upgradeOptions(def).length === 0 && <span className="small muted">No upgrades for this unit.</span>}
+                {upgradeOptions(def).length === 0 && <span className="small muted">No upgrades for this Unit.</span>}
               </div>
               <div className="row" style={{ marginTop: 8 }}>
                 <input placeholder={`Name (optional), e.g. ${def.name} A`} value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, minWidth: 140 }} />
@@ -299,7 +299,7 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
               const off = !n && (gasSpent + c.cost > gas);
               return (
                 <button key={c.id} type="button" className={`cmd-btn card-btn ${n ? 'on' : ''}`} disabled={off} onClick={() => toggleTactical(c)}
-                  {...hover({ title: c.name, meta: `Tactical card · ${c.cost} gas · ${c.resource} ${resource} · slots ${SLOTS.filter((s) => c.slots[s]).map((s) => `${c.slots[s]} ${s}`).join(', ') || 'none'}${c.unique ? ' · unique' : ''}`, body: <>{cardBody(c)}{n ? <><br />In your army: click to remove.</> : off ? <><br />Not enough Vespene Gas.</> : null}</> })}>
+                  {...hover({ title: c.name, meta: `Tactical card · ${c.cost} gas · ${c.resource} ${resource} · slots ${SLOTS.filter((s) => c.slots[s]).map((s) => `${c.slots[s]} ${s}`).join(', ') || 'none'}${c.unique ? ' · unique' : ''}`, body: <>{cardBody(c)}{n ? <><br />In your army. Click to remove.</> : off ? <><br />Not enough Vespene Gas.</> : null}</> })}>
                   <Icon name={`c_${c.id}`} size={52} />
                   <span className="cmd-cost">{c.cost}</span>
                   {n > 0 && <span className="cmd-count">✓</span>}
@@ -314,7 +314,7 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
             <h3>Your army</h3>
             <span className={`tag ${spent > budget ? 'danger' : 'accent'}`}>{spent} / {budget} minerals</span>
           </div>
-          {units.length === 0 && <p className="muted">No units yet: train them from the buildings on the left.</p>}
+          {units.length === 0 && <p className="muted">No Units yet. Train them from the buildings on the left.</p>}
           {units.map((u) => (
             <div key={u.id} className="army-unit-row">
               <Icon name={`u_${u.defId}`} size={36} />
@@ -327,7 +327,7 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
           {units.length > 0 && <Btn size="sm" variant="ghost" onClick={() => onChange({ units: [], cards: [], name: '' })}>Clear the army</Btn>}
           {named && (
             <label className="stack" style={{ marginTop: 8, gap: 4 }}>
-              <span className="small muted">Army name (optional): the army and its cards are saved under it when you take it into battle; unnamed, it gets one like “{faction} army 2”.</span>
+              <span className="small muted">Army name (optional). The army and its cards are saved under this name when it goes into battle. Unnamed, it is saved as “{faction} army 2” or similar.</span>
               <input placeholder={faction === 'Zerg' ? 'e.g. Kerrigan\'s Brood' : faction === 'Protoss' ? 'e.g. Templar Vanguard' : 'e.g. Raynor\'s Raiders'} value={value.name ?? ''} onChange={(e) => onChange({ ...value, name: e.target.value })} />
             </label>
           )}
@@ -335,7 +335,7 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
           {recent && (
             <>
               <h3 style={{ marginTop: 14 }}>Saved armies{anyScale ? '' : ` · ${scaleName}`}</h3>
-              {fits.length === 0 && <p className="small muted">None saved {anyScale ? '' : `for a ${scaleName.toLowerCase()} game `}within {budget} minerals{lockFaction ? ` for ${faction}` : ''} yet. Every army you take into a battle is saved here, with its cards.</p>}
+              {fits.length === 0 && <p className="small muted">None saved {anyScale ? '' : `for a ${scaleName.toLowerCase()} game `}within {budget} minerals{lockFaction ? ` for ${faction}` : ''} yet. Armies taken into battle are saved here with their cards.</p>}
               <div className="army-recent">
                 {fits.map((r) => (
                   <div key={r.id} className="army-recent-row">

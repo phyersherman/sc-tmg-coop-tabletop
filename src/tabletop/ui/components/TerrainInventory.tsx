@@ -44,7 +44,7 @@ function PhotoButton({ id }: { id: string }) {
   const has = !!s.terrainImages[id];
   return (
     <span className="row" style={{ gap: 2 }}>
-      <label className="btn btn-sm terrain-photo" title={has ? 'Change the photo of this piece' : 'Add a photo of this piece, so the setup legend shows which one goes where'} style={{ cursor: 'pointer' }}>
+      <label className="btn btn-sm terrain-photo" title={has ? 'Change the photo of this piece' : 'Add a photo of this piece for the table setup legend'} style={{ cursor: 'pointer' }}>
         {has ? 'Change' : 'Photo'}
         <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) thumbnailFromFile(f).then((d) => s.setTerrainImage(id, d)).catch(() => alert('Could not read that image.')); e.target.value = ''; }} />
       </label>
@@ -97,7 +97,7 @@ export function TerrainInventory() {
     <div>
       <div className="row between">
         <Toggle on={s.useOwnTerrain} onChange={(v) => s.set({ useOwnTerrain: v })}>Only use terrain I own</Toggle>
-        <span className="small muted">{s.useOwnTerrain ? `${total} pieces (${sig} blocking)` : 'using the Lost Temple set and Ramp, scaled to the table'}</span>
+        <span className="small muted">{s.useOwnTerrain ? `${total} pieces (${sig} blocking)` : 'Lost Temple set and Ramp, scaled to the table'}</span>
       </div>
       <div className="grid grid-2" style={{ marginTop: 10 }}>
         {TERRAIN_SETS.map((set) => (
@@ -114,7 +114,7 @@ export function TerrainInventory() {
         <>
           {sig < 4 && <p className="tag warn" style={{ marginTop: 8 }}>Add at least 4 blocking (Size 2+) pieces for a balanced table.</p>}
           <div className="row between" style={{ marginTop: 12 }}>
-            <p className="small muted" style={{ margin: 0 }}>How many of each piece you own. The picture is the piece in the rulebook's terrain key.</p>
+            <p className="small muted" style={{ margin: 0 }}>Enter how many of each piece you own. Pictures are from the rulebook's terrain key.</p>
             <Btn size="sm" variant={adding ? '' : 'ghost'} onClick={() => setAdding((v) => !v)}>{adding ? 'Close' : '+ A piece of your own'}</Btn>
           </div>
           <div className="terrain-rows">
@@ -138,7 +138,7 @@ export function TerrainInventory() {
               <label>Count</label><Stepper value={count} onChange={setCount} min={1} max={30} />
               <Btn variant="primary" size="sm" disabled={!name.trim()} onClick={() => { s.addCustomTerrain({ label: name.trim(), size: grass ? 2 : size, grass, w, h }, count); setName(''); }}>Add</Btn>
             </div>
-            <p className="small muted" style={{ marginTop: 6 }}>After adding, use Photo on the new row to attach a picture.</p>
+            <p className="small muted" style={{ marginTop: 6 }}>To attach a picture, press Photo on the new row.</p>
           </div>}
         </>
       )}

@@ -6,8 +6,8 @@ export function TokensScreen() {
   return (
     <div className="tokens-page">
       <div className="no-print">
-        <h1>Side-marker tokens</h1>
-        <p className="muted">Print this page, cut the tokens out, and set each one beside its marker when you set up a co-op mission: the table setup says which goes where. A reward token tells everyone what a side marker is worth once its guard or Structure is destroyed and a player holds the marker at a Scoring phase. Gold rewards go to one unit, blue to one player, violet change the mission.</p>
+        <h1>Side Marker Tokens</h1>
+        <p className="muted">Print this page and cut out the tokens. When setting up a co-op mission, place each token beside its side marker as the table setup lists. A reward token shows what its side marker is worth. The players earn it by destroying the guard or Structure, then holding the marker in a Scoring phase. Gold rewards go to one Unit, blue to one player, and violet change the mission.</p>
         <Btn variant="primary" onClick={() => window.print()}>Print the tokens</Btn>
       </div>
       <TokenSheet />

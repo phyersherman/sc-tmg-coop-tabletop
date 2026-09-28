@@ -62,7 +62,7 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
   const card = currentCard(state.orderDeck);
 
   if (order.type === 'deploy' && order.dropAt) {
-    return { ...order, lines: [...order.lines, `Camera: set the leading model down at ${fmtPt(order.dropAt)}.`] };
+    return { ...order, lines: [...order.lines, `Camera: set the Leading Model down at ${fmtPt(order.dropAt)}.`] };
   }
   if (order.type === 'deploy') {
     const table = state.terrain.table;
@@ -71,11 +71,11 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
     const entries = segs.map((s) => closestOnSegment(s, table, target));
     const entry = entries.reduce((a, b) => (dist(a, target) <= dist(b, target) ? a : b), entries[0] ?? segmentMidpoint(segs[0]!, table));
     const d = destinationToward(state, entry, target, speed, pathOptionsFor(state, 'ai', unit.id));
-    return { ...order, lines: [...order.lines, `Camera: enter at ${fmtPt(entry)} and move the leading model to about ${fmtPt(d.point)}.`] };
+    return { ...order, lines: [...order.lines, `Camera: enter at ${fmtPt(entry)} and move the Leading Model to about ${fmtPt(d.point)}.`] };
   }
 
   const mine = aiModels(state, unit);
-  if (!mine) return { ...order, lines: [...order.lines, 'Camera: this unit was not seen on the table; resolve the order manually.'] };
+  if (!mine) return { ...order, lines: [...order.lines, 'Camera: this Unit cannot be seen on the table. Resolve the order by hand.'] };
   const from = centroid(mine);
 
   if (order.type === 'move' || order.type === 'run' || order.type === 'disengage') {
@@ -89,10 +89,10 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
       const range = def.weapons.filter((w) => w.phase === 'Assault' && typeof w.range === 'number').reduce((a, w) => Math.max(a, w.range as number), 0);
       if (range > 0) {
         const vis = visibleEnemies(state, unit, range);
-        if (vis.length) stop = ` An enemy (${vis[0]!.unit.name}) is already visible within ${range}", so it may hold position instead.`;
+        if (vis.length) stop = ` ${vis[0]!.unit.name} is already in Line of Sight within ${range}", so it may stay where it is instead.`;
       }
     }
-    const lines = [`Camera: move the leading model (now at ${fmtPt(lead)}) to about ${fmtPt(d.point)}${d.remaining > 0 ? `, ${Math.round(d.remaining)}" short of the objective` : ', reaching the objective'}.${stop}`, ...order.lines.slice(1)];
+    const lines = [`Camera: move the Leading Model from ${fmtPt(lead)} to about ${fmtPt(d.point)}${d.remaining > 0 ? `, ${Math.round(d.remaining)}" short of the objective` : ', reaching the objective'}.${stop}`, ...order.lines.slice(1)];
     const reports = order.reports.slice();
     return { ...order, lines, reports };
   }
@@ -124,7 +124,7 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
       const o = withDice(order, t.firing);
       if (usingLong) for (const b of o.batches) b.hitMod = (b.hitMod ?? 0) - 1;
       const lines = [
-        `Camera: RANGED ATTACK ${t.unit.name} (nearest model ${Math.round(t.nearest)}" away${usingLong ? ', using LONG RANGE at -1 to hit' : ''}). ${t.firing} of ${unit.models} models have range and line of sight.`,
+        `Camera: RANGED ATTACK ${t.unit.name}, nearest model ${Math.round(t.nearest)}" away${usingLong ? ', with LONG RANGE at -1 to hit' : ''}. ${t.firing} of ${unit.models} models have range and Line of Sight.`,
         ...(order.lines.filter((l) => l.startsWith('STIM'))),
       ];
       const reports: OrderReportOption[] = [...order.reports.filter((r) => r.id !== 'noTarget'), { id: 'noTarget', label: 'Could not fire' }];
@@ -133,7 +133,7 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
     const target = headingPoint(state, order, from);
     const lead = leadingModel(mine, target ?? from);
     const d = target ? destinationToward(state, lead, target, speed, pathOptionsFor(state, 'ai', unit.id), unit.defId) : { point: lead, remaining: 0 };
-    return { ...order, batches: [], lines: [`Camera: no enemy unit is visible within ${lr || range}". RUN: move the leading model (at ${fmtPt(lead)}) to about ${fmtPt(d.point)}.`], reports: [{ id: 'noTarget', label: 'Ran' }] };
+    return { ...order, batches: [], lines: [`Camera: no enemy Unit in Line of Sight within ${lr || range}". RUN the Leading Model from ${fmtPt(lead)} to about ${fmtPt(d.point)}.`], reports: [{ id: 'noTarget', label: 'Ran' }] };
   }
 
   if (order.type === 'charge') {
@@ -143,7 +143,7 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
     const e = nearestEnemyByPath(state, unit, true);
     if (e && e.pathDist <= threshold) {
       const lines = [
-        `Camera: CHARGE ${e.unit.name} — ${Math.round(e.pathDist)}" by path from the leading model. Roll ${order.charge?.dice === '2d6high' ? '2D6 (highest)' : 'D6'} + ${reach}: success on ${Math.max(1, Math.ceil(e.pathDist - 1 - reach))}+ if the path is clear.`,
+        `Camera: CHARGE ${e.unit.name}, ${Math.round(e.pathDist)}" from the Leading Model along its path. Roll ${order.charge?.dice === '2d6high' ? '2D6 (keep the highest)' : 'D6'} + ${reach}. It needs ${Math.max(1, Math.ceil(e.pathDist - 1 - reach))}+ on the die if the path is clear.`,
         ...order.lines.filter((l) => l.startsWith('IMPACT')),
       ];
       return { ...order, lines, batches: order.batches.length ? withDice(order, unit.models).batches : [], reports: order.reports.filter((r) => r.id !== 'attacked' && r.id !== 'noTarget') };
@@ -155,13 +155,13 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
       const vis = visibleEnemies(state, unit, range).sort((a, b) => a.nearest - b.nearest);
       if (vis.length) {
         const t = vis[0]!;
-        return { ...withDice(order, t.firing), lines: [`Camera: no charge in reach (nearest enemy ${e ? Math.round(e.pathDist) : '?'}" by path). RANGED ATTACK ${t.unit.name}: ${t.firing} of ${unit.models} models can fire.`], reports: [{ id: 'attacked', label: 'Attacked' }, { id: 'noTarget', label: 'Could not fire' }] };
+        return { ...withDice(order, t.firing), lines: [`Camera: no enemy in charge reach (nearest ${e ? Math.round(e.pathDist) : '?'}" by path). RANGED ATTACK ${t.unit.name} with ${t.firing} of ${unit.models} models.`], reports: [{ id: 'attacked', label: 'Attacked' }, { id: 'noTarget', label: 'Could not fire' }] };
       }
     }
     const target = e ? centroid(e.models) : headingPoint(state, order, from);
     const lead = leadingModel(mine, target ?? from);
     const d = target ? destinationToward(state, lead, target, speed, pathOptionsFor(state, 'ai', unit.id), unit.defId) : { point: lead, remaining: 0 };
-    return { ...order, batches: [], impact: undefined, charge: undefined, lines: [`Camera: nothing in charge reach (nearest enemy ${e ? Math.round(e.pathDist) : '?'}" by path). RUN: move the leading model (at ${fmtPt(lead)}) to about ${fmtPt(d.point)}, ending more than 1" from enemies.`], reports: [{ id: 'noTarget', label: 'Ran' }] };
+    return { ...order, batches: [], impact: undefined, charge: undefined, lines: [`Camera: no enemy in charge reach (nearest ${e ? Math.round(e.pathDist) : '?'}" by path). RUN the Leading Model from ${fmtPt(lead)} to about ${fmtPt(d.point)}, ending more than 1" from every enemy model.`], reports: [{ id: 'noTarget', label: 'Ran' }] };
   }
 
   if (order.type === 'closeCombat') {
@@ -171,7 +171,7 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
       const inRank = mine.filter((m) => eng.some((pu) => (state.sense?.players[pu.id] ?? []).some((p) => dist(m, p) <= 1.05))).length;
       const supporting = mine.filter((m) => !eng.some((pu) => (state.sense?.players[pu.id] ?? []).some((p) => dist(m, p) <= 1.05)) && mine.some((o) => o !== m && dist(o, m) <= 1.3 && eng.some((pu) => (state.sense?.players[pu.id] ?? []).some((p) => dist(o, p) <= 1.05)))).length;
       const n = Math.min(unit.models, inRank + supporting);
-      return { ...withDice(order, Math.max(1, n)), lines: [`Camera: engaged with ${eng.map((e) => e.name).join(' and ')}. All dice into ${t.name}. ${inRank} models in the Fighting Rank and ${supporting} supporting before Close Ranks; adjust after moving.`, order.lines[0]!] };
+      return { ...withDice(order, Math.max(1, n)), lines: [`Camera: Engaged with ${eng.map((e) => e.name).join(' and ')}. All dice go into ${t.name}. Before Close Ranks, ${inRank} models are in the Fighting Rank and ${supporting} in the Supporting Rank. Adjust after moving.`, order.lines[0]!] };
     }
   }
   return order;

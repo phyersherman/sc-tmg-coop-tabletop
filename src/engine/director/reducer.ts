@@ -229,13 +229,13 @@ function startRound(state: GameState, mode: MissionMode): void {
   commitRng(state, ctx.rng);
   const pool = poolNow(state);
   state.supply.pool = pool;
-  lines.unshift(`Round ${state.round} of ${state.finalRound}. AI Supply Pool: ${pool === Infinity ? 'unlimited (final round)' : pool}. First player this phase: ${state.firstPlayer === 'ai' ? 'AI' : 'Players'}.`);
-  lines.push(`AI order: ${card.name.toUpperCase()} — ${card.flavor}${card.special ? ` ${card.special}` : ''}`);
+  lines.unshift(`Round ${state.round} of ${state.finalRound}. AI Supply Pool: ${pool === Infinity ? 'unlimited (final round)' : pool}. First Player: ${state.firstPlayer === 'ai' ? 'the AI' : 'the players'}.`);
+  lines.push(`AI order: ${card.name.toUpperCase()}. ${card.flavor}${card.special ? ` ${card.special}` : ''}`);
   const notes = mode.roundNotes?.(ctx) ?? [];
   lines.push(...notes);
   // Medic heal prompt (simplified ability kit).
   const medics = onTable(state).filter((u) => u.defId === 'medic');
-  if (medics.length) lines.push('Medics: each damaged Biological AI unit within 4" of a Medic unit heals 1 damage per Medic model. Heal it on the unit\'s card.');
+  if (medics.length) lines.push('Medics: each damaged Biological AI Unit within 4" of a Medic Unit heals 1 damage per Medic model. Remove it from the unit\'s card.');
   pushLog(state, 'system', `Round ${state.round} begins. Order card: ${card.name}.`);
   state.step = { kind: 'ROUND_START', lines };
 }
@@ -248,7 +248,7 @@ function startPhase(state: GameState, mode: MissionMode, phase: Phase): void {
   state.passed = { ai: false, players: false };
   state.nextFirstPlayer = null;
   state.turn = state.firstPlayer;
-  pushLog(state, 'system', `${PHASE_NAME[phase]} phase. First player: ${state.firstPlayer}.`);
+  pushLog(state, 'system', `${PHASE_NAME[phase]} phase. First Player: ${state.firstPlayer === 'ai' ? 'the AI' : 'the players'}.`);
   if (phase === 'combat') {
     // Terran Tenacity can be claimed before the AI fights first: the phase opens with its announcement.
     if (state.sense?.calibrated && state.firstPlayer === 'ai' && hasUnusedTenacity(state)) {
@@ -262,7 +262,7 @@ function startPhase(state: GameState, mode: MissionMode, phase: Phase): void {
       // Engagement is computed from positions; go straight to the fighting.
       const anyEngaged = onTable(state).some((u) => u.engaged) || state.playerUnits.some((p) => p.location === 'table' && !p.destroyed && p.engaged);
       if (!anyEngaged) {
-        pushLog(state, 'system', 'No units are engaged; the Combat phase is skipped.');
+        pushLog(state, 'system', 'No Units are Engaged. The Combat phase is skipped.');
         state.passed = { ai: true, players: true };
         endPhase(state, mode);
         return;
@@ -286,7 +286,7 @@ function startPhase(state: GameState, mode: MissionMode, phase: Phase): void {
   }
   const lines = [`${PHASE_NAME[phase]} phase. ${state.firstPlayer === 'ai' ? 'The AI' : 'You'} activate first.`];
   if (phase === 'movement') lines.push(`AI Supply available to deploy: ${availableNow(state) === Infinity ? 'unlimited' : availableNow(state)} of ${poolNow(state) === Infinity ? '∞' : poolNow(state)}.`);
-  if (phase === 'assault') lines.push('Ranged attacks, charges and runs. AI dice are pre-rolled on each order.');
+  if (phase === 'assault') lines.push('Ranged Attacks, Charges and Runs. The AI\'s dice are rolled on each order.');
   state.step = { kind: 'PHASE_START', lines };
 }
 
@@ -377,7 +377,7 @@ function advanceTurn(state: GameState, mode: MissionMode): void {
       state.turn = 'ai';
       continue;
     }
-    const lines = [state.phase === 'combat' ? 'Activate one of your engaged units and resolve its close combat, then tap Done. Pass when none remain.' : 'Activate one of your units, then tap Done. Or Pass (the first side to pass goes first next phase).'];
+    const lines = [state.phase === 'combat' ? 'Activate one of your Engaged Units and fight, then tap Done. Pass when none remain.' : 'Activate one of your Units, then tap Done, or Pass. The first side to pass activates first in the next phase.'];
     state.step = { kind: 'PLAYERS_TURN', lines };
     return;
   }
@@ -439,7 +439,7 @@ function resolvePendingHits(state: GameState, mode: MissionMode): void {
     state.lastAttack = a;
     state.attackLog.push(a);
     emit(state, { kind: 'attack', attack: a });
-    pushLog(state, 'players', `${q.source}: ${u.label} takes ${q.hits} hits, ${a.damage} damage${a.removed ? `, ${a.removed} model(s) removed` : ''}${a.destroyed ? ' — destroyed!' : ''}.`);
+    pushLog(state, 'players', `${q.source}: ${u.label} takes ${q.hits} hits, ${a.damage} damage${a.removed ? `, ${a.removed} model(s) removed` : ''}${a.destroyed ? '. Destroyed' : ''}.`);
   }
   commitRng(state, ctx.rng);
 }
@@ -696,14 +696,14 @@ function doScoring(state: GameState, mode: MissionMode, answers: ScoringAnswers)
   }
   state.vpHistory = [...(state.vpHistory ?? []).filter((h) => h.round !== state.round), { round: state.round, players: state.vp.players, ai: state.vp.ai }];
   // The report: what each side scored this round and why, and where the markers stand.
-  const lines: string[] = [`Round ${state.round} scored. Players ${state.vp.players} VP — AI ${state.vp.ai} VP.`];
+  const lines: string[] = [`Round ${state.round} scored. Players ${state.vp.players} VP, AI ${state.vp.ai} VP.`];
   lines.push(`This round: you +${state.vp.players - before.players} VP (${state.aiSupplyLostThisRound} AI Supply destroyed), the AI +${state.vp.ai - before.ai} VP (${Math.max(0, Math.floor(answers.playerSupplyLost))} of your Supply destroyed).`);
   const active = state.markers.filter((m) => m.active);
   if (active.length) lines.push(`Markers: ${active.map((m) => `#${m.id} ${m.controlledBy === 'players' ? 'yours' : m.controlledBy === 'ai' ? 'AI' : 'nobody'}${m.locked ? ' (locked)' : ''}`).join(', ')}.`);
   if (result) {
     state.status = result;
     commitRng(state, ctx.rng);
-    state.step = { kind: 'GAME_OVER', result, lines: [...lines, result === 'won' ? 'Victory! The players win.' : result === 'lost' ? 'Defeat. The AI wins.' : 'Draw.', missionOutcome(state, result)] };
+    state.step = { kind: 'GAME_OVER', result, lines: [...lines, result === 'won' ? 'Victory. The players win.' : result === 'lost' ? 'Defeat. The AI wins.' : 'Draw.', missionOutcome(state, result)] };
     pushLog(state, 'system', `Game over: ${result}.`);
     return;
   }
@@ -1081,10 +1081,10 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       if (!from) return state;
       // Set Wholly Within X" of where it stood, measured from the edge of its base (no path: it is set, not moved).
       const pr = playerMoveReach(state, pu, cmd.point, pu.placeRange, true);
-      if (pr.reach > pu.placeRange + 0.05) return reject(state, `PLACE reaches only ${pu.placeRange}": the whole base must end within ${pu.placeRange}" of where it stood.`);
+      if (pr.reach > pu.placeRange + 0.05) return reject(state, `PLACE reaches only ${pu.placeRange}". The whole base must end within ${pu.placeRange}" of where it stood.`);
       if (!passable(cmd.point, state.terrain.pieces)) return reject(state, 'Cannot be set on terrain (Size 1 and up).');
       const near = state.army.units.find((u) => u.location === 'table' && (() => { const q = aiPos(state, u); return !!q && dist(q, cmd.point) <= 1.05; })());
-      if (near && state.phase !== 'assault') return reject(state, `Cannot be set within engagement range of ${near.label}.`);
+      if (near && state.phase !== 'assault') return reject(state, `Cannot be set within Engagement Range of ${near.label}.`);
       setPlayerPosition(state, pu, cmd.point, { avoidEngaging: state.phase !== 'assault', facing: pr.facing });
       pushLog(state, 'players', `${pu.name} is PLACEd ${pr.reach.toFixed(1)}" away.`);
       pu.placeRange = 0;
@@ -1097,7 +1097,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       const from = playerPos(state, pu);
       if (!from) return state;
       const bm = playerMoveReach(state, pu, cmd.point, pu.bonusMove);
-      if (bm.reach > pu.bonusMove + 0.05) return reject(state, `The free move is only ${pu.bonusMove}": the whole base must end within ${pu.bonusMove}" of where it started.`);
+      if (bm.reach > pu.bonusMove + 0.05) return reject(state, `The free move is only ${pu.bonusMove}". The whole base must end within ${pu.bonusMove}" of where it started.`);
       if (!passable(cmd.point, state.terrain.pieces)) return reject(state, 'Cannot end on terrain (Size 1 and up).');
       setPlayerPosition(state, pu, cmd.point, { avoidEngaging: true, facing: bm.facing });
       pushLog(state, 'players', `${pu.name} makes a free ${pu.bonusMove}" move.`);
@@ -1155,7 +1155,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       state.lastAttack = a;
       state.attackLog.push(a);
       emit(state, { kind: 'attack', attack: a });
-      pushLog(state, 'players', `${pu.name} fires ${weapon.name} at ${target.label}${mod.notes.length ? ` (${mod.notes.join(', ')})` : ''}: ${a.hits} hits, ${a.damage} damage${a.removed ? `, ${a.removed} model(s) removed` : ''}${a.destroyed ? ' — destroyed!' : ''}.`);
+      pushLog(state, 'players', `${pu.name} fires ${weapon.name} at ${target.label}${mod.notes.length ? ` (${mod.notes.join(', ')})` : ''}: ${a.hits} hits, ${a.damage} damage${a.removed ? `, ${a.removed} model(s) removed` : ''}${a.destroyed ? '. Destroyed' : ''}.`);
       pu.firedThisActivation = [...(pu.firedThisActivation ?? []), weapon.id];
       finishPlayerAction(state, mode, pu, weapon.phase === 'Combat' ? 'combat' : 'assault', 'attack');
       return state;
@@ -1270,7 +1270,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
     case 'adjustModel': {
       const pu = state.playerUnits.find((x) => x.id === cmd.unitId);
       if (!pu || pu.location !== 'table') return state;
-      if (state.step.kind !== 'PLAYERS_TURN' || state.activeUnitId !== pu.id || !pu.mayAdjust) return reject(state, 'Adjust coherency while the unit is active, after it has moved or held.');
+      if (state.step.kind !== 'PLAYERS_TURN' || state.activeUnitId !== pu.id || !pu.mayAdjust) return reject(state, 'Adjust Coherency while the unit is active, after it has moved or held.');
       // Set on a squad-mate's spot, the squad-mate steps aside.
       const res = adjustModelDisplacing(state, 'players', pu.id, cmd.index, cmd.point);
       if ('error' in res) return reject(state, res.error);
@@ -1505,7 +1505,7 @@ function applySnapshot(state: GameState): void {
  * the wall and the table setup says so. Ramps and area terrain are fine to stand a marker on.
  */
 function reject(state: GameState, reason?: string): GameState {
-  pushLog(state, 'system', `Not allowed: ${reason ?? 'illegal action'}.`);
+  pushLog(state, 'system', `Not allowed: ${(reason ?? 'illegal action').replace(/\.$/, '')}.`);
   return state;
 }
 
@@ -1612,10 +1612,10 @@ function payFor(state: GameState, cost: number, payWith?: string[], owner = 0): 
     const cards = (state.playerCards ?? []).filter((c) => payWith.includes(c.id));
     if (cards.some((c) => ownerOf(c) !== owner)) return 'That card belongs to another player.';
     if (cards.some((c) => c.exhausted)) return 'One of those cards is already exhausted.';
-    if (payValue(state, payWith) < cost) return `Those cards only provide ${payValue(state, payWith)}; the cost is ${cost}.`;
+    if (payValue(state, payWith) < cost) return `Those cards provide only ${payValue(state, payWith)}. The cost is ${cost}.`;
     // A cost takes no more than it asks for: a card the rest of the payment already covers stays Ready.
     const spare = sparePayCard(state, payWith, cost);
-    if (spare) return `${cardDef(spare.defId)?.name ?? 'That card'} is not needed to pay ${cost}: the other cards already cover it.`;
+    if (spare) return `${cardDef(spare.defId)?.name ?? 'That card'} is not needed to pay ${cost}. The other cards cover it.`;
     return cards;
   }
   const auto = autoPay(state, cost, [], owner);
@@ -1858,7 +1858,7 @@ export function aiIntent(state: GameState, order: AiOrder): { attack: boolean | 
   try {
     if (order.type === 'closeCombat') {
       const eng = livePlayers.filter((p) => p.engagedWith.includes(u.id) || aiEngagedWith(state, u).some((e) => e.id === p.id));
-      return eng.length ? { attack: true, target: eng[0]!.name, reason: '' } : { attack: false, reason: `${u.label} is not in base contact with any of your units: no close combat.` };
+      return eng.length ? { attack: true, target: eng[0]!.name, reason: '' } : { attack: false, reason: `${u.label} is not in base contact with any of your units. No close combat.` };
     }
     const main = order.batches[0];
     const flare = (u.debuffs ?? []).reduce((a, d) => a + (d.rangeMod ?? 0), 0);
@@ -1877,7 +1877,7 @@ export function aiIntent(state: GameState, order: AiOrder): { attack: boolean | 
     };
     if (order.type === 'ranged') {
       const vis = inRange();
-      return vis.length ? { attack: true, target: vis[0]!.unit.name, reason: '' } : { attack: false, reason: `No enemy in range and line of sight of ${u.label}: it runs toward its objective instead of shooting.` };
+      return vis.length ? { attack: true, target: vis[0]!.unit.name, reason: '' } : { attack: false, reason: `No enemy in range and Line of Sight of ${u.label}. It runs toward its objective.` };
     }
     if (order.type === 'charge') {
       const from = aiPos(state, u);
@@ -1892,7 +1892,7 @@ export function aiIntent(state: GameState, order: AiOrder): { attack: boolean | 
       }
       const vis = order.batches.length ? inRange() : [];
       if (vis.length) return { attack: true, target: vis[0]!.unit.name, reason: '' };
-      return { attack: false, reason: `Nothing within charge reach of ${u.label}: it runs toward its objective instead.` };
+      return { attack: false, reason: `Nothing within charge reach of ${u.label}. It runs toward its objective.` };
     }
     return { attack: null, reason: '' };
   } finally {

@@ -65,11 +65,11 @@ export function TerrainLabScreen() {
           </select>
           {mapId === 'remix' && <div className="row"><label>Seed</label><input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value) || 0)} /><Btn onClick={() => setSeed(Math.floor(Math.random() * 100000))}>Reroll</Btn></div>}
         </div>
-        <p className="small muted" style={{ marginTop: 10 }}>{terrain.name}{terrain.page ? `, core rulebook page ${terrain.page}` : ''}. Numbers on the map match the list.</p>
+        <p className="small muted" style={{ marginTop: 10 }}>{terrain.name}{terrain.page ? `, core rulebook page ${terrain.page}` : ''}. The numbers on the map match the list.</p>
         <TerrainLegend terrain={terrain} />
       </Panel>
       <Panel title={deployment.name}>
-        <Toggle on={pictures} onChange={setPictures}>Rulebook pictures, as in table setup</Toggle>
+        <Toggle on={pictures} onChange={setPictures}>Rulebook pictures</Toggle>
         <TableMap deployment={deployment} terrain={terrain} refArt={pictures} />
       </Panel>
       <Panel title="Your terrain collection" className="span-all"><TerrainInventory /></Panel>
@@ -86,9 +86,9 @@ export function SettingsScreen() {
     <Panel title="Settings">
       <div className="col">
         <Toggle on={s.appRollsAiDice} onChange={(v) => s.set({ appRollsAiDice: v })}>App rolls the AI's dice</Toggle>
-        <p className="small muted">Off: orders only show dice counts and target numbers so you can roll physical dice.</p>
-        <Toggle on={s.confirmPass !== false} onChange={(v) => s.set({ confirmPass: v })}>Remind me before passing while units can still act</Toggle>
-        <Toggle on={!s.skipPhaseBanners} onChange={(v) => s.set({ skipPhaseBanners: !v })}>Announce each round and phase (off: the phase track at the top shows the change)</Toggle>
+        <p className="small muted">Off: orders show only dice counts and target numbers. Roll the AI's dice on the table.</p>
+        <Toggle on={s.confirmPass !== false} onChange={(v) => s.set({ confirmPass: v })}>Warn before passing while Units can still act</Toggle>
+        <Toggle on={!s.skipPhaseBanners} onChange={(v) => s.set({ skipPhaseBanners: !v })}>Announce each round and phase</Toggle>
         <div className="row">
           <Btn disabled={!game} onClick={() => { const blob = new Blob([exportSave()], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sctmg-coop-save.json'; a.click(); }}>Export save</Btn>
           <label className="btn" style={{ cursor: 'pointer' }}>
@@ -133,7 +133,7 @@ export function DebriefScreen() {
           {lost.length > 0 && <p className="small"><b>You lost:</b> {lost.join(', ')}</p>}
         </div>
         <details className="debrief-code">
-          <summary className="small muted">Scenario code, to share this setup</summary>
+          <summary className="small muted">Scenario code for this setup</summary>
           <code className="small">{share}</code>
         </details>
         <div className="row"><Btn variant="primary" onClick={() => rematch(g)}>Same setup again</Btn><Btn onClick={() => go('setup')}>New battle</Btn><Btn variant="ghost" onClick={() => go('home')}>Home</Btn></div>

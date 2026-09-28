@@ -15,7 +15,7 @@ export function CardsPanel({ g, dispatch }: { g: GameState; dispatch: (c: Comman
   const res = playerResource(g);
   const boosts = cardBoosts(g, active);
   const available = readyCards(g).reduce((a, c) => a + (cardDef(c.defId)?.resource ?? 0), 0);
-  if (!cards.length) return <p className="muted small">No cards in this army. Add a Faction card and Tactical cards in setup (Your army).</p>;
+  if (!cards.length) return <p className="muted small">No cards in this army. Add a Faction card and Tactical cards at the Your army step of setup.</p>;
   const use = (b: UsableBoost) => {
     const spec = b.spec!;
     const key = `${b.card.id}:${b.boost.name}`;
@@ -29,7 +29,7 @@ export function CardsPanel({ g, dispatch }: { g: GameState; dispatch: (c: Comman
   };
   return (
     <div className="stack">
-      <p className="small"><b>{available}</b> {RESOURCE_NAME[res]} available from Ready cards. {active ? <>Active unit: <b>{active.name}</b>.</> : <span className="muted">Select a unit to use boosts on it.</span>}</p>
+      <p className="small"><b>{available}</b> {RESOURCE_NAME[res]} available from Ready cards. {active ? <>Active unit: <b>{active.name}</b>.</> : <span className="muted">Select a Unit to use boosts on it.</span>}</p>
       {cards.map((c) => {
         const def = cardDef(c.defId);
         if (!def) return null;

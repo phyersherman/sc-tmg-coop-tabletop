@@ -26,11 +26,11 @@ export const ORDER_CARDS: Record<string, OrderCard> = {
   reinforce: { id: 'reinforce', name: 'Reinforce', flavor: 'Everything we have, now.', deployMax: 'all', deployBias: 'nearest', advance: 'normal', chargeThreshold: 'likely' },
   allIn: { id: 'allIn', name: 'All-In', flavor: 'No reserves, no retreat.', reshuffle: true, deployMax: 'all', deployBias: 'nearest', advance: 'aggressive', chargeThreshold: 'possible', chargeBonus: 1 },
   // Faction cards
-  swarmSurge: { id: 'swarmSurge', name: 'Swarm Surge', flavor: 'The ground itself erupts.', deployMax: 'all', deployBias: 'ambush', advance: 'aggressive', chargeThreshold: 'possible', chargeBonus: 1, special: 'Units with Burrow Ambush deploy anywhere within 18" of the AI edge, 10"+ from player models.' },
-  stim: { id: 'stim', name: 'Stim', flavor: 'Pop it and push.', deployMax: 2, deployBias: 'nearest', advance: 'aggressive', chargeThreshold: 'likely', hitMod: 1, special: 'Every AI Biological unit that attacks this round takes 1 damage first (Stimpack).' },
-  digIn: { id: 'digIn', name: 'Dig In', flavor: 'Hold the line.', deployMax: 1, deployBias: 'nearest', advance: 'hold', chargeThreshold: 'likely', passEarly: true, focus: 'onMarker', special: 'AI units that did not move get one re-roll on their first failed Armour save (Combat Shield).' },
-  warpIn: { id: 'warpIn', name: 'Warp In', flavor: 'The Khala opens.', deployMax: 2, deployBias: 'flank', advance: 'normal', chargeThreshold: 'possible', special: 'One AI unit may deploy from either side edge (not a player edge), 10"+ from player models.' },
-  khalaLink: { id: 'khalaLink', name: 'Khala Link', flavor: 'One mind, many blades.', deployMax: 2, deployBias: 'nearest', advance: 'normal', chargeThreshold: 'likely', hitMod: 1, special: 'AI attacks this round are at +1 to hit.' },
+  swarmSurge: { id: 'swarmSurge', name: 'Swarm Surge', flavor: 'The ground itself erupts.', deployMax: 'all', deployBias: 'ambush', advance: 'aggressive', chargeThreshold: 'possible', chargeBonus: 1, special: 'Units with Burrow Ambush may deploy anywhere within 18" of the AI\'s Entry Edge, with no model within 10" of a player model.' },
+  stim: { id: 'stim', name: 'Stim', flavor: 'Pop it and push.', deployMax: 2, deployBias: 'nearest', advance: 'aggressive', chargeThreshold: 'likely', hitMod: 1, special: 'Stimpack: every Biological AI Unit that attacks this round takes 1 damage first.' },
+  digIn: { id: 'digIn', name: 'Dig In', flavor: 'Hold the line.', deployMax: 1, deployBias: 'nearest', advance: 'hold', chargeThreshold: 'likely', passEarly: true, focus: 'onMarker', special: 'Combat Shield: AI Units that did not move re-roll their first failed Armour save.' },
+  warpIn: { id: 'warpIn', name: 'Warp In', flavor: 'The Khala opens.', deployMax: 2, deployBias: 'flank', advance: 'normal', chargeThreshold: 'possible', special: 'One AI Unit may deploy from either side edge that is not a player\'s Entry Edge, more than 10" from every player model.' },
+  khalaLink: { id: 'khalaLink', name: 'Khala Link', flavor: 'One mind, many blades.', deployMax: 2, deployBias: 'nearest', advance: 'normal', chargeThreshold: 'likely', hitMod: 1, special: 'AI attacks get +1 to hit this round.' },
 };
 
 const BASE = ['advance', 'advance', 'advance', 'hold', 'hold', 'focusFire', 'focusFire', 'flank', 'reinforce', 'allIn'];

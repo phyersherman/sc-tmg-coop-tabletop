@@ -53,12 +53,12 @@ export function availableActions(state: GameState, pu: PlayerUnit): UnitAction[]
     for (const w of playerWeapons(state, pu)) {
       // Once it has fired, a unit may still use each SIDEARM (and its main weapon after a SIDEARM) in the same activation.
       const spent = acted ? weaponSpent(state, pu, w) : null;
-      const reason = blocked ?? spent ?? (burrowed ? 'Burrowed: unburrow first' : pu.disengagedThisRound ? 'Disengaged this round' : validTargets(state, pu, w).length ? undefined : 'No target in range and line of sight');
+      const reason = blocked ?? spent ?? (burrowed ? 'Burrowed. Unburrow first' : pu.disengagedThisRound ? 'Disengaged this round' : validTargets(state, pu, w).length ? undefined : 'No target in range and Line of Sight');
       add(`weapon:${w.id}`, w.name, reason);
     }
     if (!pu.engaged) {
       const reachable = chargeOptions(state, pu).some((c) => checkCharge(state, pu, c.unit).ok);
-      add('charge', 'Charge', blocked ?? (acted ? 'Already acted this phase' : burrowed ? 'Burrowed: unburrow first' : playerUnitFlying(pu) ? 'Flying units cannot charge' : pu.disengagedThisRound ? 'Disengaged this round' : reachable ? undefined : 'No enemy within charge reach'));
+      add('charge', 'Charge', blocked ?? (acted ? 'Already acted this phase' : burrowed ? 'Burrowed. Unburrow first' : playerUnitFlying(pu) ? 'Flying units cannot charge' : pu.disengagedThisRound ? 'Disengaged this round' : reachable ? undefined : 'No enemy within charge reach'));
       add('run', 'Run', blocked ?? (acted ? 'Already acted this phase' : undefined));
     }
     add('hold', 'Hold', blocked ?? (acted ? 'Already acted this phase' : undefined));

@@ -215,7 +215,7 @@ const placeSpec = (range: number, extra?: (ctx: AbilityContext) => string | null
 const chargeTwoDice = (name: string): AbilitySpec => ({
   target: 'self',
   automated: true,
-  apply: ({ unit }) => { addEffect(unit!, name, 'Next charge rolls 2D6 and uses the higher result.', { chargeTwoDice: true }, 'charge'); return `${unit!.name}: ${name} — next charge rolls 2D6 (highest).`; },
+  apply: ({ unit }) => { addEffect(unit!, name, 'Next charge rolls 2D6 and uses the higher result.', { chargeTwoDice: true }, 'charge'); return `${unit!.name}: ${name}. Its next charge rolls 2D6 and uses the higher result.`; },
 });
 
 export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
@@ -227,7 +227,7 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
       const ab = playerUnitDef(pu).abilities.find((a) => a.name === 'Stimpack');
       const prec = precisionFrom(ab?.text ?? '') || 3;
       nonLethal(pu, 2);
-      addEffect(pu, 'Stimpack', `+3 Speed; C-14 Rifle / Quad K12 and close combat weapons gain PRECISION (${prec}). Suffered 2 non-lethal damage.`, { speed: 3 });
+      addEffect(pu, 'Stimpack', `+3 Speed. C-14 Rifle / Quad K12 and close combat weapons gain PRECISION (${prec}). Suffered 2 non-lethal damage.`, { speed: 3 });
       addEffect(pu, 'Stimpack (ranged)', `PRECISION (${prec})`, { precision: prec, weapons: ['C-14', 'Quad K12'] });
       addEffect(pu, 'Stimpack (melee)', `PRECISION (${prec})`, { precision: prec, weaponPhase: 'Combat' });
       void state;
@@ -255,7 +255,7 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
       const e = enemy!;
       e.debuffs ??= [];
       e.debuffs.push({ id: uid(state, 'flare'), source: 'Optical Flare', text: 'Ranged weapons −4" range, no LONG RANGE', rangeMod: -4, noLongRange: true });
-      return `Optical Flare blinds ${e.label}: its ranged weapons lose 4" and cannot use LONG RANGE this round.`;
+      return `Optical Flare on ${e.label}. Its ranged weapons lose 4" of range and cannot use LONG RANGE this round.`;
     },
   },
   'Target Lock': {
@@ -273,9 +273,9 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
   'Leg Enhancements': { target: 'self', automated: true, apply: ({ unit }) => { unit!.bonusMove = 2; return `${unit!.name} may make a free 2" Move: drag it on the map.`; } },
   Charge: chargeTwoDice('Charge'),
   'Metabolic Boost': chargeTwoDice('Metabolic Boost'),
-  Leap: { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Leap', '+2" to the next charge distance.', { chargeBonus: 2 }, 'charge'); return `${unit!.name}: Leap — +2" charge distance.`; } },
-  'Adrenal Overload': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Adrenal Overload', '+1 to IMPACT hit rolls this round.', { impactHit: 1 }); return `${unit!.name}: Adrenal Overload — +1 to IMPACT hit rolls.`; } },
-  Blink: placeSpec(6, ({ unit }) => (unit!.engaged ? '!Blink cannot end in engagement range; disengage first.' : null)),
+  Leap: { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Leap', '+2" to the next charge distance.', { chargeBonus: 2 }, 'charge'); return `${unit!.name}: Leap, +2" to its next charge.`; } },
+  'Adrenal Overload': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Adrenal Overload', '+1 to IMPACT hit rolls this round.', { impactHit: 1 }); return `${unit!.name}: Adrenal Overload, +1 to IMPACT hit rolls.`; } },
+  Blink: placeSpec(6, ({ unit }) => (unit!.engaged ? '!Blink cannot be used while Engaged. Disengage first.' : null)),
   'Leaping Strike': placeSpec(6, ({ unit }) => (unit!.engaged ? '!Only while unengaged.' : null)),
   'Path of Shadows': {
     target: 'self',
@@ -518,7 +518,7 @@ const firstWeapon = (source: string, text: string, mods: EffectMods, pred: (pu: 
   target: 'self',
   ...activeIs(pred, label),
   automated: true,
-  apply: ({ unit }) => { addEffect(unit!, source, text, mods, 'firstWeapon'); return `${source}: ${unit!.name} — ${text}`; },
+  apply: ({ unit }) => { addEffect(unit!, source, text, mods, 'firstWeapon'); return `${source}: ${unit!.name}. ${text}`; },
 });
 const dropPoint = (source: string): AbilitySpec => ({
   target: 'point',
@@ -539,7 +539,7 @@ const detector = (source: string): AbilitySpec => ({
 const armourBoost = (source: string, pred: (pu: PlayerUnit) => boolean): AbilitySpec => ({
   target: 'none',
   automated: false,
-  apply: () => `!${source} is used while rolling saves against an AI attack (it appears there).`,
+  apply: () => `!Use ${source} while rolling saves against an AI attack.`,
   needsUnit: pred,
 });
 const creepSpread = (source: string): AbilitySpec => ({
@@ -645,7 +645,7 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
   'Go! Go! Go!': { target: 'self', ...activeIs((pu) => isBio(pu) && pu.location === 'table', 'the active Biological unit'), automated: true, apply: ({ unit }) => { unit!.bonusMove = 2; return `Go! Go! Go!: ${unit!.name} may make a free 2" Move.`; } },
   'Zealous Charge': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Zealous Charge', '+2 Speed this round.', { speed: 2 }); return `Zealous Charge: ${unit!.name} +2 Speed.`; } },
   Phase: { target: 'self', automated: true, apply: ({ unit }) => { unit!.placeRange = 3; return `Phase: ${unit!.name} may be PLACEd up to 3".`; } },
-  'Ready for Pickup?': { target: 'self', once: 'game', automated: true, apply: ({ unit }) => { unit!.placeRange = 12; return `Ready for Pickup?: ${unit!.name} may be PLACEd up to 12" (not in engagement range), instead of an action.`; } },
+  'Ready for Pickup?': { target: 'self', once: 'game', automated: true, apply: ({ unit }) => { unit!.placeRange = 12; return `Ready for Pickup?: ${unit!.name} may be PLACEd up to 12", but not within Engagement Range. This replaces its action.`; } },
   'Field Repair': { target: 'self', ...activeIs(isMech, 'the active Mechanical unit'), automated: true, apply: ({ unit }) => `Field Repair: ${unit!.name} repairs ${heal(unit!, 2)} damage.` },
   // ---- Cards that came with the Immortal, Siege Tank and Ravager ---------------------------------------------
   "Pound 'em Flat!": firstWeapon("Pound 'em Flat!", 'Its first ranged weapon gains PRECISION (2) while it stands still.', { precision: 2, weaponPhase: 'Assault' }, isMech, 'the active Mechanical unit'),
@@ -692,7 +692,7 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
     apply: ({ friendly }) => {
       addEffect(friendly!, 'Might Of The Nerazim', '+2 Speed this round.', { speed: 2 });
       addEffect(friendly!, 'Might Of The Nerazim: strike', 'First weapon used gains CRITICAL HIT (2).', { critical: 2 }, 'firstWeapon');
-      return `Might Of The Nerazim: ${friendly!.name} surges out of the dark — +2 Speed and CRITICAL HIT (2) on its first weapon.`;
+      return `Might Of The Nerazim: ${friendly!.name} gains +2 Speed and CRITICAL HIT (2) on its first weapon.`;
     },
   },
   'Personal Transport': {
@@ -716,7 +716,7 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
   'Mass Recall': {
     target: 'point',
     once: 'game',
-    targetHint: 'anywhere; Protoss units within 6" return to Reserves',
+    targetHint: 'any spot. Protoss Units within 6" of it return to Reserves',
     automated: true,
     apply: ({ state, point }) => {
       const back = state.playerUnits.filter((pu) => pu.location === 'table' && !pu.summoned && playerUnitDef(pu).faction === 'Protoss' && (() => { const q = unitPos(state, pu); return !!q && dist(q, point!) <= 6; })());
@@ -736,14 +736,14 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
     if (state.step.kind === 'PHASE_START') state.turn = 'players';
     return 'Terran Tenacity: you claim the First Player Marker.';
   } },
-  'Bound by the Khala': { target: 'none', automated: false, apply: () => 'Bound by the Khala: after this activation, immediately activate another friendly unit (take your next activation before passing to the AI).' },
+  'Bound by the Khala': { target: 'none', automated: false, apply: () => 'Bound by the Khala: after this activation, activate another friendly Unit at once, before the AI takes its turn.' },
   'Lie in Wait': { target: 'self', ...activeIs((pu) => pu.location === 'table' && !pu.engaged && isGround(pu), 'the active unengaged Ground unit'), automated: true, apply: ({ unit }) => { unit!.statuses = [...new Set([...(unit!.statuses ?? []), 'Burrowed' as const])]; return `Lie in Wait: ${unit!.name} burrows.`; } },
   'Rapid Burrowing': { target: 'friendly', automated: true, friendlyFilter: (pu) => !pu.engaged && playerUnitDef(pu).faction === 'Zerg', apply: ({ friendly }) => { friendly!.statuses = [...new Set([...(friendly!.statuses ?? []), 'Burrowed' as const])]; return `Rapid Burrowing: ${friendly!.name} burrows.`; } },
   'Nasty Surprise': { target: 'self', automated: true, apply: ({ unit }) => { unit!.statuses = (unit!.statuses ?? []).filter((s) => s !== 'Burrowed'); return `Nasty Surprise: ${unit!.name} unburrows.`; } },
   'Additional Supply Depots': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Additional Supply Depots', '+1 Supply for markers and objectives this round.', { supplyBonus: 1 }); return `Additional Supply Depots: ${unit!.name} +1 Supply for markers.`; } },
   'Gravitic Boosters': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Gravitic Boosters', '+1" to the next charge distance.', { chargeBonus: 1 }, 'charge'); return `Gravitic Boosters: ${unit!.name} +1" on its next charge.`; } },
   'Pneumatized Carapace': chargeTwoDice('Pneumatized Carapace'),
-  'ComSat Station': { target: 'none', automated: false, apply: () => 'ComSat Station: pick a non-player table edge; enemy units cannot deploy from it this round.' },
+  'ComSat Station': { target: 'none', automated: false, apply: () => 'ComSat Station: pick a non-player table edge. Enemy Units cannot deploy from it this round.' },
   'Photon Overcharge': { target: 'none', automated: false, apply: () => 'Photon Overcharge: an enemy entering from somewhere other than its own entry edge suffers HITS 3 (1).' },
   'Advanced Training': { target: 'none', automated: false, apply: () => 'Advanced Training: the next Support unit CP ability this round costs 1 less.' },
   'Guardian Shell': armourBoost('Guardian Shell', isGround),

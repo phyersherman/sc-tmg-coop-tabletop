@@ -27,8 +27,8 @@ export function CollectionScreen() {
         <h1>Collection</h1>
         <span className="muted small">{ownedCount} of {all.length} models</span>
       </div>
-      <p className="muted">Type how many of each miniature you own, or use the button to add a squad's worth.
-        Army building and the AI's force both draw from this list.</p>
+      <p className="muted">Enter how many of each miniature you own, or add a squad at a time.
+        Your armies and the AI's force are built from these models.</p>
 
       <div className="tabs">
         {(['models', 'terrain'] as Tab[]).map((t) => (
@@ -79,7 +79,7 @@ export function CollectionScreen() {
           <div className="stack" style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
             <Toggle on={c.enforce.player} onChange={(v) => c.setEnforce({ player: v })}>Limit my army to models I own</Toggle>
             <Toggle on={c.enforce.ai} onChange={(v) => c.setEnforce({ ai: v })}>Limit the AI's army to models I own</Toggle>
-            <span className="small muted">Turn these off to play with proxies.</span>
+            <span className="small muted">Turn these off to play with stand-ins.</span>
           </div>
         </Panel>
       )}

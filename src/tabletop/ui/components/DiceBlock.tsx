@@ -30,7 +30,7 @@ export function DiceBlock({ batch, showRolls, title, faction = 'Terran', models:
           <p>
             <b>{hits} hit{hits === 1 ? '' : 's'}.</b>{' '}
             {batch.surge && hits > 0 && (
-              <>If your unit is <b>{batch.surge.types.join(' or ')}</b>: {surge} hit{surge === 1 ? '' : 's'} skip Armour and go straight to damage; roll Armour saves for the other {hits - surge}. Otherwise roll Armour saves for all {hits}. </>
+              <>Against a <b>{batch.surge.types.join(' or ')}</b> Unit, {surge} hit{surge === 1 ? '' : 's'} skip Armour and deal damage. Roll Armour saves for the other {hits - surge}. Against any other Unit, roll Armour saves for all {hits}. </>
             )}
             {(!batch.surge || hits === 0) && hits > 0 && <>Roll Armour saves for {hits}. </>}
             Each failed save = {batch.dmg} damage.
@@ -38,7 +38,7 @@ export function DiceBlock({ batch, showRolls, title, faction = 'Terran', models:
         </>
       ) : (
         <p>
-          Roll {dice} dice, hits on {need}+. {batch.surge ? `Then roll the Surge die (${batch.surge.die}): if the target is ${batch.surge.types.join(' or ')}, that many hits skip Armour.` : ''} Each unsaved hit = {batch.dmg} damage.
+          Roll {dice} dice, hits on {need}+. {batch.surge ? `Then roll the Surge die (${batch.surge.die}). If the target is ${batch.surge.types.join(' or ')}, that many hits skip Armour.` : ''} Each unsaved hit = {batch.dmg} damage.
         </p>
       )}
       {batch.keywordsText.length > 0 && (

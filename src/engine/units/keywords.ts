@@ -13,13 +13,13 @@ export function keywordText(kw: WeaponKeyword): string {
     case 'CRITICAL HIT':
       return `CRITICAL HIT (${v}): ${v} hits skip Armour and go straight to damage.`;
     case 'ANTI-EVADE':
-      return `ANTI-EVADE (${v}): target's Evade rolls are at -${v}.`;
+      return `ANTI-EVADE (${v}): the target's Evade rolls are at -${v}.`;
     case 'SIDEARM':
-      return 'SIDEARM: fired in addition to the main weapon (same or different target).';
+      return 'SIDEARM: fires in addition to the main weapon, at the same or a different target.';
     case 'PINPOINT':
-      return 'PINPOINT: may target an engaged enemy unit.';
+      return 'PINPOINT: may target an Engaged enemy Unit.';
     case 'INDIRECT FIRE':
-      return 'INDIRECT FIRE: no line of sight needed; target may Evade if not visible.';
+      return 'INDIRECT FIRE: needs no Line of Sight. A target out of sight may Evade.';
     case 'INSTANT':
       return 'INSTANT: the target cannot use Reaction abilities against this attack.';
     case 'BULKY':
@@ -33,7 +33,7 @@ export function keywordText(kw: WeaponKeyword): string {
     case 'CONCENTRATED FIRE':
       return `CONCENTRATED FIRE (${v}): removes at most ${v} models.`;
     case 'BLAST TEMPLATE':
-      return 'BLAST TEMPLATE: no Surge die is rolled. The template is set over the nearest model, and the models it covers are both extra dice and the Surge result.';
+      return 'BLAST TEMPLATE: roll no Surge die. Set the template over the nearest model. The models it covers give both the extra dice and the Surge result.';
     default:
       return kw.v !== undefined ? `${kw.k} (${kw.v})` : kw.k;
   }
@@ -43,16 +43,16 @@ export function keywordText(kw: WeaponKeyword): string {
 export function statusText(status: string): string {
   switch (status) {
     case 'Burrowed':
-      return 'BURROWED: counts as Size 0, may be shot at only by units within 4", and heals when it activates.';
+      return 'BURROWED: counts as Size 0 and may be shot at only by Units within 4". It heals when it activates.';
     case 'Hidden':
-      return 'HIDDEN: it may not be targeted by ranged attacks beyond 6", and it may Evade.';
+      return 'HIDDEN: it may not be targeted by Ranged Attacks from beyond 6". It may Evade.';
     case 'Siege Mode':
-      return 'SIEGE MODE: it cannot Move, Run, Disengage, Charge or Close Ranks, counts as Size 3, and may fire only the weapon that needs the Status.';
+      return 'SIEGE MODE: it cannot Move, Run, Disengage, Charge or Close Ranks. It counts as Size 3 and may fire only the weapon that needs this Status.';
     default:
       return status;
   }
 }
 
 export function impactText(dice: number, hit: number, models: number): string {
-  return `IMPACT: after a successful charge, roll ${dice} dice per model in the Fighting or Supporting rank (${models} models = ${dice * models} dice). Each ${hit}+ is a hit that goes to your Armour roll; damage 1 each, no Surge.`;
+  return `IMPACT: after a successful charge, roll ${dice} dice per model in the Fighting or Supporting rank (${models} models = ${dice * models} dice). Each ${hit}+ is a hit against your Armour roll, for 1 damage each, with no Surge.`;
 }

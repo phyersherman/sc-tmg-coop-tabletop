@@ -13,7 +13,7 @@ export function passWithReminder(g: GameState, dispatch: (c: Command) => void): 
   const ask = useSettings.getState().confirmPass !== false;
   if (ask && waiting.length && Date.now() - armedAt > 4000) {
     armedAt = Date.now();
-    ui.showToast(`${waiting.length} unit${waiting.length === 1 ? '' : 's'} can still act: ${waiting.map((p) => p.name).join(', ')}. Press Pass again to pass.`, 'info');
+    ui.showToast(`${waiting.length} Unit${waiting.length === 1 ? '' : 's'} can still act: ${waiting.map((p) => p.name).join(', ')}. Press Pass again to pass.`, 'info');
     return;
   }
   armedAt = 0;

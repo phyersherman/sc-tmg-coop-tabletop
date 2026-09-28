@@ -32,7 +32,7 @@ export function TableSetup({ g, onDone, doneLabel = 'Table is set' }: { g: GameS
     <div className="table-setup" role="dialog" aria-label="Set up the table">
       <div className="table-setup-head">
         <div>
-          <span className="muted small">Before round 1</span>
+          <span className="muted small">Before Round 1</span>
           <h2>Set up the table</h2>
         </div>
         <Btn variant="primary" size="lg" onClick={onDone}>{doneLabel}</Btn>
@@ -40,12 +40,12 @@ export function TableSetup({ g, onDone, doneLabel = 'Table is set' }: { g: GameS
       <div className="table-setup-body">
         <div className="table-setup-map">
           <TableMap deployment={d} terrain={g.terrain} markers={g.markers} refArt />
-          <p className="small muted">Measured from the top-left corner of the table, as you look at it here. Your entry edge is blue, the AI's red.</p>
+          <p className="small muted">Measure from the top-left corner of the table as shown here. Your entry edge is blue, the AI's is red.</p>
         </div>
         <ol className="table-setup-steps">
           <li>
             <b>Table</b>
-            <span>{t.width}" × {t.height}" — {d.name}.</span>
+            <span>{t.width}" × {t.height}", {d.name}.</span>
           </li>
           <li>
             <b>Entry edges</b>
@@ -54,7 +54,7 @@ export function TableSetup({ g, onDone, doneLabel = 'Table is set' }: { g: GameS
           {needsZoi && (
             <li>
               <b>Zone of Influence markers</b>
-              <span>At the ends of each entry edge that does not run the full length of the table.</span>
+              <span>Place one at each end of any entry edge that does not run the full length of the table.</span>
             </li>
           )}
           <li>
@@ -64,8 +64,8 @@ export function TableSetup({ g, onDone, doneLabel = 'Table is set' }: { g: GameS
                 <li key={m.id}>
                   Marker {m.id} ({m.affinity === 'ai' ? 'red' : m.affinity === 'players' ? 'blue' : 'neutral'}) at {inch(m.x)} from the left, {inch(m.y)} from the top
                   {m.movedFrom && (m.movedFrom.piece === 'Lost Temple Ramp'
-                    ? <span className="warn"> — the card puts it at ({inch(m.movedFrom.x)}, {inch(m.movedFrom.y)}), across the Lost Temple Ramp's edge; set it up on top of the plateau here instead</span>
-                    : <span className="warn"> — the card puts it at ({inch(m.movedFrom.x)}, {inch(m.movedFrom.y)}), inside {m.movedFrom.piece}; set it just beside the wall here instead</span>)}
+                    ? <span className="warn">. The card puts it at ({inch(m.movedFrom.x)}, {inch(m.movedFrom.y)}), across the Lost Temple Ramp's edge. Set it on top of the plateau here instead.</span>
+                    : <span className="warn">. The card puts it at ({inch(m.movedFrom.x)}, {inch(m.movedFrom.y)}), inside {m.movedFrom.piece}. Set it beside the wall here instead.</span>)}
                 </li>
               ))}
             </ul>
@@ -73,7 +73,7 @@ export function TableSetup({ g, onDone, doneLabel = 'Table is set' }: { g: GameS
           {sides.length > 0 && (
             <li>
               <b>Side markers</b>
-              <span>Something of the enemy's stands on each side marker. Set it up now, with its reward token beside the marker (print them from Tokens). Destroy it, then hold the marker at a Scoring phase: the reward is yours for the next round only. The rest of the enemy leaves side markers alone.</span>
+              <span>An enemy guard or Structure stands on each side marker. Set it up now, with the marker's reward token from the Tokens page beside it. Destroy it, then hold the marker in a Scoring phase to earn the reward for the next round only. The rest of the enemy leaves side markers alone.</span>
               <ul className="table-setup-sides">
                 {sides.map(({ id, o, u }) => {
                   const def = u ? unitById(u.defId) : null;
@@ -83,9 +83,9 @@ export function TableSetup({ g, onDone, doneLabel = 'Table is set' }: { g: GameS
                       <span>
                         <b>Marker {id}: {o.object === 'guard' ? `${def?.name ?? 'a unit'} guard` : `${def?.name ?? 'a Structure'} (Structure)`}</b>
                         {o.object === 'guard'
-                          ? ` — ${u?.models ?? ''} model${u?.models === 1 ? '' : 's'} of ${def?.name ?? 'the unit'} on the marker, in coherency, with a Guard token. It holds the marker, shoots and fights back, and never leaves or returns. Use spare models or stand-ins.`
-                          : ` — stand any building on the marker, or its printed token. HP ${def?.stats.hp ?? ''}${def?.stats.shields ? ` + ${def.stats.shields} shields` : ''}, Armour ${def?.stats.armour ?? ''}+. It never fights back.`}
-                        <br /><span className="muted">Reward: <b>{REWARDS[o.reward].name}</b> — {REWARDS[o.reward].text}.</span>
+                          ? `. Set ${u?.models ?? ''} model${u?.models === 1 ? '' : 's'} of ${def?.name ?? 'the Unit'} on the marker in Coherency, with a Guard token. Use spare models or stand-ins. The guard holds the marker, shoots and fights back, and never leaves or returns.`
+                          : `. Stand any building or its printed token on the marker. HP ${def?.stats.hp ?? ''}${def?.stats.shields ? ` + ${def.stats.shields} shields` : ''}, Armour ${def?.stats.armour ?? ''}+. It never fights back.`}
+                        <br /><span className="muted">Reward: <b>{REWARDS[o.reward].name}</b>, {REWARDS[o.reward].text}.</span>
                       </span>
                     </li>
                   );
@@ -96,14 +96,14 @@ export function TableSetup({ g, onDone, doneLabel = 'Table is set' }: { g: GameS
           {garrison.length > 0 && (
             <li>
               <b>Enemy on the table</b>
-              <span>These start in place, holding the objectives. They do not move in round 1.</span>
+              <span>Set these up now, holding the objectives. They do not move in Round 1.</span>
               <ul>
                 {garrison.map((u) => {
                   const at = g.sense?.ai[u.id]?.[0];
                   const m = g.markers.find((x) => x.id === u.special?.guard);
                   return (
                     <li key={u.id}>
-                      {u.label} ({u.models} model{u.models === 1 ? '' : 's'}){m ? ` on Marker ${m.id}` : ''}{at ? `: leading model at ${inch(at.x)} from the left, ${inch(at.y)} from the top` : ''}
+                      {u.label} ({u.models} model{u.models === 1 ? '' : 's'}){m ? ` on Marker ${m.id}` : ''}{at ? `: Leading Model at ${inch(at.x)} from the left, ${inch(at.y)} from the top` : ''}
                     </li>
                   );
                 })}
@@ -114,7 +114,7 @@ export function TableSetup({ g, onDone, doneLabel = 'Table is set' }: { g: GameS
             <b>Terrain{map ? `: ${map.name}` : ''}</b>
             {map ? (
               <>
-                <span>{map.page ? `From the core rulebook, page ${map.page}.` : 'Built the way the rulebook\'s maps are.'} Take out: {piecesNeeded({ pieces: g.terrain.pieces }).map((p) => `${p.count}× ${p.label}`).join(', ')}.</span>
+                <span>{map.page ? `From the core rulebook, page ${map.page}.` : 'A random map in the style of the rulebook maps.'} Take out: {piecesNeeded({ pieces: g.terrain.pieces }).map((p) => `${p.count}× ${p.label}`).join(', ')}.</span>
                 <ul className="table-setup-pieces">
                   {g.terrain.pieces.map((p) => (
                     <li key={p.n}>
@@ -125,7 +125,7 @@ export function TableSetup({ g, onDone, doneLabel = 'Table is set' }: { g: GameS
                 </ul>
               </>
             ) : (
-              <span>Place terrain as shown on the map; the numbers match the list in the game log.</span>
+              <span>Place the terrain as shown on the map. The numbers match the list in the game log.</span>
             )}
           </li>
         </ol>

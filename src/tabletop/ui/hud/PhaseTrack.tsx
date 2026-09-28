@@ -4,9 +4,9 @@ import { currentCard } from '@engine/ai/orderDeck';
 import { availableNow, poolNow } from '@engine/director/selectors';
 
 const PHASES: { id: Phase; name: string; what: string }[] = [
-  { id: 'movement', name: 'Movement', what: 'Deploy, move or hold each unit.' },
+  { id: 'movement', name: 'Movement', what: 'Deploy, move or hold each Unit.' },
   { id: 'assault', name: 'Assault', what: 'Shoot, charge or run.' },
-  { id: 'combat', name: 'Combat', what: 'Engaged units fight.' },
+  { id: 'combat', name: 'Combat', what: 'Engaged Units fight.' },
   { id: 'scoring', name: 'Scoring', what: 'Markers and destroyed Supply score.' },
 ];
 

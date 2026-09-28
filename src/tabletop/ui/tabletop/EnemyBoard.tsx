@@ -25,7 +25,7 @@ export function EnemyBoard({ g, selected, onPick }: { g: GameState; selected: st
         <h2>Enemy</h2>
         {!g.config.options.hideAiRoster && reserves.length > 0 && <span className="eb-reserves">In Reserves: {reserves.map((u) => u.label).join(', ')}</span>}
       </div>
-      {onTable.length === 0 && <p className="eb-empty">No enemy units on the table yet. They arrive in the Movement phase.</p>}
+      {onTable.length === 0 && <p className="eb-empty">No enemy Units on the table yet. They arrive in the Movement phase.</p>}
       <div className="eb-grid">
         {onTable.map((u) => <EnemyTile key={u.id} g={g} u={u} active={u.id === activeId} selected={u.id === selected} onPick={() => onPick(u.id)} />)}
       </div>
@@ -59,7 +59,7 @@ function EnemyTile({ g, u, active, selected, onPick }: { g: GameState; u: AiUnit
         <div className="eb-flags">
           {typeof u.special?.sideMarker === 'number' && (() => {
             const o = sideState(g).objects[u.special.sideMarker as number];
-            return <span className="eb-flag side" title={o ? `Destroy it and hold the marker at Scoring: ${REWARDS[o.reward].text}` : undefined}>{o?.object === 'structure' ? 'Structure' : 'Guard'} · Marker {u.special.sideMarker as number}{o ? ` · ${REWARDS[o.reward].name}` : ''}</span>;
+            return <span className="eb-flag side" title={o ? `Destroy it and hold the marker in a Scoring phase. Reward: ${REWARDS[o.reward].text}.` : undefined}>{o?.object === 'structure' ? 'Structure' : 'Guard'} · Marker {u.special.sideMarker as number}{o ? ` · ${REWARDS[o.reward].name}` : ''}</span>;
           })()}
           {u.damageMarker > 0 && <span className="eb-flag hurt">{u.damageMarker} damage</span>}
           {u.engaged && <span className="eb-flag engaged">Engaged</span>}
@@ -69,7 +69,7 @@ function EnemyTile({ g, u, active, selected, onPick }: { g: GameState; u: AiUnit
           {done && <span className="eb-flag muted">Activated</span>}
         </div>
       </button>
-      {card ? <ActionCardView g={g} card={card} unit={u} /> : phase === 'combat' ? <p className="eb-nocard">{u.engaged ? 'Fights when engaged.' : 'Not engaged: no fight.'}</p> : <p className="eb-nocard">No card drawn yet this phase.</p>}
+      {card ? <ActionCardView g={g} card={card} unit={u} /> : phase === 'combat' ? <p className="eb-nocard">{u.engaged ? 'Engaged: it fights.' : 'Not Engaged: no fight.'}</p> : <p className="eb-nocard">No card drawn yet this phase.</p>}
     </article>
   );
 }

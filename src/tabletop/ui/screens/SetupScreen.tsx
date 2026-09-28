@@ -217,9 +217,9 @@ export function SetupScreen() {
               <label>Minerals per player</label>
               <input type="number" value={minerals} step={50} min={200} onChange={(e) => setMinerals(Number(e.target.value) || 0)} />
             </div>
-            {players > 1 && <p className="small muted" style={{ marginTop: 6 }}>Each player builds their own army of {minerals} minerals, with their own cards. The AI is built to face all {players} of you: {minerals * players} minerals before difficulty.</p>}
+            {players > 1 && <p className="small muted" style={{ marginTop: 6 }}>Each player builds an army of {minerals} minerals with their own cards. The AI faces all {players} of you with {minerals * players} minerals before difficulty.</p>}
             <div className="row" style={{ marginTop: 10 }}>
-              <Toggle on={playerHasFlying} onChange={setPlayerHasFlying}>Players field Flying units</Toggle>
+              <Toggle on={playerHasFlying} onChange={setPlayerHasFlying}>Players field Flying Units</Toggle>
             </div>
           </Panel>
           <Panel title="Difficulty" tag={`AI budget ${budget}`}>
@@ -236,7 +236,7 @@ export function SetupScreen() {
                 <div className="col" style={{ marginTop: 6 }}>
                   {MUTATORS.map((m) => (
                     <Toggle key={m.id} on={mutators.includes(m.id)} onChange={(v) => setMutators(v ? [...mutators, m.id] : mutators.filter((x) => x !== m.id))}>
-                      {m.name} ({m.cost}) <span className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}>— {m.text}</span>
+                      {m.name} ({m.cost}) <span className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}>· {m.text}</span>
                     </Toggle>
                   ))}
                 </div>
@@ -257,21 +257,21 @@ export function SetupScreen() {
               ))}
             </div>
           )}
-          <p className="small muted">Train units from the buildings that make them, choose their upgrades, and pick your cards. {players > 1 ? 'Each player picks their own faction and cards, and spends only their own Command Points, Biomass or Psionic Energy in the battle.' : ''} The army starts empty every battle; the ones you have fielded before are at the bottom right, to bring back if you want them.</p>
+          <p className="small muted">Train Units from the buildings that make them, choose their upgrades, then pick your cards. {players > 1 ? 'Each player picks their own faction and cards, and spends only their own Command Points, Biomass or Psionic Energy in the battle.' : ''} The army starts empty each battle. Armies fielded before are listed at the bottom right.</p>
           <ArmyPicker key={whose} faction={me.faction} onFaction={setMyFaction} budget={minerals} scale={scale} owned={modelLimit('player')} value={me.value} onChange={setMine} recent={settings.recentArmies} onForget={settings.removeRecentArmy} named />
-          <p className="small muted" style={{ marginTop: 10 }}>You can also skip this: the AI then plays with no list of your units, and you tell it what it sees at the table.</p>
+          <p className="small muted" style={{ marginTop: 10 }}>This step can be skipped. The AI then has no list of your Units, and the players tell it what it sees at the table.</p>
         </Panel>
       )}
 
       {step === 3 && (
         <Panel title="The enemy" accent tag={army ? 'Ready · hidden' : 'Not built'}>
-          <p>The AI builds its army in secret: {budget} minerals ({diff.name}) from the models in your Collection that the players are not fielding, of any race. You meet its units as they arrive on the table; until then only their number of minerals is known.</p>
-          <p className="small muted">{unusedCount} unit type{unusedCount === 1 ? '' : 's'} left for the AI to draw on after your armies.</p>
+          <p>The AI builds its army in secret. It spends {budget} minerals ({diff.name}) on Collection models of any race that the players are not fielding. Its Units are revealed as they arrive on the table. Until then, only its mineral total is known.</p>
+          <p className="small muted">{unusedCount} Unit type{unusedCount === 1 ? '' : 's'} left for the AI after your armies.</p>
           {army && issues.some((i) => i.level === 'error') && <p className="tag danger">Not enough unused models for an AI army. Add models to your Collection, or field fewer yourselves.</p>}
           {outmatched && (
             <div style={{ marginTop: 10 }}>
               <Toggle on={dropAnywhere} onChange={setDropAnywhere}>The AI makes up the shortfall</Toggle>
-              <p className="small muted" style={{ margin: '4px 0 0' }}>Your collection fields {army!.spent} of the {budget} minerals the AI should have against {players > 1 ? `${players} players` : 'you'}. With this on, the {shortfall} it is short come back as destroyed units return with the models they free, and its units may be set down anywhere on the table more than 6" from yours — from the opening deployment on.</p>
+              <p className="small muted" style={{ margin: '4px 0 0' }}>Your Collection fields {army!.spent} of the {budget} minerals the AI should have against {players > 1 ? `${players} players` : 'you'}. With this on, destroyed AI Units return with the models they free to make up the {shortfall} minerals. From the opening deployment on, its Units may be set down anywhere on the table more than 6" from yours.</p>
             </div>
           )}
           <div className="row" style={{ marginTop: 12 }}>
@@ -291,7 +291,7 @@ export function SetupScreen() {
             </div>
           </Panel>
           <Panel title="Terrain map" tag={map.page ? `rulebook p. ${map.page}` : 'random'}>
-            <p className="small muted">A random table built the way the rulebook's maps are, or one of the printed maps from the back of the core rulebook.</p>
+            <p className="small muted">Roll a random table in the style of the rulebook maps, or pick a printed map from the back of the core rulebook.</p>
             <div className="row" style={{ flexWrap: 'wrap' }}>
               <Btn size="sm" variant={!mapChoice ? 'primary' : ''} onClick={() => { setMapChoice(null); setTerrainSeed(Math.floor(Math.random() * 100000)); }}>{mapChoice ? 'Random table' : 'Reroll'}</Btn>
               {mapsFor(deployment.scale).map((m) => (
@@ -312,11 +312,11 @@ export function SetupScreen() {
 
       {step === 5 && (
         <Panel title="Ready to launch" accent>
-          <p><b>{mode.name}</b> — {mode.blurb}</p>
+          <p><b>{mode.name}.</b> {mode.blurb}</p>
           <p>{diff.name}, {players} player{players > 1 ? 's' : ''}{players > 1 ? ` (${inPlay.map((f, i) => `P${i + 1} ${f.faction} ${costOf(f.value)}`).join(', ')})` : ''}, {minerals} minerals each vs a hidden AI army of {army?.spent} minerals. {deployment.name}, {map.name}{map.page ? ` (rulebook p. ${map.page})` : ''}.</p>
           {difficulty === 'brutalPlus' && <p>Mutators: {mutators.map((id) => MUTATORS.find((m) => m.id === id)?.name).join(', ')}</p>}
-          {outmatched && dropAnywhere && <p>The AI is {shortfall} minerals short of models: destroyed units return to make it up, and its units may be set down anywhere more than 6" from yours.</p>}
-          {<p className="small muted">Dice: {settings.appRollsAiDice ? 'the app rolls AI dice' : 'you roll AI dice'} (change in Settings).</p>}
+          {outmatched && dropAnywhere && <p>The AI is {shortfall} minerals short of models. Destroyed Units return to make it up, and its Units may be set down anywhere more than 6" from yours.</p>}
+          {<p className="small muted">AI dice: {settings.appRollsAiDice ? 'rolled by the app' : 'rolled on the table'} (change in Settings).</p>}
           <Btn variant="primary" size="lg" onClick={launch} disabled={!army}>Start the battle</Btn>
         </Panel>
       )}

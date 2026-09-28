@@ -83,7 +83,7 @@ export function ArmiesScreen() {
             <Btn variant="ghost" onClick={() => setPrinting(null)}>Close</Btn>
           </div>
         </div>
-        <p className="muted no-print">Everything you need at the table: the army's cost and Supply, each unit's profile, weapons and abilities, and the cards it fights with. Only the page below is printed.</p>
+        <p className="muted no-print">Only the page below is printed.</p>
         <ArmySheet name={printing.name} faction={printing.faction} scale={printing.scale} units={printing.units} cards={printing.cards} />
       </div>
     );
@@ -97,7 +97,7 @@ export function ArmiesScreen() {
           <h1>{editing.id ? 'Edit army' : 'New army'}</h1>
           <span className="muted small">{spent} / {editing.budget} minerals · {supply(editing.value)} Supply</span>
         </div>
-        <p className="muted">Pick units from the buildings that train them, choose the size and upgrades of each, and add the cards the army fights with. It is saved under its name and offered whenever you start a battle.</p>
+        <p className="muted">Pick Units from the buildings that train them, choose the size and upgrades of each, then add the army's cards. Saved armies can be picked when setting up a battle.</p>
 
         <Panel title="Size of game" tag={SCALE_NOTE[editing.scale].note}>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -113,8 +113,8 @@ export function ArmiesScreen() {
             <Toggle on={fromCollection} onChange={setFromCollection}>Only models I own</Toggle>
             <span className="small muted">
               {fromCollection
-                ? 'Units you have no miniatures left for cannot be added. Turn this off to plan with anything in the game.'
-                : 'Building with every model in the game. A battle on the table still needs the miniatures, so this list may not be fieldable yet.'}
+                ? 'Units you have no miniatures left for cannot be added. Turn this off to plan with any Unit.'
+                : 'Any Unit can be added. A battle still needs the miniatures, so this army may not be fieldable yet.'}
             </span>
           </div>
           {!fromCollection && !!editing.value.units.length && (() => {
@@ -138,7 +138,7 @@ export function ArmiesScreen() {
           <Btn variant="primary" size="lg" disabled={!editing.value.units.length} onClick={save}>Save army</Btn>
           <Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn>
           <Btn disabled={!editing.value.units.length} onClick={() => setPrinting({ name: editing.value.name?.trim() || `${editing.faction} army`, faction: editing.faction, scale: editing.scale, units: editing.value.units, cards: editing.value.cards })}>Print this army</Btn>
-          {spent > editing.budget && <span className="small danger-text">It costs {spent - editing.budget} minerals more than the limit. You can save it and raise the limit later.</span>}
+          {spent > editing.budget && <span className="small danger-text">{spent - editing.budget} minerals over the limit. It can still be saved.</span>}
         </div>
       </div>
     );
@@ -150,7 +150,7 @@ export function ArmiesScreen() {
         <h1>Armies</h1>
         <span className="muted small">{armies.length} saved</span>
       </div>
-      <p className="muted">Build a force here whenever you like. Saved armies are offered when you set up a battle, and an army you take into a battle is saved back here on its own.</p>
+      <p className="muted">Saved armies can be picked when setting up a battle. Any army taken into a battle is saved here too.</p>
 
       <Panel title="New army" tag="pick a faction and a size">
         <div className="stack" style={{ gap: 10 }}>
@@ -162,12 +162,12 @@ export function ArmiesScreen() {
               ))}
             </div>
           ))}
-          <p className="small muted" style={{ margin: 0 }}>Skirmish: {SCALE_NOTE.skirmish.note}. Standard: {SCALE_NOTE.standard.note}. Grand: {SCALE_NOTE.grand.note}. You can set any limit while you build.</p>
+          <p className="small muted" style={{ margin: 0 }}>Skirmish: {SCALE_NOTE.skirmish.note}. Standard: {SCALE_NOTE.standard.note}. Grand: {SCALE_NOTE.grand.note}. Any mineral limit can be set while building.</p>
         </div>
       </Panel>
 
       <Panel title="Saved armies">
-        {!armies.length && <p className="small muted">Nothing saved yet. Build one above, or take an army into a battle and it will be here afterwards.</p>}
+        {!armies.length && <p className="small muted">No saved armies yet. Build one above, or take an army into a battle.</p>}
         <div className="stack" style={{ gap: 8 }}>
           {armies.map((a) => (
             <div key={a.id} className="list-row">

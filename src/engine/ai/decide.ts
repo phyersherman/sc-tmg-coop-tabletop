@@ -28,10 +28,10 @@ export function headingText(state: GameState, obj: AiObjective): string {
       return `Mission Marker ${obj.markerId}`;
     }
     case 'enemy':
-      return 'the nearest enemy unit';
+      return 'the nearest enemy Unit';
     case 'follow': {
       const b = state.army.units.find((u) => u.id === obj.unitId);
-      return b ? `${b.label} (stay within 4" of it)` : 'the nearest friendly unit';
+      return b ? `${b.label}, staying within 4" of it` : 'the nearest friendly Unit';
     }
     case 'lane':
       return obj.toEdge === 'E' ? 'the right table edge' : 'the left table edge';
@@ -43,20 +43,20 @@ export function headingText(state: GameState, obj: AiObjective): string {
 }
 
 export function focusText(rule: FocusRule): string {
-  const tie = ' Ties: fewest models, then lowest remaining HP, then lowest Supply, then your choice.';
+  const tie = ' On a tie: fewest models, then least HP left, then lowest Supply, then the players choose.';
   switch (rule.primary) {
     case 'nearest':
-      return 'the nearest enemy unit by the shortest path.' + tie;
+      return 'the nearest enemy Unit by the shortest path.' + tie;
     case 'weakest':
-      return 'the enemy unit in range with the fewest remaining models.' + ' Ties: nearest.';
+      return 'the enemy Unit in range with the fewest models left.' + ' On a tie: the nearest.';
     case 'onMarker':
-      return `an enemy unit within 3" of Mission Marker ${rule.markerId ?? ''} if one is in range, otherwise the nearest enemy unit.` + tie;
+      return `an enemy Unit within 3" of Mission Marker ${rule.markerId ?? ''}, or the nearest enemy Unit if none is in range.` + tie;
     case 'highestSupply':
-      return 'the enemy unit in range with the highest Supply.' + ' Ties: nearest.';
+      return 'the enemy Unit in range with the highest Supply.' + ' On a tie: the nearest.';
     case 'lastAttacker':
-      return 'the enemy unit that last damaged this unit if it is in range, otherwise the nearest enemy unit.' + tie;
+      return 'the enemy Unit that last damaged it, or the nearest enemy Unit if that one is out of range.' + tie;
     case 'nearestToMarker':
-      return 'the enemy unit closest to a Mission Marker that is in range, otherwise the nearest enemy unit.' + tie;
+      return 'the enemy Unit in range closest to a Mission Marker, or the nearest enemy Unit if none is in range.' + tie;
   }
 }
 
@@ -217,27 +217,27 @@ export function deployOrder(state: GameState, unit: AiUnitInstance): AiOrder {
   const lines: string[] = [];
   if (unit.objective.kind === 'lane') {
     const from = unit.objective.toEdge === 'E' ? 'left' : 'right';
-    lines.push(`Enter from the ${from} table edge at its vertical centre (${table.height / 2}" from the top). Move the leading model up to ${speed}" straight toward the opposite edge, then set the rest in coherency.`);
-    lines.push(`This unit follows the lane and ignores markers. Uses ${supply} Supply. Models: ${unit.models}.`);
+    lines.push(`Enter from the ${from} table edge, ${table.height / 2}" from the top. Move the Leading Model up to ${speed}" straight toward the far edge, then set the rest in Coherency.`);
+    lines.push(`It follows the lane and ignores Mission Markers. Supply: ${supply}. Models: ${unit.models}.`);
     return { type: 'deploy', unitId: unit.id, title: `Deploy ${unit.label}`, lines, heading: unit.objective, headingText: headingText(state, unit.objective), batches: [], reports: [report('done', 'Deployed')] };
   }
   const hasAmbush = d.abilities.some((a) => /Burrow Ambush/i.test(a.name) && (!a.upgradeCost || unit.upgrades.includes(a.id)));
   // A collection too small for the players' armies: the AI is not held to its entry edge.
   const dropAt = state.config.options.aiDropsAnywhere ? dropPointFor(state, unit, tp) : undefined;
   if (dropAt) {
-    lines.push(`Set the whole unit down anywhere on the table, every model more than 6" from every player model and outside the players' Zone of Influence: the leading model at about ${fmtIn(dropAt)}, the rest in coherency (within 3").`);
-    lines.push('The AI is short of models for this battle, so its units enter wherever they are needed instead of at its edge.');
+    lines.push(`Set the whole unit down anywhere on the table, outside the players' Zone of Influence and with every model more than 6" from every player model. Place the Leading Model at about ${fmtIn(dropAt)} and the rest in Coherency within 3".`);
+    lines.push('The AI is short of models for this battle. Its Units arrive where they are needed, not at its Entry Edge.');
   } else if (card.deployBias === 'ambush' && hasAmbush) {
-    lines.push(`BURROW AMBUSH: set the whole unit anywhere within 18" of the AI entry edge, with no model within 10" of any player model and not inside the players' Zone of Influence.`);
-    lines.push('The unit does nothing else this phase.');
+    lines.push(`BURROW AMBUSH: set the Unit up anywhere within 18" of the AI's Entry Edge, outside the players' Zone of Influence and with no model within 10" of a player model.`);
+    lines.push('It takes no other action this phase.');
   } else if (hasMutator(state, 'aggressiveDeployment') || (card.id === 'warpIn' && !state.modeState['warpInUsed'])) {
-    lines.push(`Enter from ${describeSegment(seg, table)} OR from either side edge that is not a player entry edge, ending more than 10" from every player model.`);
-    lines.push(`Move the leading model up to ${speed}" onto the table, then set the rest of the unit in coherency (within 3").`);
+    lines.push(`Enter from ${describeSegment(seg, table)}, or from either side edge that is not a player's Entry Edge. End more than 10" from every player model.`);
+    lines.push(`Move the Leading Model up to ${speed}" onto the table, then set the rest of the Unit in Coherency within 3".`);
   } else {
-    lines.push(`Enter from ${describeSegment(seg, table)}. Move the leading model up to ${speed}" onto the table from that edge, then set the rest of the unit in coherency (within 3").`);
+    lines.push(`Enter from ${describeSegment(seg, table)}. Move the Leading Model up to ${speed}" onto the table, then set the rest of the Unit in Coherency within 3".`);
   }
-  lines.push(`Head toward ${headingText(state, unit.objective)}. The unit may not end inside the players' Zone of Influence (the 6" strip along their entry edge).`);
-  lines.push(`Uses ${supply} Supply. Models: ${unit.models}${unit.damageMarker ? ` (damage marker ${unit.damageMarker})` : ''}.`);
+  lines.push(`Head toward ${headingText(state, unit.objective)}. The Unit may not end in the players' Zone of Influence, the 6" strip along their Entry Edge.`);
+  lines.push(`Supply: ${supply}. Models: ${unit.models}${unit.damageMarker ? `. Damage marker: ${unit.damageMarker}` : ''}.`);
   return {
     type: 'deploy',
     unitId: unit.id,
@@ -290,13 +290,13 @@ function stanceOrder(state: GameState, unit: AiUnitInstance, to: 'siege' | 'unsi
   const status = w.requiresStatus!;
   const lines = to === 'siege'
     ? [
-        `${unit.label} does not move: it deploys into ${status} where it stands.`,
-        `While it is in ${status} it cannot move, counts as Size 3, and fires only its ${w.name} (Range ${typeof w.range === 'number' ? `${w.range}"` : 'E'}).`,
-        'On the table, change the model to its sieged pose.',
+        `${unit.label} stays where it is and enters ${status}.`,
+        `In ${status} it cannot move, counts as Size 3 and fires only its ${w.name} (Range ${typeof w.range === 'number' ? `${w.range}"` : 'E'}).`,
+        'Change the model to its sieged pose.',
       ]
     : [
-        `${unit.label} packs up: it leaves ${status} and can move and fire normally again from now on.`,
-        'On the table, change the model back to its mobile pose. It does not move this phase.',
+        `${unit.label} leaves ${status}. From now on it moves and fires as normal.`,
+        'Change the model back to its mobile pose. It does not move this phase.',
       ];
   return {
     type: 'special',
@@ -313,23 +313,23 @@ export function moveOrder(state: GameState, unit: AiUnitInstance, profile: Profi
   const speed = speedFor(d, unit.models) + speedModFor(state, unit);
   const lines: string[] = [];
   const head = headingText(state, unit.objective);
-  lines.push(`Move up to ${speed}" toward ${head}, by the shortest path (through Size 0–1 terrain, around Size 2+). End more than 1" from all enemy models.`);
+  lines.push(`Move up to ${speed}" toward ${head} by the shortest path, through Size 0–1 terrain and around Size 2+. End more than 1" from every enemy model.`);
   if (profile === 'rangedLine') {
     const r = preferredRange(d, unit.upgrades) + rangeModFor(state);
-    lines.push(`Stop early if that puts models in range (${r}") and line of sight of an enemy unit. Prefer ending within 1" of terrain for cover.`);
+    lines.push(`Stop as soon as a model has an enemy Unit within ${r}" and in Line of Sight. End within 1" of terrain for cover where possible.`);
   } else if (profile === 'support') {
-    lines.push('Stay within 4" of the unit it is following and behind it relative to the enemy.');
+    lines.push(unit.objective.kind === 'follow' ? 'Keep behind that Unit, on the side away from the enemy.' : 'Stay within 4" of the Unit it follows, on the side away from the enemy.');
   } else {
-    lines.push('Keep the unit together and behind cover where possible; it wants to charge next phase.');
+    lines.push('Keep the Unit together and behind cover where possible, ready to charge next phase.');
   }
   const reports: OrderReportOption[] = [];
   if (unit.objective.kind === 'marker') {
-    lines.push('If the unit ends within 3" of that marker, tap "Reached the marker".');
+    lines.push('If the Unit ends within 3" of the Mission Marker, tap "Reached the marker".');
     reports.push(report('reached', 'Reached the marker'));
   }
   if (unit.objective.kind === 'lane') {
     lines.length = 0;
-    lines.push(`Move up to ${speed}" straight toward ${head} by the shortest path. If any model reaches the edge, the unit leaves the table: tap "Exited".`);
+    lines.push(`Move up to ${speed}" straight toward ${head} by the shortest path. If any model reaches the edge, the Unit leaves the table. Tap "Exited the table".`);
     reports.push(report('exited', 'Exited the table'));
   }
   reports.push(report('done', 'Moved'));
@@ -341,11 +341,11 @@ function disengageOrder(state: GameState, unit: AiUnitInstance): AiOrder {
   const speed = speedFor(d, unit.models) + speedModFor(state, unit);
   const s = currentSupply(d, unit.models);
   const lines = [
-    `DISENGAGE: move up to ${speed}" toward ${headingText(state, unit.objective)} so that every model ends more than 1" from all enemy models.`,
-    'Any model that cannot get clear is removed. If the leading model cannot get clear, the unit stays and the leading model is removed.',
+    `DISENGAGE: move up to ${speed}" toward ${headingText(state, unit.objective)}. Every model must end more than 1" from every enemy model.`,
+    'Remove any model that cannot get clear. If the Leading Model cannot get clear, the Unit stays where it is and the Leading Model is removed.',
     s > unit.engagedEnemySupply
-      ? `Its Supply (${s}) exceeds the engaged enemy's (${unit.engagedEnemySupply}), so it may still shoot or charge this round.`
-      : 'It may not shoot or charge later this round.',
+      ? `Its Supply (${s}) is higher than the Engaged enemy's (${unit.engagedEnemySupply}), so it may still shoot or charge this round.`
+      : 'It may not shoot or charge for the rest of this round.',
   ];
   return { type: 'disengage', unitId: unit.id, title: `${unit.label}: Disengage`, lines, heading: unit.objective, batches: [], reports: [report('done', 'Disengaged')] };
 }
@@ -353,7 +353,7 @@ function disengageOrder(state: GameState, unit: AiUnitInstance): AiOrder {
 function runLines(state: GameState, unit: AiUnitInstance, profile: Profile): string {
   const d = def(unit);
   const speed = speedFor(d, unit.models) + speedModFor(state, unit);
-  const head = profile === 'meleeRusher' || unit.objective.kind === 'enemy' ? 'the nearest enemy unit (ending more than 1" away)' : headingText(state, unit.objective);
+  const head = profile === 'meleeRusher' || unit.objective.kind === 'enemy' ? 'the nearest enemy Unit, ending more than 1" away' : headingText(state, unit.objective);
   return `Otherwise: RUN up to ${speed}" toward ${head}.`;
 }
 
@@ -366,15 +366,15 @@ export function rangedOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
   const focus = focusFor(state, unit);
   const lines: string[] = [];
   if (engagedOnly) {
-    lines.push(`This unit is engaged: it fires at the unit it is engaged with (that unit may make Evade rolls).`);
+    lines.push('The Unit is Engaged. It fires at the Unit it is Engaged with, which may make Evade rolls.');
   } else {
-    lines.push(`If any enemy unit is visible within ${r}"${lr ? ` (or ${lr}" at -1 to hit using LONG RANGE)` : ''} of at least one model: RANGED ATTACK ${focusText(focus)}`);
-    lines.push('Only models in range with line of sight fire. Reduce the model count below if fewer can fire.');
-    if (batches.length > 1) lines.push(`Sidearms (${batches.slice(1).map((b) => `${b.weapon} ${typeof b.range === 'number' ? `${b.range}"` : 'engaged'}`).join(', ')}) fire at the same target, each only if it is within that sidearm's own range.`);
+    lines.push(`RANGED ATTACK an enemy Unit in Line of Sight within ${r}" of at least one model${lr ? `, or within ${lr}" with LONG RANGE at -1 to hit` : ''}. Target ${focusText(focus)}`);
+    lines.push('Only models with range and Line of Sight fire. Lower the model count below if fewer can.');
+    if (batches.length > 1) lines.push(`SIDEARM weapons (${batches.slice(1).map((b) => `${b.weapon} ${typeof b.range === 'number' ? `${b.range}"` : 'engaged'}`).join(', ')}) fire at the same target if it is within their own range.`);
   }
-  if (currentCard(state.orderDeck).id === 'stim' && def(unit).tags.includes('Biological')) lines.push('STIM: this unit takes 1 damage before firing (enter it in the roster).');
+  if (currentCard(state.orderDeck).id === 'stim' && def(unit).tags.includes('Biological')) lines.push('STIM: the Unit takes 1 damage before it fires. Enter it in the roster.');
   if (!engagedOnly) lines.push(runLines(state, unit, profile));
-  const reports: OrderReportOption[] = [report('attacked', 'Attacked'), report('noTarget', engagedOnly ? 'Could not fire' : 'No target — ran')];
+  const reports: OrderReportOption[] = [report('attacked', 'Attacked'), report('noTarget', engagedOnly ? 'Could not fire' : 'No target, ran')];
   return { type: 'ranged', unitId: unit.id, title: `${unit.label}: Ranged Attack`, lines, focus, heading: unit.objective, headingText: headingText(state, unit.objective), batches, reports };
 }
 
@@ -389,8 +389,8 @@ export function chargeOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
   const threshold = card.chargeThreshold === 'likely' ? speed + 3 + bonus : speed + 6 + bonus;
   const focus = focusFor(state, unit);
   const lines: string[] = [];
-  lines.push(`If an enemy Ground unit is within ${threshold}" of the leading model by path: CHARGE ${focusText(focus)}`);
-  lines.push(`Charge roll: Speed ${speed} + ${dice === '2d6high' ? '2D6 (take the highest)' : 'D6'}${bonus ? ` + ${bonus}` : ''}. It succeeds if the leading model can end within 1" of the target. On success set models base-to-base, then the rest in coherency.`);
+  lines.push(`CHARGE an enemy Ground Unit within ${threshold}" of the Leading Model, measured along its path. Target ${focusText(focus)}`);
+  lines.push(`${dice === '2d6high' ? `Roll 2D6, keep the highest and add ${speed}` : `Roll D6 + ${speed}`}${bonus ? ` + ${bonus}` : ''}. The charge succeeds if the Leading Model can end within 1" of the target. Set the models base-to-base, then the rest in Coherency.`);
   const batches: DiceInstruction[] = [];
   let impact: DiceInstruction | undefined;
   if (d.impact) {
@@ -407,14 +407,14 @@ export function chargeOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
     if (rb.length) {
       const main = rb[0]!;
       const r = (typeof main.range === 'number' ? main.range : 0) + (main.rangeMod ?? 0);
-      lines.push(`If no charge is possible but an enemy unit is visible within ${r}": RANGED ATTACK it instead (same target rule).`);
+      lines.push(`If it cannot charge, it makes a RANGED ATTACK instead against an enemy Unit in Line of Sight within ${r}", chosen the same way.`);
       batches.push(...rb);
     }
   }
   lines.push(runLines(state, unit, profile));
   const reports: OrderReportOption[] = [report('charged', 'Charge succeeded'), report('chargeFailed', 'Charge failed')];
   if (alsoRanged && batches.length) reports.push(report('attacked', 'Fired instead'));
-  reports.push(report('noTarget', 'No target — ran'));
+  reports.push(report('noTarget', 'No target, ran'));
   const order: AiOrder = { type: 'charge', unitId: unit.id, title: `${unit.label}: Charge`, lines, focus, heading: unit.objective, headingText: headingText(state, unit.objective), batches, charge: { speed, min: speed + 1 + bonus, max: speed + 6 + bonus, dice }, reports };
   if (impact) order.impact = impact;
   return order;
@@ -423,9 +423,13 @@ export function chargeOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
 export function supportAssault(state: GameState, unit: AiUnitInstance): AiOrder {
   const d = def(unit);
   const speed = speedFor(d, unit.models) + speedModFor(state, unit);
-  const lines = [`RUN up to ${speed}" to stay within 4" of ${headingText(state, unit.objective)}, keeping out of enemy charge range where possible.`];
-  if (d.id === 'medic') lines.push('At the start of the next round, any damaged Biological AI unit within 4" of the Medics heals 1 damage per Medic model (enter it in the roster).');
-  if (d.id === 'sentry') lines.push('Guardian Shield: ranged attacks against AI units within 4" of the Sentries roll 1 fewer die.');
+  const head = headingText(state, unit.objective);
+  const lines = [
+    unit.objective.kind === 'follow' ? `RUN up to ${speed}" toward ${head}.` : `RUN up to ${speed}" to within 4" of ${head}.`,
+    'Keep out of enemy charge range where possible.',
+  ];
+  if (d.id === 'medic') lines.push('At the start of the next round, every damaged Biological AI Unit within 4" of the Medics heals 1 damage per Medic model. Enter it in the roster.');
+  if (d.id === 'sentry') lines.push('Guardian Shield: ranged attacks against AI Units within 4" of the Sentries roll 1 fewer die.');
   return { type: 'run', unitId: unit.id, title: `${unit.label}: Support`, lines, heading: unit.objective, batches: [], reports: [report('done', 'Done')] };
 }
 
@@ -433,10 +437,10 @@ function combatOrder(state: GameState, unit: AiUnitInstance, rng: Rng): AiOrder 
   const batches = batchesFor(state, unit, rng, 'Combat');
   const focus = focusFor(state, unit);
   const lines = [
-    'CLOSE RANKS: move the leading model up to 3" closer to the enemy it is engaged with, then set the others in coherency with as many as possible base-to-base with enemy models (models already in contact stay put).',
-    `Attack with every model in the Fighting Rank (within 1" of an enemy) or Supporting Rank (touching a friendly model that is). Reduce the model count below if fewer qualify.`,
-    'If engaged with more than one enemy unit: all dice go to ' + focusText({ ...focus, primary: focus.primary === 'onMarker' ? 'nearest' : focus.primary }),
-    'Afterwards, update the Engaged toggle if the enemy unit was wiped out or the AI unit was.',
+    'CLOSE RANKS: move the Leading Model up to 3" toward the enemy it is Engaged with. Set the others in Coherency, as many as possible base-to-base with enemy models. Models already in base contact stay put.',
+    'Attack with every model in the Fighting Rank (within 1" of an enemy) and the Supporting Rank (touching a friendly model in the Fighting Rank). Lower the model count below if fewer qualify.',
+    'If Engaged with more than one enemy Unit, all dice go to ' + focusText({ ...focus, primary: focus.primary === 'onMarker' ? 'nearest' : focus.primary }),
+    'If either Unit is wiped out, update the Engaged toggle.',
   ];
   return { type: 'closeCombat', unitId: unit.id, title: `${unit.label}: Close Combat`, lines, focus, batches, reports: [report('done', 'Resolved')] };
 }
@@ -487,7 +491,7 @@ export function decideAi(state: GameState, mode: MissionMode, ctx: MissionCtx, r
           // Stalled on the line (a side marker's reward): it does not run this round.
           if (heldInPlace(state, u)) continue;
           const speed = speedFor(d, u.models) + speedModFor(state, u);
-          return { type: 'run', unitId: u.id, title: `${u.label}: Run`, lines: [`RUN up to ${speed}" straight toward ${headingText(state, u.objective)}. If any model reaches the edge, tap "Exited".`], heading: u.objective, batches: [], reports: [report('exited', 'Exited the table'), report('done', 'Ran')] };
+          return { type: 'run', unitId: u.id, title: `${u.label}: Run`, lines: [`RUN up to ${speed}" straight toward ${headingText(state, u.objective)}. If any model reaches the edge, the Unit leaves the table. Tap "Exited the table".`], heading: u.objective, batches: [], reports: [report('exited', 'Exited the table'), report('done', 'Ran')] };
         }
         if (u.engaged) {
           if (p === 'rangedLine' && !u.disengagedThisRound) {
@@ -498,7 +502,7 @@ export function decideAi(state: GameState, mode: MissionMode, ctx: MissionCtx, r
         }
         if (u.disengagedThisRound) {
           const speed = speedFor(d, u.models) + speedModFor(state, u);
-          return { type: 'run', unitId: u.id, title: `${u.label}: Run`, lines: [`This unit disengaged and cannot attack. RUN up to ${speed}" toward ${headingText(state, u.objective)}.`], heading: u.objective, batches: [], reports: [report('done', 'Ran')] };
+          return { type: 'run', unitId: u.id, title: `${u.label}: Run`, lines: [`It Disengaged this round and cannot attack. RUN up to ${speed}" toward ${headingText(state, u.objective)}.`], heading: u.objective, batches: [], reports: [report('done', 'Ran')] };
         }
         if (planted(u)) {
           // Dug in: it shells what it can see and never runs or charges.

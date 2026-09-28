@@ -38,19 +38,19 @@ function speedOf(state: GameState, u: AiUnitInstance): number {
 function runOrder(state: GameState, u: AiUnitInstance, to: MoveTo): AiOrder {
   const objective = aim(state, u, to);
   const head = to === 'cover' ? `${headingText(state, objective)}, ending within 1" of terrain` : headingText(state, objective);
-  return { type: 'run', unitId: u.id, title: `${u.label}: Run`, lines: [`RUN up to ${speedOf(state, u)}" toward ${head}. End more than 1" from all enemy models.`], heading: objective, headingText: head, batches: [], reports: [report('done', 'Ran')] };
+  return { type: 'run', unitId: u.id, title: `${u.label}: Run`, lines: [`RUN up to ${speedOf(state, u)}" toward ${head}. End more than 1" from every enemy model.`], heading: objective, headingText: head, batches: [], reports: [report('done', 'Ran')] };
 }
 
 function holdOrder(u: AiUnitInstance): AiOrder {
-  return { type: 'hold', unitId: u.id, title: `${u.label}: Hold`, lines: ['HOLD: the unit stays where it is. It counts as activated.'], batches: [], reports: [report('done', 'Held')] };
+  return { type: 'hold', unitId: u.id, title: `${u.label}: Hold`, lines: ['HOLD: the Unit stays where it is and counts as activated.'], batches: [], reports: [report('done', 'Held')] };
 }
 
 /** When the card's attack or charge finds nothing and it says to hold, the unit does not run. */
 function holdInstead(order: AiOrder): AiOrder {
   return {
     ...order,
-    lines: order.lines.map((l) => (/^Otherwise: RUN/.test(l) ? 'Otherwise: the unit holds where it is.' : l)),
-    reports: order.reports.map((r) => (r.id === 'noTarget' ? { ...r, label: 'No target — held' } : r)),
+    lines: order.lines.map((l) => (/^Otherwise: RUN/.test(l) ? 'Otherwise: it holds where it is.' : l)),
+    reports: order.reports.map((r) => (r.id === 'noTarget' ? { ...r, label: 'No target, held' } : r)),
   };
 }
 
@@ -99,7 +99,7 @@ export function cardOrder(state: GameState, base: AiOrder, rng: Rng): AiOrder {
   // A Burrowed unit cannot attack or charge: with no card it can play, it holds.
   const lead = card ? primaryStep(card) : null;
   if (aiBurrowed(u) && (!card || lead?.k === 'attack' || lead?.k === 'charge')) {
-    return { ...holdOrder(u), lines: ['BURROWED: it cannot attack or charge, so it holds where it is. It counts as activated.'] };
+    return { ...holdOrder(u), lines: ['BURROWED: it cannot attack or charge. It holds where it is and counts as activated.'] };
   }
   if (!card) return base;
   u.cardMods = modsOf(card, state.round);
@@ -121,12 +121,12 @@ function burrowing(u: AiUnitInstance, card: ActionCard, order: AiOrder): AiOrder
   const lines: string[] = [];
   if (aiBurrowed(u) && (order.type === 'move' || order.type === 'run') && !aiHas(u, 'Tunneling Claws')) {
     setAiBurrowed(u, false);
-    lines.push('It surfaces to move: BURROWED ends.');
+    lines.push('It surfaces to move. BURROWED ends.');
   }
   if (card.steps.some((s) => s.k === 'ability' && s.name === 'Burrow')) {
     const on = !aiBurrowed(u);
     setAiBurrowed(u, on);
-    lines.push(on ? 'It is now BURROWED.' : 'It surfaces: BURROWED ends.');
+    lines.push(on ? 'It is now BURROWED.' : 'It surfaces. BURROWED ends.');
   } else if (card.boost?.name === 'Rapid Burrowing' && !aiBurrowed(u)) {
     setAiBurrowed(u, true);
     lines.push('It is now BURROWED.');
@@ -140,8 +140,8 @@ function cardText(card: ActionCard): [string[], string[]] {
     .filter((s): s is Extract<CardStep, { k: 'ability' }> => s.k === 'ability')
     .map((a) => `${a.name.toUpperCase()} (free for the AI): ${a.text}${a.use ? ` AI: ${a.use}` : ''}`);
   const extras = [
-    ...card.buffs.map((b) => `Until the End of the Round: ${b.name} — ${b.text}`),
-    ...(card.boost ? [`Faction boost — ${card.boost.name}: ${card.boost.text}${card.boost.use ? ` AI: ${card.boost.use}` : ''}`] : []),
+    ...card.buffs.map((b) => `Until the End of the Round, ${b.name}: ${b.text}`),
+    ...(card.boost ? [`Faction Boost (${card.boost.name}): ${card.boost.text}${card.boost.use ? ` AI: ${card.boost.use}` : ''}`] : []),
   ];
   return [abilities, extras];
 }

@@ -77,7 +77,7 @@ export function UnitBuilder({ faction, onAdd, lockFaction, owned, used, allowSum
             {o.name} +{composition === 'large' ? o.cost.large : o.cost.small}{o.note ? <span className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}> · {o.note}</span> : null}
           </Toggle>
         ))}
-        {upgradeOptions(def).length === 0 && <span className="small muted">No upgrades for this unit.</span>}
+        {upgradeOptions(def).length === 0 && <span className="small muted">No upgrades for this Unit.</span>}
       </div>
       <div className="row">
         <input placeholder={`Name (optional), e.g. ${def.name} A`} value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, minWidth: 160 }} />

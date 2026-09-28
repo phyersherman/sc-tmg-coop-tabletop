@@ -18,7 +18,7 @@ const FOCUS: Record<Focus, string> = {
 function whereTo(g: GameState, u: AiUnitInstance | undefined, to: MoveTo): string {
   switch (to) {
     case 'focus': return 'the nearest enemy';
-    case 'friend': return 'the nearest friendly unit';
+    case 'friend': return 'the nearest friendly Unit';
     case 'cover': return 'the nearest cover';
     case 'marker': return 'the nearest marker it does not hold';
     case 'objective': return u ? headingText(g, u.objective) : 'its objective';
@@ -45,7 +45,7 @@ export function stepText(g: GameState, card: ActionCard, s: CardStep, u?: AiUnit
       const extra = [s.twoDice ? 'roll 2D6, keep the higher' : '', s.bonus ? `+${s.bonus}"` : ''].filter(Boolean).join(', ');
       return { title: `Charge ${FOCUS[s.focus ?? 'nearest']}${extra ? ` (${extra})` : ''}`, detail: `${s.orFire ? 'Out of reach: fire instead. ' : ''}Nothing to charge: ${s.otherwise === 'run' ? 'run toward its objective' : 'hold'}.` };
     }
-    case 'ability': return { title: s.name, detail: `${s.text}${s.use ? ` — AI: ${s.use}` : ''}` };
+    case 'ability': return { title: s.name, detail: `${s.text}${s.use ? ` AI: ${s.use}` : ''}` };
   }
 }
 
@@ -83,10 +83,10 @@ export function ActionCardView({ g, card, unit, full = false, entry }: { g: Game
       </ol>
       {card.buffs.length > 0 && (
         <div className="ac-buffs">
-          {card.buffs.map((b) => <p key={b.name}><b>✚ {b.name}</b>{full ? ` — ${b.text}` : ''}</p>)}
+          {card.buffs.map((b) => <p key={b.name}><b>✚ {b.name}</b>{full ? `: ${b.text}` : ''}</p>)}
         </div>
       )}
-      {card.boost && <p className="ac-boost"><b>★ {card.boost.name}</b>{full ? ` — ${card.boost.text}` : ''}{full && card.boost.use && <span className="ac-use">AI uses it on {card.boost.use}</span>}</p>}
+      {card.boost && <p className="ac-boost"><b>★ {card.boost.name}</b>{full ? `: ${card.boost.text}` : ''}{full && card.boost.use && <span className="ac-use">AI uses it on {card.boost.use}</span>}</p>}
       {full && (
         <ul className="ac-reminders">
           {remindersFor(card).map((k) => <li key={k}>{REMINDERS[k]}</li>)}

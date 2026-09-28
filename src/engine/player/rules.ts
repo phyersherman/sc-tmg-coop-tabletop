@@ -123,13 +123,13 @@ export function checkMove(state: GameState, pu: PlayerUnit, pt: Pt, kind: 'move'
   if (state.step.kind !== 'PLAYERS_TURN') return no('Wait for your activation.');
   if (pu.location !== 'table') return no(`${pu.name} is not on the table.`);
   const phaseKey = state.phase === 'movement' ? 'movement' : state.phase === 'assault' ? 'assault' : null;
-  if (!phaseKey) return no('No movement in this phase (use Close Ranks in combat).');
+  if (!phaseKey) return no('Units do not move in this phase. In the Combat phase, use Close Ranks.');
   const planted = statusBlocks(pu, kind);
   if (planted) return no(planted);
   if (kind === 'run' && state.phase !== 'assault') return no('Run is an Assault phase action.');
   if ((kind === 'move' || kind === 'disengage') && state.phase !== 'movement') return no('Move is a Movement phase action.');
   if (pu.activated[phaseKey]) return no(`${pu.name} already acted this phase.`);
-  if (pu.engaged && kind !== 'disengage') return no(`${pu.name} is engaged: it can only Disengage in the Movement phase.`);
+  if (pu.engaged && kind !== 'disengage') return no(`${pu.name} is Engaged. It can only Disengage, and only in the Movement phase.`);
   if (!pu.engaged && kind === 'disengage') return no(`${pu.name} is not engaged.`);
   const from = playerPos(state, pu);
   if (!from) return no('Position unknown.');
@@ -300,12 +300,12 @@ export function targetReport(state: GameState, pu: PlayerUnit, weapon: WeaponPro
     else if (weapon.target === 'Ground' && flying) reason = `${weapon.name} cannot target Flying units`;
     else if (weapon.target === 'Flying' && !flying) reason = `${weapon.name} only targets Flying units`;
     else if (weapon.range === 'E') reason = 'Not engaged with it';
-    else if (pu.engaged && !pu.engagedWith.includes(u.id)) reason = `${pu.name} is engaged: it can only shoot units it is fighting`;
-    else if (!pu.engaged && u.engaged && !weapon.keywords.some((k) => k.k === 'PINPOINT')) reason = `${u.label} is engaged in combat (needs PINPOINT)`;
+    else if (pu.engaged && !pu.engagedWith.includes(u.id)) reason = `${pu.name} is Engaged. It can only shoot units it is fighting`;
+    else if (!pu.engaged && u.engaged && !weapon.keywords.some((k) => k.k === 'PINPOINT')) reason = `${u.label} is Engaged. Only a PINPOINT weapon can target it`;
     else if (d !== null && d > maxRange(weapon)) reason = `Out of range: ${d.toFixed(1)}" (range ${maxRange(weapon)}")`;
     else if (!flying && losBlocked(near.from ?? from, playerUnitSize(pu), near.to ?? p, tdef.stats.size, state.terrain.pieces)) {
       const blocker = state.terrain.pieces.find((t) => t.size >= 1 && !t.catalogId.startsWith('token:') && losBlocked(near.from ?? from, playerUnitSize(pu), near.to ?? p, tdef.stats.size, [t]));
-      reason = `No line of sight${blocker ? ` (${blocker.label ?? 'terrain'} #${blocker.n})` : ''}`;
+      reason = `No Line of Sight${blocker ? ` (${blocker.label ?? 'terrain'} #${blocker.n})` : ''}`;
     }
     return { unit: u, ok: false, reason, distance: d };
   });
@@ -324,19 +324,19 @@ export function weaponSpent(state: GameState, pu: PlayerUnit, weapon: WeaponProf
   if (fired.includes(weapon.id)) return `${pu.name} already used ${weapon.name} this activation.`;
   const isSidearm = (w: WeaponProfile | undefined) => !!w?.keywords.some((k) => k.k === 'SIDEARM');
   const mainUsed = fired.some((id) => !isSidearm(playerUnitDef(pu).weapons.find((w) => w.id === id)));
-  if (!isSidearm(weapon) && mainUsed) return `${pu.name} already attacked with its main weapon: only a SIDEARM can be used as well.`;
+  if (!isSidearm(weapon) && mainUsed) return `${pu.name} already attacked with its main weapon. Only a SIDEARM can still fire.`;
   return null;
 }
 
 export function checkAttack(state: GameState, pu: PlayerUnit, weapon: WeaponProfile, target: AiUnitInstance): RuleCheck {
   if (state.step.kind !== 'PLAYERS_TURN') return no('Wait for your activation.');
   if (pu.location !== 'table') return no(`${pu.name} is not on the table.`);
-  if (weapon.phase === 'Assault' && state.phase !== 'assault') return no('Ranged attacks happen in the Assault phase.');
+  if (weapon.phase === 'Assault' && state.phase !== 'assault') return no('Ranged Attacks happen in the Assault phase.');
   if (weapon.phase === 'Combat' && state.phase !== 'combat') return no('Close combat happens in the Combat phase.');
   const spent = weaponSpent(state, pu, weapon);
   if (spent) return no(spent);
   if (pu.disengagedThisRound && state.phase === 'assault') return no(`${pu.name} disengaged this round and cannot attack.`);
-  if (isBurrowed(pu)) return no(`${pu.name} is Burrowed: it can only Move, Run, Disengage, Hold or Close Ranks. Unburrow first.`);
+  if (isBurrowed(pu)) return no(`${pu.name} is Burrowed. It can only Move, Run, Disengage, Hold or Close Ranks. Unburrow first.`);
   if (!validTargets(state, pu, weapon).some((t) => t.unit.id === target.id)) return no(targetReport(state, pu, weapon).find((r) => r.unit.id === target.id)?.reason ?? `${target.label} is not a legal target for ${weapon.name}.`);
   return ok;
 }
@@ -386,7 +386,7 @@ export function checkCloseRanks(state: GameState, pu: PlayerUnit, pt: Pt): RuleC
   const from = playerPos(state, pu);
   if (!from) return no('Position unknown.');
   const cr = playerMoveReach(state, pu, pt, 3);
-  if (cr.reach > 3.05) return no(`Close Ranks moves at most 3" (${cr.length === Infinity ? 'no path' : `${cr.reach.toFixed(1)}"`}): the whole base must end within 3" of where it started.`);
+  if (cr.reach > 3.05) return no(`Close Ranks moves at most 3" (${cr.length === Infinity ? 'no path' : `${cr.reach.toFixed(1)}"`}). The whole base must end within 3" of where it started.`);
   const engaged = pu.engagedWith;
   const lead = shapeAt(pu.defId, pt);
   const cur = shapeAt(pu.defId, from);
@@ -434,7 +434,7 @@ const titleStatus = (s: string) => s.replace(/\w\S*/g, (t) => t[0]!.toUpperCase(
 /** Actions a Status forbids outright: a unit in SIEGE MODE is planted where it stands. */
 export function statusBlocks(pu: PlayerUnit, action: 'move' | 'run' | 'disengage' | 'charge' | 'closeRanks'): string | null {
   void action;
-  return (pu.statuses ?? []).includes('Siege Mode') ? 'In SIEGE MODE it cannot move: change mode first.' : null;
+  return (pu.statuses ?? []).includes('Siege Mode') ? 'It cannot move in SIEGE MODE. Change mode first.' : null;
 }
 
 /** Whether one of your units still has something to do in the current phase. */
