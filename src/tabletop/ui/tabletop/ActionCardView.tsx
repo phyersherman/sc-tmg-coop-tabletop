@@ -27,14 +27,17 @@ function whereTo(g: GameState, u: AiUnitInstance | undefined, to: MoveTo): strin
 }
 
 
+const bonus = (speed: number, mod: number): string | undefined => (mod ? `Speed ${speed}", ${mod > 0 ? '+' : '−'}${Math.abs(mod)}" from this card.` : undefined);
+
 /** One line of a card, in the words a player reads it out at the table. */
 export function stepText(g: GameState, card: ActionCard, s: CardStep, u?: AiUnitInstance): { title: string; detail?: string } {
   const def = unitById(card.defId);
   const speed = u ? speedFor(def, u.models) + speedModFor(g, { ...u, cardMods: undefined }) : def.stats.speed?.[0] ?? 0;
   const inches = (mod: number) => `${Math.max(0, speed + mod)}"`;
   switch (s.k) {
-    case 'move': return { title: `Move ${inches(s.mod)} toward ${whereTo(g, u, s.to)}` };
-    case 'run': return { title: `Run ${inches(s.mod)} toward ${whereTo(g, u, s.to)}` };
+    // A card that changes the distance says so, or the table asks why the Unit moves more than its Speed.
+    case 'move': return { title: `Move ${inches(s.mod)} toward ${whereTo(g, u, s.to)}`, detail: bonus(speed, s.mod) };
+    case 'run': return { title: `Run ${inches(s.mod)} toward ${whereTo(g, u, s.to)}`, detail: bonus(speed, s.mod) };
     case 'hold': return { title: 'Hold position' };
     case 'attack': {
       const w = bestWeapon(def, u?.upgrades ?? [], 'Assault');
@@ -53,7 +56,7 @@ export function stepText(g: GameState, card: ActionCard, s: CardStep, u?: AiUnit
  * An AI action card, as it lies on the table: its name, what the unit does, top to bottom, and the buffs and boost
  * it brings. `full` adds the ability texts and the rule reminders for resolving it.
  */
-export function ActionCardView({ g, card, unit, full = false, entry }: { g: GameState; card: ActionCard; unit?: AiUnitInstance; full?: boolean; /** Arriving from Reserves: where it comes on, before the card's move. */ entry?: string }) {
+export function ActionCardView({ g, card, unit, full = false, reminders = true, entry }: { g: GameState; card: ActionCard; unit?: AiUnitInstance; full?: boolean; /** The rule reminders under a full card (the order card keeps them behind its Full rules toggle). */ reminders?: boolean; /** Arriving from Reserves: where it comes on, before the card's move. */ entry?: string }) {
   return (
     <div className={`ac ${full ? 'ac-full' : 'ac-mini'} ac-${card.phase}`} role="group" aria-label={`Action card: ${card.name}`}>
       <div className="ac-head">
@@ -87,7 +90,7 @@ export function ActionCardView({ g, card, unit, full = false, entry }: { g: Game
         </div>
       )}
       {card.boost && <p className="ac-boost"><b><StepIcon mark="boost" className="inline" />{card.boost.name}</b>{full ? `: ${card.boost.text}` : ''}{full && card.boost.use && <span className="ac-use">AI uses it on {card.boost.use}</span>}</p>}
-      {full && (
+      {full && reminders && (
         <ul className="ac-reminders">
           {remindersFor(card).map((k) => <li key={k}>{REMINDERS[k]}</li>)}
         </ul>

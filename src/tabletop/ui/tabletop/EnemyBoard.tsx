@@ -16,7 +16,7 @@ const STAT_DEBUFFS = ['speed', 'hit', 'armour', 'evade'] as const;
  * Each shows the unit's numbers, what has happened to it, and the action card its type follows this phase.
  * Picking a card opens its damage entry.
  */
-export function EnemyBoard({ g, selected, onPick }: { g: GameState; selected: string | null; onPick: (id: string) => void }) {
+export function EnemyBoard({ g, selected, lastId = null, onPick }: { g: GameState; selected: string | null; /** The Unit whose order the table carried out last: it stays lit, not dimmed. */ lastId?: string | null; onPick: (id: string) => void }) {
   const onTable = g.army.units.filter((u) => u.location === 'table' && u.models > 0);
   const reserves = g.army.units.filter((u) => u.location === 'reserves' && u.models > 0);
   const activeId = g.step.kind === 'AI_ORDER' ? g.step.order.unitId : null;
@@ -29,13 +29,13 @@ export function EnemyBoard({ g, selected, onPick }: { g: GameState; selected: st
       </div>
       {onTable.length === 0 && <p className="eb-empty">No enemy Units on the table yet. They arrive in the Movement phase.</p>}
       <div className="eb-grid">
-        {onTable.map((u) => <EnemyTile key={u.id} g={g} u={u} active={u.id === activeId} selected={u.id === selected} onPick={() => onPick(u.id)} />)}
+        {onTable.map((u) => <EnemyTile key={u.id} g={g} u={u} active={u.id === activeId} last={u.id === lastId} selected={u.id === selected} onPick={() => onPick(u.id)} />)}
       </div>
     </section>
   );
 }
 
-function EnemyTile({ g, u, active, selected, onPick }: { g: GameState; u: AiUnitInstance; active: boolean; selected: boolean; onPick: () => void }) {
+function EnemyTile({ g, u, active, last, selected, onPick }: { g: GameState; u: AiUnitInstance; active: boolean; last: boolean; selected: boolean; onPick: () => void }) {
   const def = unitById(u.defId);
   const card = faceCard(g, u);
   const phase = g.phase === 'movement' || g.phase === 'assault' || g.phase === 'combat' ? g.phase : null;
@@ -43,8 +43,9 @@ function EnemyTile({ g, u, active, selected, onPick }: { g: GameState; u: AiUnit
   const debuffs = STAT_DEBUFFS.filter((s) => aiDebuff(u, s) > 0);
   const speed = def.stats.speed ? speedFor(def, u.models) + speedModFor(g, { ...u, cardMods: undefined }) : null;
   return (
-    <article className={`eb-tile ${active ? 'active' : ''} ${selected ? 'selected' : ''} ${done ? 'done' : ''}`}>
-      <button type="button" className="eb-tile-top" onClick={onPick} aria-pressed={selected} title="Enter damage, models lost and DEBUFFs">
+    <article className={`eb-tile ${active ? 'active' : ''} ${last ? 'last' : ''} ${selected ? 'selected' : ''} ${done ? 'done' : ''}`}>
+      {/* The top of the card opens its damage entry. A role, not a <button>: it holds a stat list and blocks. */}
+      <div role="button" tabIndex={0} className="eb-tile-top" onClick={onPick} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(); } }} aria-pressed={selected} aria-label={`${u.label}: enter damage, models lost and DEBUFFs`} data-unit={u.id}>
         <div className="eb-name">
           <b>{u.label}</b>
           <span>{def.role} · {currentSupply(def, u.models)} Supply</span>
@@ -70,8 +71,8 @@ function EnemyTile({ g, u, active, selected, onPick }: { g: GameState; u: AiUnit
           {(u.buffs ?? []).map((b) => <span key={b.name} className="eb-flag buff" title={b.text}><StepIcon mark="buff" className="inline" />{b.name}</span>)}
           {done && <span className="eb-flag muted">Activated</span>}
         </div>
-      </button>
-      {card ? <ActionCardView g={g} card={card} unit={u} /> : phase === 'combat' ? <p className="eb-nocard">{u.engaged ? 'Engaged: it fights.' : 'Not Engaged: no fight.'}</p> : <p className="eb-nocard">No card yet this phase.</p>}
+      </div>
+      {card ? <ActionCardView g={g} card={card} unit={u} /> : phase === 'combat' ? <p className="eb-nocard">{u.engaged ? 'Engaged: it fights.' : 'Not Engaged: no fight.'}</p> : <p className="eb-nocard eb-cardback">No card yet this phase</p>}
     </article>
   );
 }

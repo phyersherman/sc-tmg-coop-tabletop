@@ -78,13 +78,12 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
   const main = order.batches[0];
   const range = main ? (typeof main.range === 'number' ? main.range + (main.rangeMod ?? 0) : 0) : 0;
   return (
-    <Panel accent className="cmd">
+    <Panel className="cmd cmd-ai">
       <div className="cmd-head">
-        <span className="tag red">Enemy</span>
         <h2 style={{ margin: 0 }}>{u.label}{order.card ? '' : `: ${VERB[order.type]}`}</h2>
       </div>
       {order.card
-        ? <ActionCardView g={g} card={order.card} unit={u} full entry={order.type === 'deploy' ? order.lines.find((l) => /^(Enter from|Set the whole unit down|BURROW AMBUSH|Camera: enter)/.test(l)) : undefined} />
+        ? <ActionCardView g={g} card={order.card} unit={u} full reminders={details} entry={order.type === 'deploy' ? order.lines.find((l) => /^(Enter from|Set the whole unit down|BURROW AMBUSH|Camera: enter)/.test(l)) : undefined} />
         : <>
             <p className="cmd-sub">{sub}</p>
             <p className="small muted" style={{ margin: '0 0 8px' }}>{def.name} · {u.models} models{order.focus ? ` · target: ${focusText(order.focus)}` : ''}</p>
@@ -95,7 +94,7 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
           <p className="ask">{camLine ? 'Roll the attack.' : `Fire at the nearest enemy Unit in Line of Sight within ${range}" of any of its models. Otherwise, do not fire.`}</p>
           {!camLine && main?.longRange ? <p className="ask">{`LONG RANGE: if no enemy Unit is that close, fire at one within ${main.longRange + (main.rangeMod ?? 0)}" instead, at -1 to hit.`}</p> : null}
           <div className="row">
-            <Btn variant="primary" size="lg" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>{camLine ? 'Roll' : 'Open fire'}</Btn>
+            <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>{camLine ? 'Roll' : 'Open fire'}</Btn>
             {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>{order.reports.find((r) => r.id === 'noTarget')?.label ?? 'No target'}</Btn>}
           </div>
         </div>
@@ -105,7 +104,7 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
           <p className="ask">{camLine ? 'Roll the AI\'s charge distance on the table.' : `Charge the nearest enemy Ground Unit within ${order.charge?.max ?? '?'}" of the Leading Model. Otherwise, do not charge.`}</p>
           {!camLine && order.charge && <p className="ask">{chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>}
           <div className="row">
-            {order.impact ? <Btn variant="primary" size="lg" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge made, roll IMPACT</Btn> : <Btn variant="primary" size="lg" onClick={() => report('charged')}>Charge made</Btn>}
+            {order.impact ? <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge made, roll IMPACT</Btn> : <Btn variant="primary" size="lg" className="tt-primary" onClick={() => report('charged')}>Charge made</Btn>}
             {hasReport('chargeFailed') && <Btn size="lg" onClick={() => report('chargeFailed')}>Charge failed</Btn>}
             {hasReport('attacked') && order.batches.length > 0 && <Btn size="lg" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>No charge, fire instead</Btn>}
             {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>No target, it ran</Btn>}
@@ -118,39 +117,40 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
       {needsAsk && !askFighters && order.type === 'closeCombat' && (
         <div className="stack">
           <p className="ask">Close Ranks. Move its Leading Model up to 3" toward the enemy Unit it is Engaged with, then close the rest in around it.</p>
-          <div className="row"><Btn variant="primary" size="lg" onClick={() => { setRollWhat('batches'); setAskFighters(true); }}>Ranks closed</Btn></div>
+          <div className="row"><Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('batches'); setAskFighters(true); }}>Ranks closed</Btn></div>
         </div>
       )}
       {needsAsk && order.type !== 'ranged' && order.type !== 'charge' && order.type !== 'closeCombat' && (
-        <div className="row"><Btn variant="primary" size="lg" onClick={() => setStage('roll')}>Roll</Btn></div>
+        <div className="row"><Btn variant="primary" size="lg" className="tt-primary" onClick={() => setStage('roll')}>Roll</Btn></div>
       )}
 
       {stage === 'roll' && rollWhat === 'batches' && order.batches.map((b, i) => <DiceBlock key={i} batch={b} showRolls={showRolls} faction={def.faction} models={order.type === 'closeCombat' ? fighters ?? undefined : undefined} />)}
       {stage === 'roll' && rollWhat === 'impact' && order.impact && <DiceBlock batch={order.impact} showRolls={showRolls} title="IMPACT" faction={def.faction} models={fighters ?? undefined} />}
 
-      <div className="row" style={{ marginTop: 6, marginBottom: 8 }}>
-        <Btn size="sm" variant="ghost" onClick={() => setDetails((v) => !v)}>{details ? 'Hide the full rules' : 'Full rules for this order'}</Btn>
-      </div>
-      {details && (
-        <ol className="order-lines">
-          {order.lines.map((l, i) => <li key={i} className={l.startsWith('Otherwise') ? 'otherwise' : ''}>{l}</li>)}
-        </ol>
-      )}
 
       {(!hasDice || stage === 'roll') && (
         <div className="row">
           {stage === 'roll' && rollWhat === 'impact' && (
             <>
               <span className="row small"><span className="muted">Enemy Supply Engaged</span><Stepper value={enemySupply} onChange={setEnemySupply} min={0} max={12} /></span>
-              <Btn size="lg" variant="primary" onClick={() => report('charged')}>Charge resolved</Btn>
+              <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('charged')}>Charge resolved</Btn>
             </>
           )}
-          {stage === 'roll' && rollWhat === 'batches' && order.type === 'ranged' && <Btn size="lg" variant="primary" onClick={() => report('attacked')}>Attack resolved</Btn>}
-          {stage === 'roll' && rollWhat === 'batches' && order.type === 'charge' && <Btn size="lg" variant="primary" onClick={() => report('attacked')}>Attack resolved</Btn>}
-          {stage === 'roll' && rollWhat === 'batches' && order.type === 'closeCombat' && <Btn size="lg" variant="primary" onClick={() => report('done')}>Combat resolved</Btn>}
-          {!hasDice && order.reports.map((r) => <Btn key={r.id} size="lg" variant={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'primary' : ''} onClick={() => report(r.id)}>{r.label}</Btn>)}
+          {stage === 'roll' && rollWhat === 'batches' && order.type === 'ranged' && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('attacked')}>Attack resolved</Btn>}
+          {stage === 'roll' && rollWhat === 'batches' && order.type === 'charge' && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('attacked')}>Attack resolved</Btn>}
+          {stage === 'roll' && rollWhat === 'batches' && order.type === 'closeCombat' && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('done')}>Combat resolved</Btn>}
+          {!hasDice && order.reports.map((r) => <Btn key={r.id} size="lg" variant={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'primary' : ''} className={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'tt-primary' : ''} onClick={() => report(r.id)}>{r.label}</Btn>)}
           {stage === 'roll' && <Btn size="sm" variant="ghost" onClick={() => setStage('ask')}>Back</Btn>}
         </div>
+      )}
+      {/* The rules behind the order, for the operator: after the one action, never between the steps and it. */}
+      <div className="row cmd-more">
+        <Btn size="sm" variant="ghost" onClick={() => setDetails((v) => !v)}>{details ? 'Hide the full rules' : 'Full rules for this order'}</Btn>
+      </div>
+      {details && (
+        <ol className="order-lines">
+          {order.lines.map((l, i) => <li key={i} className={l.startsWith('Otherwise') ? 'otherwise' : ''}>{l}</li>)}
+        </ol>
       )}
     </Panel>
   );
@@ -411,7 +411,7 @@ function Banner({ step, g, dispatch }: { step: Extract<Step, { kind: 'ROUND_STAR
         {step.kind === 'ROUND_END' && <RoundReview g={g} />}
       </div>
       <div className="row banner-actions">
-        {!tenacity && <Btn variant="primary" onClick={() => dispatch({ t: 'continue' })}>Continue</Btn>}
+        {!tenacity && <Btn variant="primary" size="lg" className="tt-primary" onClick={() => dispatch({ t: 'continue' })}>Continue <kbd>Space</kbd></Btn>}
         {step.kind === 'ROUND_END' && <span className="small muted">Continue when the table is ready.</span>}
         {(step.kind === 'ROUND_START' || step.kind === 'PHASE_START') && (
           <Btn size="sm" variant="ghost" className="banner-skip" title="Stop announcing rounds and phases. The phase track at the top still shows each change. Turn them back on in Settings." onClick={() => { useSettings.getState().set({ skipPhaseBanners: true }); dispatch({ t: 'continue' }); }}>Skip these from now on</Btn>
@@ -505,7 +505,7 @@ export function GameScreen() {
   const now = g.pendingReaction ? <DamageReactionCard g={g} dispatch={dispatch} />
     : briefing ? briefing
     : bannerStep ? <Banner step={bannerStep} g={g} dispatch={dispatch} />
-    : step.kind === 'AI_ORDER' && aiGated ? (pendingEvent ? null : <div className="tt-card tt-wait"><h2>AI turn</h2><p className="muted">Reading the table…</p></div>)
+    : step.kind === 'AI_ORDER' && aiGated ? (pendingEvent ? null : <div className="tt-card tt-wait"><h2>AI turn</h2><p>Reading the table<span className="tt-dots" aria-hidden="true" /></p></div>)
     : step.kind === 'AI_ORDER' ? <>
         <CommandCard key={g.log.length} order={step.order} g={g} dispatch={dispatch} />
         <TakeBack g={g} />

@@ -284,7 +284,8 @@ function startPhase(state: GameState, mode: MissionMode, phase: Phase): void {
     state.step = { kind: 'SCORING_FORM', prompts: prompts.map(({ auto: _auto, ...rest }) => rest) };
     return;
   }
-  const lines = [`${PHASE_NAME[phase]} phase. ${state.firstPlayer === 'ai' ? 'The AI activates' : 'You activate'} first.`];
+  // The banner's title names the phase: the first line goes straight to who acts first.
+  const lines = [`${state.firstPlayer === 'ai' ? 'The AI activates' : 'You activate'} first.`];
   if (phase === 'movement') lines.push(`AI Supply available to deploy: ${availableNow(state) === Infinity ? 'unlimited' : availableNow(state)} of ${poolNow(state) === Infinity ? '∞' : poolNow(state)}.`);
   if (phase === 'assault') lines.push('Ranged Attacks, Charges and Runs. The AI\'s dice are rolled on each order.');
   state.step = { kind: 'PHASE_START', lines };
@@ -318,7 +319,8 @@ function advanceTurn(state: GameState, mode: MissionMode): void {
       // Passing early is for when nothing is waiting to come on: with anything deployable, the AI deploys instead.
       if (!(state.phase === 'movement' && shouldPassEarly(state) && !deployable(state, mode, ctx).length)) order = decideAi(state, mode, ctx, ctx.rng);
       if (order) order = cardOrder(state, order, ctx.rng);
-      if (order) order = withCardText(state, applySense(state, order, ctx.rng));
+      // With no map in play there is nothing seen to read positions from: the order stays as the table will run it.
+      if (order) order = withCardText(state, noMap(state) ? order : applySense(state, order, ctx.rng));
       commitRng(state, ctx.rng);
       if (order && (order.type === 'ranged' || order.type === 'charge' || order.type === 'closeCombat')) {
         // Check now whether the attack can happen, so the player is never asked to resolve an attack that cannot.

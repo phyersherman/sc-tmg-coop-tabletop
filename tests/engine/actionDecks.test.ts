@@ -258,3 +258,16 @@ describe('shooters shoot', () => {
     }
   });
 });
+
+describe('no map in play', () => {
+  it('never turns an order into camera coordinates, guards on side markers included', () => {
+    for (const mode of COOP_MODES.slice(0, 3)) {
+      const cfg = makeConfig({ modeId: mode.id, aiFaction: 'Protoss', playMode: 'tabletop' });
+      cfg.options = { ...cfg.options, actionDecks: true, noMap: true };
+      playGame(cfg, {
+        seed: 3,
+        onOrder: (_s, o) => { expect(o.lines.some((l) => l.startsWith('Camera:')), `${mode.id}: ${o.title}`).toBe(false); },
+      });
+    }
+  });
+});
