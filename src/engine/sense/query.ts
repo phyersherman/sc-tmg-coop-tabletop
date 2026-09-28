@@ -10,6 +10,7 @@ import { aiUnitSize, playerUnitFlying, playerUnitSize, playerUnitSupply } from '
 import { pathOptionsFor, closestBases, edgeDistance, edgeToPoint, ENGAGEMENT_IN, moveReach, shapeAt, unitGap, unitShapes } from './placement';
 import { MARKER_RADIUS_IN } from '@data/bases';
 import { isStructure } from '../director/selectors';
+import { aiBurrowed } from '../ai/burrow';
 
 export function hasSense(state: GameState): boolean {
   return !!state.sense && state.sense.calibrated;
@@ -135,7 +136,8 @@ export function suggestedMarkerControl(state: GameState): Record<number, MarkerC
     let pl = 0;
     for (const u of state.army.units) {
       // A Structure never controls or contests a marker, not even unopposed.
-      if (u.location !== 'table' || isStructure(u)) continue;
+      // Burrowed units cannot control or contest markers either.
+      if (u.location !== 'table' || isStructure(u) || aiBurrowed(u)) continue;
       const pts = aiModels(state, u);
       if (!pts) continue;
       const def = unitById(u.defId);

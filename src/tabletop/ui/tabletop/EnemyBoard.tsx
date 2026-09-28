@@ -35,7 +35,7 @@ export function EnemyBoard({ g, selected, onPick }: { g: GameState; selected: st
 
 function EnemyTile({ g, u, active, selected, onPick }: { g: GameState; u: AiUnitInstance; active: boolean; selected: boolean; onPick: () => void }) {
   const def = unitById(u.defId);
-  const card = faceCard(g, u.defId);
+  const card = faceCard(g, u);
   const phase = g.phase === 'movement' || g.phase === 'assault' || g.phase === 'combat' ? g.phase : null;
   const done = phase ? u.activated[phase] : false;
   const debuffs = STAT_DEBUFFS.filter((s) => aiDebuff(u, s) > 0);

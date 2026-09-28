@@ -19,11 +19,11 @@ interface Chapter { title: string; body: ReactNode; aside?: ReactNode }
 
 const CHAPTERS: Chapter[] = [
   {
-    title: 'The app is your opponent',
+    title: 'An opponent that never tires',
     body: (
       <>
-        <p>Co-op Command plays the enemy army in the StarCraft Tabletop Miniatures Game, so one or two of you can play together against it. Your table is the battlefield: the models, the terrain and the dice there are the truth.</p>
-        <p>The app decides what each enemy unit does, rolls its dice, keeps the Supply and the score, and asks you what happened. You move its models for it, the way its cards say.</p>
+        <p>Co-op Command plays the enemy army in the StarCraft Tabletop Miniatures Game, so one or two players can fight side by side against it. The battlefield is the table in front of you. Where the app and the table disagree, the table is right.</p>
+        <p>The app decides what each enemy Unit does, rolls its dice, and keeps the Supply and the score. The players move the enemy models the way its cards say, and tell the app what happened.</p>
       </>
     ),
   },
@@ -32,10 +32,10 @@ const CHAPTERS: Chapter[] = [
     body: (
       <>
         <ol>
-          <li><b>Collection.</b> Tell the app which miniatures you own. The enemy is built only from models you own.</li>
-          <li><b>Your army.</b> Each player builds a force with its cards. Any race, for either player.</li>
-          <li><b>The enemy.</b> The app builds a hidden army from the models you are not fielding, of any race. You meet its units as they arrive.</li>
-          <li><b>The table.</b> The setup map shows the deployment card, every terrain piece numbered, the Mission Markers, and what stands on the side markers. Set it all up, then start. After that the map is put away: your table is the map.</li>
+          <li><b>Collection.</b> Enter the miniatures you own. The enemy is built only from these.</li>
+          <li><b>Your army.</b> Each player builds a force from their cards, of any race.</li>
+          <li><b>The enemy.</b> A hidden army is built from the models you are not fielding, of any race. You meet its Units as they arrive.</li>
+          <li><b>The table.</b> The setup map shows the deployment card, every terrain piece by number, the Mission Markers, and what stands on each side marker. Set it all up and put the map away. From then on, the table is the map.</li>
         </ol>
       </>
     ),
@@ -44,14 +44,13 @@ const CHAPTERS: Chapter[] = [
     title: 'Reading the enemy',
     body: (
       <>
-        <p>During the battle the screen shows each enemy unit on the table as a card: its Speed, Armour, Evade and HP, the models it has left, and whether it is damaged, Engaged, buffed or DEBUFFed.</p>
-        <p>Every enemy unit type has two decks of action cards, one for the Movement phase and one for the Assault phase. When a unit activates, its type draws a card, and every unit of that type follows the same card for the rest of the phase. Read a card from the top down:</p>
+        <p>Each enemy Unit on the table has a card with its Speed, Armour, Evade and HP, the models it has left, and whether it is damaged, Engaged, buffed or DEBUFFed.</p>
+        <p>Every enemy Unit type has two decks of action cards, one for the Movement phase and one for the Assault phase. When a Unit activates, it plays the card from its deck that best suits its state. A Unit holding its marker digs in. A badly hurt Unit takes cover or falls back. A fresh Unit presses the attack. Read a card from the top down.</p>
         <ul>
-          <li><b>➜ » ■ ✹ ⚡</b> move, run, hold, fire, charge: what the unit does, and what it does if it cannot.</li>
-          <li><b>◆</b> an ability, used for free (the AI never pays Biomass, Command Points or Psionic Energy).</li>
-          <li><b>✚</b> a buff until the End of the Round: the AI never reacts, so its reactions come as buffs.</li>
-          <li><b>★</b> a Faction card boost, and who the AI uses it on.</li>
-          <li><b>↻</b> the deck is shuffled back together next round.</li>
+          <li><b>➜ » ■ ✹ ⚡</b> Move, run, hold, fire or charge. The card also says what to do if the Unit cannot.</li>
+          <li><b>◆</b> An ability, used for free. The AI never pays Biomass, Command Points or Psionic Energy.</li>
+          <li><b>✚</b> A buff until the End of the Round. The AI never reacts, so its reactions come as buffs instead.</li>
+          <li><b>★</b> A Faction card boost, and the Unit it goes to.</li>
         </ul>
       </>
     ),
@@ -61,9 +60,9 @@ const CHAPTERS: Chapter[] = [
     title: 'A turn at the table',
     body: (
       <>
-        <p>Sides alternate one unit at a time, as in any game. On your turn, activate a unit on the table, then press <b>Done</b> (or <b>Pass</b> when you have nothing left this phase).</p>
-        <p>On the enemy's turn the app shows the card and the unit it is for. Move the models as it says, using the reminders under the card: the focus is the nearest enemy by the shortest path, moves go round walls and never end within 1" of your models. If the card attacks, the app asks one question (is anything in range?), rolls the dice and tells you the hits; then tap what happened.</p>
-        <p>When your attack lands, pick the enemy unit's card and enter the hits: the app rolls its Armour and Evade and removes the models.</p>
+        <p>The sides take turns, one Unit at a time. On your turn, activate a Unit on the table, then press <b>Done</b>. Press <b>Pass</b> when you have nothing left to activate this phase.</p>
+        <p>On the enemy's turn, the app shows the card and the Unit it is for. Move the models as the card says. The focus is the nearest enemy by the shortest path. Moves go around walls and never end within 1" of your models. If the card attacks, answer whether anything is in range. The app rolls the dice and gives the hits. Tap what happened.</p>
+        <p>When your attack lands, pick the enemy Unit's card and enter the hits. The app rolls its Armour and Evade and removes the models.</p>
       </>
     ),
   },
@@ -71,8 +70,8 @@ const CHAPTERS: Chapter[] = [
     title: 'Combat and scoring',
     body: (
       <>
-        <p>There are no cards in the Combat phase. Tick which enemy units are Engaged, and every engaged unit fights as normal: the app rolls the enemy's dice and yours are rolled on the table.</p>
-        <p>At Scoring, tell the app who holds each marker and what you lost. It keeps the VP, the Supply Pool and the round-by-round score, and brings back destroyed enemy units depending on the difficulty.</p>
+        <p>There are no action cards in the Combat phase. Tick which enemy Units are Engaged. Every Engaged Unit fights as normal. The app rolls the enemy's dice, and the players roll their own at the table.</p>
+        <p>At Scoring, enter who holds each marker and what you lost. The app keeps the VP, the Supply Pool and the score for each round. Depending on the difficulty, it brings destroyed enemy Units back.</p>
       </>
     ),
   },
@@ -80,8 +79,8 @@ const CHAPTERS: Chapter[] = [
     title: 'Co-op missions',
     body: (
       <>
-        <p>Each co-op mission has a main objective: hold the Temple, stop the trains, survive the nights, guard your base from the Thrashers, close the rifts, lock the markers, or gather terrazine. The strip under the score always says where you stand, and when the next Scoring can lose the battle.</p>
-        <p>Most of the enemy goes after that objective. The other markers, the <b>side markers</b>, are a choice: leaving the objective to take one costs you units and time, and pays you back with a reward.</p>
+        <p>Every co-op mission has a main objective. Hold the Temple, stop the trains, survive the nights, guard your base from the Thrashers, close the rifts, lock the markers, or gather terrazine. The strip under the score tracks it, and warns you when the next Scoring can lose the battle.</p>
+        <p>Most of the enemy goes after the objective. The other markers, the <b>side markers</b>, are a choice. Leaving the objective to take one costs Units and time. It pays back with a reward.</p>
       </>
     ),
   },
@@ -89,12 +88,12 @@ const CHAPTERS: Chapter[] = [
     title: 'Side markers: guards and Structures',
     body: (
       <>
-        <p>At the start of a co-op mission something of the enemy's stands on each side marker. Table setup lists which, and which token goes beside it.</p>
+        <p>At the start of a co-op mission, something of the enemy's stands on each side marker. The table setup says which, and which token goes beside it.</p>
         <ul>
-          <li><b>A guard</b> is a real enemy unit, a copy of its cheapest Core unit, set on the marker before round 1 (spare models or stand-ins). It holds the marker and never leaves it: it shoots what it can see and fights what comes to it, and it does not come back once destroyed. Put a <b>Guard</b> token beside it.</li>
-          <li><b>A Structure</b> (a Refinery, an Extractor or an Assimilator) stands on the marker and never fights back, but takes a lot to bring down. Use any building you have, or its printed token; its HP and Armour are on the token.</li>
+          <li><b>A guard</b> is a real enemy Unit, a copy of the enemy's cheapest Core Unit. Set it on the marker before round 1, using spare models or stand-ins. It never leaves the marker. It shoots what it can see and fights what comes to it. Once destroyed, it does not come back. Put a <b>Guard</b> token beside it.</li>
+          <li><b>A Structure</b> is a Refinery, an Extractor or an Assimilator. It stands on the marker and never fights back, but it takes a lot to bring down. Use any building you have, or its printed token. Its HP and Armour are on the token.</li>
         </ul>
-        <p>The rest of the enemy leaves side markers alone: it is up to you whether to go for them.</p>
+        <p>The rest of the enemy leaves side markers alone. Whether to go for them is up to you.</p>
       </>
     ),
     aside: (
@@ -111,9 +110,9 @@ const CHAPTERS: Chapter[] = [
         <ol>
           <li>Destroy the guard or the Structure on a side marker.</li>
           <li>Hold that marker at a Scoring phase.</li>
-          <li>The player whose unit holds it earns the marker's reward, for the <b>next round only</b>. Used then or lost. With two players level on it, you choose who takes it.</li>
+          <li>The player with the most Supply on the marker earns its reward for the <b>next round only</b>. If it is not used then, it is lost. If two players are level, you choose who takes it.</li>
         </ol>
-        <p>Gold rewards go to one unit (Reinforce brings a destroyed unit back, Firepower gives one unit +1 RoA). Blue ones go to one player (Requisition: +2 Supply). Violet ones change the mission itself and apply on their own. Print the tokens and set each beside its marker, so everyone can see what it is worth.</p>
+        <p>Gold rewards go to one Unit. Reinforce brings a destroyed Unit back, and Firepower gives one Unit +1 RoA on its ranged weapons. Blue rewards go to one player, such as Requisition, which adds +2 Supply. Violet rewards change the mission itself and apply on their own. Set each reward token beside its marker, so everyone can see what it is worth.</p>
       </>
     ),
     aside: (
@@ -127,7 +126,7 @@ const CHAPTERS: Chapter[] = [
   },
 ];
 
-/** Learn to play: how a battle runs with the app, one short chapter at a time. */
+/** Learn to play: how a battle runs, one short chapter at a time. */
 export function TutorialScreen() {
   const go = useUi((s) => s.go);
   const [i, setI] = useState(0);

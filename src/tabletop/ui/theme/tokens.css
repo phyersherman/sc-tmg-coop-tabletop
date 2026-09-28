@@ -1206,7 +1206,6 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .ac-phase { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--red-side); font-family: var(--font-head); }
 .ac-name { font-family: var(--font-head); font-size: 20px; text-transform: uppercase; letter-spacing: 0.06em; flex: 1; }
 .ac-full .ac-name { font-size: 28px; }
-.ac-shuffle { font-size: 20px; color: #fcd34d; }
 .ac-steps { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
 .ac-step { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; font-size: 16px; line-height: 1.35; }
 .ac-full .ac-step { font-size: 19px; }
@@ -1265,3 +1264,7 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .table-setup-sides { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 .table-setup-sides li { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; }
 .eb-flag.side { border-color: #fbbf24; color: #fcd34d; }
+
+/* The rulebook's own devices: an italic summary under a heading, and a boxed tip or designer's note. */
+.rulebook .rule-summary { margin-top: -4px; color: var(--muted); }
+.rulebook .rule-note { margin: 10px 0 4px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--panel); }

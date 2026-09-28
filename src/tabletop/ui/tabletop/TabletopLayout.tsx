@@ -20,6 +20,7 @@ import { phaseNote } from '../hud/PhaseTrack';
 import { Stakes } from '../hud/Stakes';
 import { Rewards } from '../hud/Rewards';
 import { Btn, Stepper, Toggle } from '../components/Basics';
+import { aiBurrowed, aiHas } from '@engine/ai/burrow';
 
 const PHASES = ['movement', 'assault', 'combat', 'scoring'] as const;
 
@@ -216,8 +217,11 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
       ) : null}
       <div className="row" style={{ marginTop: 4 }}>
         <Btn size="sm" onClick={() => dispatch({ t: 'setModels', unitId: u.id, models: Math.max(0, u.models - 1) })}>−1 model</Btn>
+        {/* Medics and the like: damage comes back off the marker. */}
+        {u.damageMarker > 0 && <Btn size="sm" variant="ok" onClick={() => dispatch({ t: 'heal', unitId: u.id, amount: 1 })}>Heal 1</Btn>}
         {/* The state, not the action: on while the unit is Engaged, and the map keeps it right when it knows where things stand. */}
         <Toggle on={u.engaged} onChange={(v) => dispatch({ t: 'setEngaged', unitId: u.id, engaged: v, enemySupply: u.engagedEnemySupply || 1 })}>Engaged</Toggle>
+        {aiHas(u, 'Burrow') && <Toggle on={aiBurrowed(u)} onChange={(v) => dispatch({ t: 'setBurrowed', unitId: u.id, on: v })}>Burrowed</Toggle>}
       </div>
 
       <h3 className="tt-sub">DEBUFF until the End of the Round</h3>

@@ -133,7 +133,10 @@ export function report(id: OrderReportOption['id'], label: string): OrderReportO
 /** Units the AI could deploy right now: in Reserves, within its Supply, under the order card's cap and the mission's filters. */
 export function deployable(state: GameState, mode: MissionMode, ctx: MissionCtx): AiUnitInstance[] {
   const card = currentCard(state.orderDeck);
-  const cap = mode.deployCap?.(ctx) ?? (card.deployMax === 'all' ? 99 : card.deployMax);
+  // An official mission is played as against a real opponent, who deploys until the Supply Pool is full; the order
+  // card paces the AI's arrivals in the co-op missions only.
+  const cardCap = mode.official || card.deployMax === 'all' ? 99 : card.deployMax;
+  const cap = mode.deployCap?.(ctx) ?? cardCap;
   const deployedThisRound = state.army.units.filter((u) => u.deployedRound === state.round).length;
   if (deployedThisRound >= cap && state.round < state.finalRound) return [];
   const pool = poolNow(state);

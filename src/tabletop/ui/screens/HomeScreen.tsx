@@ -6,12 +6,12 @@ import { DIFFICULTIES } from '@engine/difficulty';
 
 /** What to do before a battle, in the order a game night needs it. */
 const PREP: { screen: 'collection' | 'armies' | 'terrain' | 'rulebook' | 'tokens' | 'tutorial'; name: string; what: string }[] = [
-  { screen: 'tutorial', name: 'Learn to play', what: 'How a battle runs with the app, and what the guards and Structures on side markers are for.' },
-  { screen: 'collection', name: 'Collection', what: 'The miniatures you own. The AI fields only these.' },
-  { screen: 'armies', name: 'Armies', what: 'Build and save your own forces, with a printable army sheet.' },
-  { screen: 'terrain', name: 'Terrain Lab', what: 'A balanced table layout for any deployment card.' },
-  { screen: 'tokens', name: 'Side-marker tokens', what: 'Printable tokens that show what each co-op side marker is worth.' },
-  { screen: 'rulebook', name: 'AI Rulebook', what: 'How the AI’s units move, pick targets and fight.' },
+  { screen: 'tutorial', name: 'Learn to play', what: 'How a battle runs, from setup to the last Scoring phase.' },
+  { screen: 'collection', name: 'Collection', what: 'The miniatures you own. The enemy is built from these.' },
+  { screen: 'armies', name: 'Armies', what: 'Your forces, saved for game night, with a sheet to print.' },
+  { screen: 'terrain', name: 'Terrain Lab', what: 'A fair terrain layout for any deployment card.' },
+  { screen: 'tokens', name: 'Side-marker tokens', what: 'Tokens to print for the guards, Structures and rewards on side markers.' },
+  { screen: 'rulebook', name: 'AI Rulebook', what: 'How the enemy moves, picks its targets and fights.' },
 ];
 
 /**
@@ -30,7 +30,7 @@ export function HomeScreen() {
         <div className="home-deck-art" aria-hidden="true" />
         <div className="home-deck-body">
           <h1 className="hero-title home-title">Co-op Command</h1>
-          <p className="home-lede">The referee and the enemy for the StarCraft Tabletop Miniatures Game. The app runs the AI army and keeps the score; you play the miniatures.</p>
+          <p className="home-lede">An enemy army for the StarCraft Tabletop Miniatures Game. It decides what the enemy does, rolls its dice and keeps the score. You play the miniatures.</p>
           {game && (
             <div className="home-saved">
               <div className="home-saved-facts">
@@ -49,7 +49,7 @@ export function HomeScreen() {
             <Btn variant={game ? '' : 'primary'} size="lg" onClick={() => go('setup')}>Set up a battle</Btn>
             <Btn variant="ghost" size="lg" onClick={() => go('tutorial')}>Learn to play</Btn>
           </div>
-          <p className="home-note small muted">A battle is one mission against an AI army built from your collection: a co-op mission for one or two players, or one of the official mission cards.</p>
+          <p className="home-note small muted">A battle is one mission against an enemy built from your own collection. Play a co-op mission or one of the official mission cards, alone or with a friend.</p>
         </div>
       </section>
 

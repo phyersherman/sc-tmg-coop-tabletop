@@ -59,7 +59,6 @@ export function ActionCardView({ g, card, unit, full = false, entry }: { g: Game
       <div className="ac-head">
         <span className="ac-phase">{card.phase === 'movement' ? 'Movement' : 'Assault'}</span>
         <b className="ac-name">{card.name}</b>
-        {card.shuffle && <span className="ac-shuffle" title={REMINDERS.shuffle}>↻</span>}
       </div>
       <ol className="ac-steps">
         {entry && (
@@ -68,7 +67,10 @@ export function ActionCardView({ g, card, unit, full = false, entry }: { g: Game
             <span><b>Arrives from Reserves</b><span className="ac-detail">{entry}</span></span>
           </li>
         )}
-        {card.steps.map((s, i) => {
+        {card.steps.map((raw, i) => {
+          // A unit arriving from Reserves always moves on (cardOrders): a Hold, or a move into cover, takes it
+          // toward its objective instead.
+          const s: CardStep = entry && (raw.k === 'hold' || ((raw.k === 'move' || raw.k === 'run') && raw.to === 'cover')) ? { k: 'move', mod: raw.k === 'hold' ? 0 : raw.mod, to: 'objective' } : raw;
           const t = stepText(g, card, s, unit);
           const once = s.k === 'ability' && /Once per Game/i.test(s.text) && usedOnce(g, card.defId, s.name);
           return (

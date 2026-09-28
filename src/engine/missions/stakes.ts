@@ -47,7 +47,7 @@ export function missionStakes(g: GameState): Stakes {
     }
     case 'lock-and-load': {
       const locked = g.markers.filter((m) => m.locked).length;
-      return { text: `Lock all ${g.markers.length} markers, or 3 with a VP lead at the end: ${locked} locked.`, tone: g.round >= g.finalRound - 1 && locked < 3 ? 'warn' : 'ok' };
+      return { text: `Lock all ${g.markers.length} markers, or 3 without trailing on VP at the end: ${locked} locked.`, tone: g.round >= g.finalRound - 1 && locked < 3 ? 'warn' : 'ok' };
     }
     case 'mist-opportunities': {
       const need = 6 + 2 * (players - 1);
@@ -77,20 +77,20 @@ export function missionOutcome(g: GameState, result: 'won' | 'lost' | 'draw'): s
     case 'temple-of-the-past':
       if (result === 'lost' && (s.aiStreak ?? 0) >= 2) return 'The AI held the Temple at two Scoring phases in a row.';
       if (result === 'won' && (s.holds ?? 0) >= 3) return 'You held the Temple at three Scoring phases.';
-      return result === 'won' ? `You held the Temple ${plural(s.holds ?? 0, 'time')} and kept level on VP. ${score}` : `You held the Temple ${plural(s.holds ?? 0, 'time')}: it took three, or two without trailing on VP. ${score}`;
+      return result === 'won' ? `You held the Temple ${plural(s.holds ?? 0, 'time')} and kept level on VP. ${score}` : `You held the Temple ${plural(s.holds ?? 0, 'time')}. Victory needed three, or two without trailing on VP. ${score}`;
     case 'oblivion-express':
       if (result === 'won') return `You destroyed ${plural(s.killed ?? 0, 'train')} before they could leave.`;
       if ((s.escaped ?? 0) >= 2) return 'Two trains escaped off the right edge.';
-      return `Only ${plural(s.killed ?? 0, 'train')} destroyed by the end: it took two.`;
+      return `Only ${plural(s.killed ?? 0, 'train')} destroyed by the end. Victory needed two.`;
     case 'void-thrashing':
       if (result === 'won') return `All ${s.thrashers ?? 3} Thrashers destroyed.`;
       if ((s.baseHp ?? 3) <= 0) return 'The Thrashers reached your base and brought it down.';
       return `The battle ended with ${plural((s.thrashers ?? 3) - (s.killed ?? 0), 'Thrasher')} still standing.`;
     case 'rifts-to-korhal':
-      return result === 'won' ? 'You closed four rifts.' : `Only ${plural(s.closed ?? 0, 'rift')} closed by the end: it took four.`;
+      return result === 'won' ? 'You closed four rifts.' : `Only ${plural(s.closed ?? 0, 'rift')} closed by the end. Victory needed four.`;
     case 'lock-and-load': {
       const locked = g.markers.filter((m) => m.locked).length;
-      return result === 'won' ? `You locked ${plural(locked, 'marker')}. ${score}` : `${plural(locked, 'marker')} locked by the end: it took all of them, or three with a VP lead. ${score}`;
+      return result === 'won' ? `You locked ${plural(locked, 'marker')}. ${score}` : `${plural(locked, 'marker')} locked by the end. Victory needed all of them, or three without trailing on VP. ${score}`;
     }
     case 'mist-opportunities': {
       const need = 6 + 2 * ((g.config.players ?? 1) - 1);

@@ -4,22 +4,27 @@ import { availableWeapons, maxRange } from '../units/weapons';
 export type Profile = 'meleeRusher' | 'brawler' | 'rangedLine' | 'support';
 
 const OVERRIDES: Record<string, Profile> = {
-  queen: 'brawler',
   medic: 'support',
   sentry: 'support',
-  adept: 'brawler',
   kerrigan: 'brawler',
 };
 
+/** Expected damage from one model's weapon attack, before saves. */
+const punch = (w: { roa: number; hit: number; dmg: number }) => (w.roa * Math.max(0, 7 - w.hit) / 6) * w.dmg;
+
+/**
+ * How the AI plays a unit. A unit with a gun shoots (rangedLine) unless its close combat hits harder than its gun:
+ * only then does it charge first and fire when it cannot reach (brawler). A unit with no gun rushes in.
+ */
 export function classify(def: UnitDef): Profile {
   const o = OVERRIDES[def.id];
   if (o) return o;
   const assault = availableWeapons(def, [], 'Assault').filter((w) => w.target !== 'Flying');
   if (assault.length === 0) return 'meleeRusher';
-  const range = Math.max(...assault.map((w) => (w.range === 'E' ? 0 : w.range)));
-  if (range >= 12) return 'rangedLine';
-  if (def.impact || def.role === 'Hero') return 'brawler';
-  return 'rangedLine';
+  const melee = availableWeapons(def, [], 'Combat');
+  const gun = Math.max(...assault.map(punch));
+  const fists = melee.length ? Math.max(...melee.map(punch)) : 0;
+  return fists >= gun ? 'brawler' : 'rangedLine';
 }
 
 /** Preferred engagement range (inches) for movement stop conditions. */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deploymentById } from '@data/index';
+import { CARDS, UNITS, deploymentById } from '@data/index';
+import { buildAiArmy } from '@engine/army/builder';
 import { apply, createGame } from '@engine/director/reducer';
 import { makePlayerUnit } from '@engine/sense/playerUnits';
 import { chargeOptions, checkCloseRanks, checkMove, validTargets, playerWeapons } from '@engine/player/rules';
@@ -383,8 +384,9 @@ describe('AI charges on the map', () => {
   it('a unit that charged into contact ends in base contact with its target: no extra move, no overlap', () => {
     const cfg = makeConfig({ modeId: 'frontlines' });
     cfg.playerUnits = [makePlayerUnit('zl', 'zealot', 'large', [], 'Zealots', 5), makePlayerUnit('mr', 'marine', 'large', [], 'Marines', 6)];
-    // This is about where a charge ends, not what the AI picks: without its action decks it charges whenever it can,
-    // which gives the test charges to check.
+    // This is about where a charge ends, not what the AI picks: an army of Zerglings (which only charge) without its
+    // action decks charges whenever it can. The unit that charges stays locked in that fight, so one game gives one.
+    cfg.army = buildAiArmy({ faction: 'Zerg', budget: cfg.army.budget, ownership: { zergling: 36 }, heroAllowed: false, seed: 11, units: UNITS, cards: CARDS });
     cfg.options = { ...cfg.options, actionDecks: false };
     let s = createGame(cfg, dep, flat);
     let seen = 0;
@@ -412,7 +414,7 @@ describe('AI charges on the map', () => {
       }
       seen = s.events?.length ? s.events[s.events.length - 1]!.id : 0;
     }
-    expect(checked).toBeGreaterThanOrEqual(2);
+    expect(checked).toBeGreaterThanOrEqual(1);
   });
 });
 

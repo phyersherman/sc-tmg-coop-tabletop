@@ -48,12 +48,12 @@ export const REWARDS: Record<RewardKind, { name: string; text: string; scope: 'u
   reinforce: { name: 'Reinforce', text: 'one of your destroyed units returns to Reserves at full strength', scope: 'unit', short: 'A lost unit returns' },
   requisition: { name: 'Requisition', text: '+2 to your Supply Pool this round', scope: 'player', short: '+2 Supply this round' },
   firepower: { name: 'Firepower', text: 'one of your units gets +1 Rate of Attack on its ranged weapons this round', scope: 'unit', short: '+1 RoA for one unit' },
-  stall: { name: 'Stall the train', text: 'the train furthest along the line (or the one arriving now) does not run this round', scope: 'mission', short: 'A train stops a round' },
-  nest: { name: 'Burn the nest', text: 'if this round is a night, the most expensive destroyed AI unit does not return', scope: 'mission', short: 'Its best unit stays dead' },
+  stall: { name: 'Stall the train', text: 'the train furthest along the line, or else the one arriving this round, does not run this round', scope: 'mission', short: 'A train stops a round' },
+  nest: { name: 'Burn the nest', text: 'if this round is a night, the most expensive destroyed AI unit does not return', scope: 'mission', short: 'Top AI unit stays down' },
   floodlights: { name: 'Floodlights', text: 'if this round is a night, the AI\'s Supply boost at nightfall is 1 less', scope: 'mission', short: 'Night Supply −1' },
   cradle: { name: 'Seal the cradle', text: 'the next Thrasher due arrives a round later', scope: 'mission', short: 'Thrasher a round late' },
-  shield: { name: 'Shield battery', text: 'your base regains 1 HP (up to 3)', scope: 'mission', short: 'Base +1 HP' },
-  recon: { name: 'Recon', text: 'the app rolls two spots for this round\'s rift and opens it at the one nearer your units', scope: 'mission', short: 'Rift opens near you' },
+  shield: { name: 'Shield battery', text: 'your base regains 1 HP, to a maximum of 3', scope: 'mission', short: 'Base +1 HP' },
+  recon: { name: 'Recon', text: 'two spots are rolled for this round\'s rift, and it opens at the one nearer your units', scope: 'mission', short: 'Rift opens near you' },
   anchor: { name: 'Void anchor', text: 'this round\'s rift opens within 6" of this marker', scope: 'mission', short: 'Rift within 6" here' },
   vent: { name: 'Prime the vent', text: 'this marker is one of this round\'s vents', scope: 'mission', short: 'This marker vents' },
 };
@@ -148,7 +148,7 @@ function objectLine(s: GameState, id: number, o: SideObject): string {
   const u = s.army.units.find((x) => x.id === o.unitId);
   const name = u ? objectName(s, u) : '';
   const a = /^[aeiou]/i.test(name) ? 'an' : 'a';
-  const what = u ? (o.object === 'guard' ? `${a} ${name} guarding it (it fights back)` : `${a} ${name} (a Structure: it never fights back)`) : 'a guard';
+  const what = u ? (o.object === 'guard' ? `guarded by ${a} ${name}, which fights back` : `${a} ${name}, a Structure that never fights back`) : 'a guard';
   return `Marker ${id}: ${what}. Reward: ${REWARDS[o.reward].name}, ${REWARDS[o.reward].text}.`;
 }
 
@@ -175,7 +175,7 @@ export function grantReward(c: MissionCtx, kind: RewardKind, marker: number, own
   const side = writeSide(s);
   const r: Reward = { id: `reward-${s.round}-${marker}-${kind}`, kind, marker, round: s.round + 1, owner: REWARDS[kind].scope === 'mission' ? null : owner, used: false };
   side.rewards.push(r);
-  c.log(`Marker ${marker} earns ${REWARDS[kind].name} for ${REWARDS[kind].scope === 'mission' ? 'the team' : ownerName(s, r.owner)}, for round ${r.round} only.`);
+  c.log(`Marker ${marker} earns ${REWARDS[kind].name} for ${REWARDS[kind].scope === 'mission' ? 'the team' : ownerName(s, r.owner)}. It can be used in round ${r.round} only.`);
 }
 
 /** Claimable at this Scoring: the object is gone and the reward not yet earned. */
@@ -191,7 +191,7 @@ export function withSideMarkers(mode: MissionMode, specs: SideSpec[]): MissionMo
     ...mode,
     briefing: (s) => !specs.length ? mode.briefing(s) : [
       ...mode.briefing(s),
-      `Side markers: destroy what stands on one, then hold the marker at a Scoring phase. The player holding it earns its reward for the next round only, for one unit (level holders: you choose who). Unused, it is lost. The AI's force leaves side markers alone.${s.config.playMode === 'video' ? '' : ' Set each one on its marker before the battle; the map shows where.'}`,
+      `Side markers: a guard or a Structure stands on each one. Destroy it, then hold the marker at a Scoring phase. The player with the most Supply on the marker earns its reward for the next round only. An unused reward is lost. If two players are level, choose which one takes it. The rest of the AI's force leaves side markers alone.${s.config.playMode === 'video' ? '' : ' Set each guard and Structure on its marker before the battle.'}`,
       ...specs.map((sp) => {
         const o = sideState(s).objects[sp.marker];
         return o ? objectLine(s, sp.marker, o) : `Marker ${sp.marker}: ${sp.object === 'guard' ? 'a guard' : 'a Structure'}. Reward: ${REWARDS[sp.reward].name}, ${REWARDS[sp.reward].text}.`;
@@ -233,7 +233,7 @@ export function withSideMarkers(mode: MissionMode, specs: SideSpec[]): MissionMo
         ...claimable(s).map(([id]): ScoringPrompt => ({
           id: `holder-${id}`,
           kind: 'number',
-          text: `Marker ${id} is clear. If you hold it, which player has the most Supply on it (1 or 2; 0 if level: you choose when you use it)?`,
+          text: `Marker ${id} is clear. If the players hold it, which player has the most Supply on it? Enter 1 or 2, or 0 if they are level. With 0, choose who takes the reward when it is used.`,
           min: 0,
           max: 2,
           defaultValue: (holderOf(s, id) ?? -1) + 1,

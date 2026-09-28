@@ -20,9 +20,9 @@ export function applyMarkerControl(state: GameState, answers: ScoringAnswers): {
 
 export function markerPrompts(state: GameState): ScoringPrompt[] {
   return [
-    { id: 'markers', kind: 'markers', text: 'Who has the higher total Supply within 3" of each active Mission Marker? (AI units on a marker count +1 if led by a Commander hero.)' },
-    { id: 'playerSupplyLost', kind: 'number', text: 'Player Supply destroyed this round (sum of the Supply brackets your units dropped by).', min: 0, max: 30, defaultValue: 0, auto: (s) => s.playerSupplyLostThisRound ?? 0 },
-    ...(state.round >= state.finalRound ? [{ id: 'playerReserveSupply', kind: 'number', text: 'Final round: total Supply of player units still in Reserves (they count as destroyed).', min: 0, max: 30, defaultValue: 0, auto: (s) => s.playerUnits.filter((p) => p.location === 'reserves' && !p.destroyed).reduce((a, p) => a + playerUnitSupply(p), 0) } as ScoringPrompt] : []),
+    { id: 'markers', kind: 'markers', text: 'Who has the higher total Supply within 3" of each active Mission Marker? An AI unit led by a Commander hero counts +1.' },
+    { id: 'playerSupplyLost', kind: 'number', text: 'Player Supply destroyed this round: the Supply brackets the players\' units dropped by, added together.', min: 0, max: 30, defaultValue: 0, auto: (s) => s.playerSupplyLostThisRound ?? 0 },
+    ...(state.round >= state.finalRound ? [{ id: 'playerReserveSupply', kind: 'number', text: 'Final round: total Supply of player units still in Reserves. These count as destroyed.', min: 0, max: 30, defaultValue: 0, auto: (s) => s.playerUnits.filter((p) => p.location === 'reserves' && !p.destroyed).reduce((a, p) => a + playerUnitSupply(p), 0) } as ScoringPrompt] : []),
   ];
 }
 
@@ -32,19 +32,19 @@ export function controlled(state: GameState, side: 'ai' | 'players'): number[] {
 
 export function baseBriefing(state: GameState): string[] {
   const d = state.deployment;
-  const sequence = 'All units start in Reserves. Each round: Movement → Assault → Combat → Scoring. You and the AI alternate one unit at a time; the first side to pass gets the First Player Marker next phase.';
+  const sequence = 'All units start in Reserves. Each round has four phases: Movement, Assault, Combat and Scoring. The players and the AI take turns activating one unit at a time. The first side to pass takes the First Player Marker for the next phase.';
   // In Simulation the app is the table: setting markers and terrain out is not something you do, so it is not said.
   if (state.config.playMode === 'video') {
     return [
-      `Battlefield: ${d.table.width}" × ${d.table.height}", ${d.name}. The AI is the Red player; you are Blue.`,
+      `Battlefield: ${d.table.width}" × ${d.table.height}", ${d.name}. The AI plays Red and the players play Blue.`,
       sequence,
     ];
   }
   return [
-    `Table: ${d.table.width}" × ${d.table.height}". Deployment card: ${d.name}. The AI is the Red player; you are Blue.`,
+    `Table: ${d.table.width}" × ${d.table.height}". Deployment card: ${d.name}. The AI plays Red and the players play Blue.`,
     // Where the markers really are: a card's spot that falls on terrain has been moved clear of it.
-    `Set Mission Markers at the listed coordinates (measured from the top-left corner): ${(state.markers.length ? state.markers : d.markers).map((m) => `#${m.id} at (${m.x}", ${m.y}")`).join(', ')}. Markers 1 & 3 are red, 2 & 4 blue, 5 neutral.`,
-    'Place terrain as shown on the map (or use the legend to substitute pieces you own).',
+    `Set the Mission Markers at these positions, measured from the top-left corner: ${(state.markers.length ? state.markers : d.markers).map((m) => `#${m.id} at (${m.x}", ${m.y}")`).join(', ')}. Markers 1 & 3 are red, 2 & 4 blue, 5 neutral.`,
+    'Place terrain as shown on the map. Pieces you own may stand in for the ones shown.',
     sequence,
   ];
 }

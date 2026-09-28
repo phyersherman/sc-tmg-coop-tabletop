@@ -39,8 +39,13 @@ export const templeOfThePast = withSideMarkers(coopMode({
   id: 'temple-of-the-past',
   name: 'Temple of the Past',
   sc2Inspiration: 'Temple of the Past',
-  blurb: 'Hold Mission Marker 5 (the Temple). The AI sends everything at it, with extra waves in rounds 2–4. Win by holding the Temple at three Scoring phases; lose if the AI holds it twice in a row.',
-  briefing: (s) => [...baseBriefing(s), 'Marker 5 is the Temple. Every AI unit heads for it. Waves: in rounds 2, 3 and 4 one extra AI unit deploys ignoring the Supply Pool (one more per extra player).'],
+  blurb: 'Mission Marker 5 is the Temple, and the AI throws everything at it. Hold the Temple at three Scoring phases to win. If the AI holds it at two Scoring phases in a row, the players lose.',
+  briefing: (s) => [
+    ...baseBriefing(s),
+    'Marker 5 is the Temple. Every AI unit heads for it.',
+    'Waves: in rounds 2, 3 and 4, one extra AI unit deploys free of the Supply Pool, plus one more for each extra player.',
+    'Scoring: from round 2, the side that controls the Temple scores 2 VP. After round 5, two holds also win if the players do not trail on VP.',
+  ],
   onSetup: (c) => {
     ms(c).holds = 0;
     ms(c).aiStreak = 0;
@@ -52,11 +57,11 @@ export const templeOfThePast = withSideMarkers(coopMode({
       const cands = s.army.units.filter((u) => u.location === 'reserves').sort((a, b) => instanceCost(unitById(a.defId), a) - instanceCost(unitById(b.defId), b));
       for (const u of cands.slice(0, n)) {
         u.special = { ...(u.special ?? {}), forceDeploy: true, freeSupply: true };
-        c.log(`Wave: ${u.label} will deploy regardless of Supply.`);
+        c.log(`Wave: ${u.label} deploys this round, free of the Supply Pool.`);
       }
     }
   },
-  roundNotes: (c) => (c.state.round >= 2 && c.state.round <= 4 ? ['An AI wave arrives this round: it deploys even without Supply.'] : []),
+  roundNotes: (c) => (c.state.round >= 2 && c.state.round <= 4 ? ['An AI wave arrives this round. It deploys free of the Supply Pool.'] : []),
   objectiveFor: () => ({ kind: 'marker', markerId: 5 }),
   scoringPrompts: (c) => markerPrompts(c.state),
   onScoring: (c, a) => {
@@ -86,8 +91,12 @@ export const oblivionExpress = withSideMarkers(coopMode({
   id: 'oblivion-express',
   name: 'Oblivion Express',
   sc2Inspiration: 'Oblivion Express',
-  blurb: 'Three armoured trains cross the table from left to right in rounds 1, 3 and 5. Destroy at least two before they leave. A train that escapes gives the AI 3 VP and faster reinforcements.',
-  briefing: (s) => [...baseBriefing(s), 'Trains enter from the left edge at the table\'s vertical centre and move straight for the right edge every phase. They fight only if engaged.'],
+  blurb: 'Three Armoured Trains cross the table from left to right, one each in rounds 1, 3 and 5. Destroy two before they leave to win. If two escape, the players lose.',
+  briefing: (s) => [
+    ...baseBriefing(s),
+    'Each train enters from the left edge at the table\'s vertical centre. In the Movement and Assault phases it moves straight for the right edge, unless it is Engaged. A train has no weapons and never attacks.',
+    'Scoring: the players score 3 VP for each train destroyed. A train that leaves by the right edge scores the AI 3 VP and adds 1 to its Supply escalation.',
+  ],
   onSetup: (c) => {
     const s = c.state;
     // An armoured train of its own (18 HP, Armour 6+), never a copy of whatever the AI's priciest unit is.
@@ -109,7 +118,7 @@ export const oblivionExpress = withSideMarkers(coopMode({
       if (t) {
         t.special = { ...t.special, holdUntil: c.state.round + 1 };
         c.log(`${t.label} is stalled: it does not run this round.`);
-      } else c.log('No train is on the line this round: the stall is lost.');
+      } else c.log('No train is on the line this round. The stall is lost.');
     }
   },
   roundNotes: (c) => (c.state.army.units.some((u) => u.special?.train && u.special.trainRound === c.state.round) ? ['A train arrives this round from the left edge.'] : []),
@@ -151,8 +160,12 @@ export const deadOfNight = withSideMarkers(coopMode({
   id: 'dead-of-night',
   name: 'Dead of Night',
   sc2Inspiration: 'Dead of Night',
-  blurb: 'Days (rounds 1 and 3) are quiet: the AI deploys one unit and holds. Nights (rounds 2, 4, 5) are brutal: all destroyed AI units return, the Supply Pool jumps, and everything charges. Score markers by day and survive the nights.',
-  briefing: (s) => [...baseBriefing(s), 'Day rounds: 1 VP per marker you control. Night rounds: +3 VP if at least half of your starting Supply is still on the table at the end of the round.'],
+  blurb: 'By day, in rounds 1 and 3, the AI deploys one unit and holds. By night, in rounds 2, 4 and 5, every destroyed AI unit returns, the AI Supply Pool grows, and the whole force attacks. The side with the most VP after round 5 wins.',
+  briefing: (s) => [
+    ...baseBriefing(s),
+    'Day scoring: each side scores 1 VP for each marker it controls.',
+    'Night scoring: the players score 3 VP if at least half of their starting Supply is still on the table at the end of the round.',
+  ],
   onSetup: () => undefined,
   onRoundStart: (c) => {
     const s = c.state;
@@ -175,19 +188,19 @@ export const deadOfNight = withSideMarkers(coopMode({
       // Floodlights: the night's surge is smaller.
       s.supply.bonus += Math.max(0, s.supply.escalation - (takeCounter(c, 'floodlights') ? 1 : 0));
       s.orderDeck.current = s.config.aiFaction === 'Zerg' ? 'swarmSurge' : 'allIn';
-      c.log('Night falls. The swarm comes.');
+      c.log('Night falls. The enemy attacks.');
     } else {
       s.orderDeck.current = 'hold';
       // A nest or the floodlights earned last night have nothing to do by day.
-      for (const k of ['nest', 'nest', 'floodlights'] as const) if (takeCounter(c, k)) c.log('It is day: that reward has nothing to act on and is lost.');
+      for (const k of ['nest', 'nest', 'floodlights'] as const) if (takeCounter(c, k)) c.log('It is day. That reward has nothing to act on and is lost.');
     }
   },
-  roundNotes: (c) => [NIGHT.has(c.state.round) ? 'NIGHT: every destroyed AI unit is back, the AI Supply Pool is boosted and all AI units hunt your units.' : 'DAY: the AI deploys at most one unit and holds what it has.'],
+  roundNotes: (c) => [NIGHT.has(c.state.round) ? 'NIGHT: every destroyed AI unit returns, the AI Supply Pool grows, and every AI unit hunts the players\' units.' : 'DAY: the AI deploys at most one unit and holds what it has.'],
   deployCap: (c) => (NIGHT.has(c.state.round) ? 99 : 1),
   objectiveFor: (c) => (NIGHT.has(c.state.round) ? { kind: 'enemy' } : undefined),
   scoringPrompts: (c) => [
     ...markerPrompts(c.state),
-    ...(NIGHT.has(c.state.round) ? [{ id: 'survived', kind: 'yesno', text: 'Is at least half of your starting Supply still on the table?', defaultValue: true } as ScoringPrompt] : []),
+    ...(NIGHT.has(c.state.round) ? [{ id: 'survived', kind: 'yesno', text: 'Is at least half of the players\' starting Supply still on the table?', defaultValue: true } as ScoringPrompt] : []),
   ],
   onScoring: (c, a) => {
     applyMarkerControl(c.state, a);
@@ -210,8 +223,12 @@ export const voidThrashing = withSideMarkers(coopMode({
   id: 'void-thrashing',
   name: 'Void Thrashing',
   sc2Inspiration: 'Void Thrashing',
-  blurb: 'Three Thrashers (the AI\'s biggest units) march on Mission Marker 2, your base. Each Scoring phase a Thrasher is within 3" of it, the base loses 1 of 3 HP. Destroy all three Thrashers to win.',
-  briefing: (s) => [...baseBriefing(s), 'Marker 2 is your base (3 HP). Thrashers arrive in rounds 1, 2 and 4 and never respawn. Other AI units fight normally.'],
+  blurb: 'Three Thrashers, the AI\'s most expensive units, march on Mission Marker 2, the players\' base. Destroy all three to win. If the base falls, the players lose.',
+  briefing: (s) => [
+    ...baseBriefing(s),
+    'Marker 2 is the players\' base, with 3 HP. At each Scoring phase it loses 1 HP for every Thrasher within 3" of it.',
+    'The Thrashers are the AI\'s three most expensive units, Heroes excepted. They arrive in rounds 1, 2 and 4 and never return once destroyed. Other AI units fight as normal.',
+  ],
   onSetup: (c) => {
     const s = c.state;
     const picks = highestCostDefs(s, 3);
@@ -235,7 +252,7 @@ export const voidThrashing = withSideMarkers(coopMode({
       if (next) {
         next.special = { ...next.special, thrasherRound: Number(next.special!.thrasherRound) + 1 };
         c.log(`${next.label} is delayed: it now arrives in round ${next.special.thrasherRound}.`);
-      } else c.log('No Thrasher can be delayed any more: the seal is lost.');
+      } else c.log('No Thrasher can be delayed any more. The seal is lost.');
     }
     if (takeCounter(c, 'shield')) {
       ms(c).baseHp = Math.min(3, ms(c).baseHp + 1);
@@ -277,8 +294,13 @@ export const riftsToKorhal = withSideMarkers(coopMode({
   id: 'rifts-to-korhal',
   name: 'Rifts to Korhal',
   sc2Inspiration: 'Rifts to Korhal',
-  blurb: 'A void rift opens somewhere on the table each round. Close a rift by ending the Movement phase with a unit within 3" of it and holding there through the Assault phase. Every open rift scores for the AI. Close four to win.',
-  briefing: (s) => [...baseBriefing(s), 'Rift positions are announced at the start of each round and shown on the map. AI units deployed that round defend the newest rift.'],
+  blurb: 'A void rift opens somewhere on the table each round. Close four rifts by the end of round 5 to win.',
+  briefing: (s) => [
+    ...baseBriefing(s),
+    'A new rift opens at the start of each round, at the position given. AI units that deploy that round head for the newest rift.',
+    'To close a rift, end the Movement phase with a unit within 3" of it and hold there through the Assault phase.',
+    'Scoring: the AI scores 1 VP for each rift still open.',
+  ],
   onSetup: (c) => {
     ms(c).rifts = [];
     ms(c).closed = 0;
@@ -336,7 +358,7 @@ export const riftsToKorhal = withSideMarkers(coopMode({
     if (u.deployedRound === c.state.round || u.location === 'reserves') return { kind: 'point', x: newest.x, y: newest.y, label: `the rift at (${newest.x}", ${newest.y}")` };
     return undefined;
   },
-  scoringPrompts: (c) => [...markerPrompts(c.state), { id: 'riftsClosed', kind: 'number', text: 'Rifts you closed this round (a unit within 3" of it that held through Movement and Assault).', min: 0, max: 5, defaultValue: 0 }],
+  scoringPrompts: (c) => [...markerPrompts(c.state), { id: 'riftsClosed', kind: 'number', text: 'Rifts closed this round. A rift closes when a unit ends the Movement phase within 3" of it and holds there through the Assault phase.', min: 0, max: 5, defaultValue: 0 }],
   onScoring: (c, a) => {
     applyMarkerControl(c.state, a);
     const rifts = ms(c).rifts as { x: number; y: number; round: number; open: boolean }[];
@@ -351,7 +373,7 @@ export const riftsToKorhal = withSideMarkers(coopMode({
     }
     const open = rifts.filter((r) => r.open).length;
     c.state.vp.ai += open;
-    if (open) c.log(`Open rifts feed the AI: +${open} VP.`);
+    if (open) c.log(`Open rifts score the AI ${open} VP.`);
   },
   winCheck: (c, final) => (ms(c).closed >= 4 ? 'won' : final ? 'lost' : null),
 }), [
@@ -366,15 +388,24 @@ export const lockAndLoad = withSideMarkers(coopMode({
   id: 'lock-and-load',
   name: 'Lock & Load',
   sc2Inspiration: 'Lock & Load',
-  blurb: 'Lock a Mission Marker by controlling it at Scoring with units from two different players (solo: two different units). Locked markers can never flip. Lock all five, or hold three locks with a VP lead at the end.',
-  briefing: (s) => [...baseBriefing(s), 'Report locks at Scoring. The AI ignores locked markers and piles onto the rest.', 'Each lock also earns a reward for the next round only (you choose who takes it; unused, it is lost): Marker 2 or 4, Reinforce (a destroyed unit returns to Reserves); Marker 1 or 3, Firepower (one unit: +1 Rate of Attack on its ranged weapons); Marker 5, Requisition (+2 Supply for one player).'],
+  blurb: 'Lock the Mission Markers one by one. A locked marker never changes hands. Lock all five to win, or hold three locks at the end without trailing on VP.',
+  briefing: (s) => [
+    ...baseBriefing(s),
+    'To lock a marker, control it at a Scoring phase with units from two different players. Playing solo, two different units will do. Report locks at Scoring.',
+    'The AI ignores locked markers and piles onto the rest.',
+    'Scoring: the players score 2 VP for each lock. The AI scores 1 VP for each marker it controls.',
+    'Each lock earns a reward for the next round only. Choose who takes it. An unused reward is lost.',
+    'Markers 1 and 3: Firepower. One unit gets +1 Rate of Attack on its ranged weapons.',
+    'Markers 2 and 4: Reinforce. A destroyed unit returns to Reserves.',
+    'Marker 5: Requisition. One player gets +2 Supply.',
+  ],
   onSetup: () => undefined,
   onRoundStart: () => undefined,
   roundNotes: (c) => [`Locked markers: ${c.state.markers.filter((m) => m.locked).map((m) => m.id).join(', ') || 'none'}.`],
   scoringPrompts: (c) => [
     ...markerPrompts(c.state),
-    { id: 'lockA', kind: 'number', text: 'Marker locked this round (0 = none). Requires control by two different players\' units (solo: two units).', min: 0, max: 5, defaultValue: 0 },
-    { id: 'lockB', kind: 'number', text: 'Second marker locked this round (0 = none).', min: 0, max: 5, defaultValue: 0 },
+    { id: 'lockA', kind: 'number', text: 'Marker locked this round, or 0 for none. A lock needs units from two different players on the marker, or two units playing solo.', min: 0, max: 5, defaultValue: 0 },
+    { id: 'lockB', kind: 'number', text: 'Second marker locked this round, or 0 for none.', min: 0, max: 5, defaultValue: 0 },
   ],
   onScoring: (c, a) => {
     applyMarkerControl(c.state, a);
@@ -403,8 +434,13 @@ export const mistOpportunities = withSideMarkers(coopMode({
   id: 'mist-opportunities',
   name: 'Mist Opportunities',
   sc2Inspiration: 'Mist Opportunities',
-  blurb: 'Two markers vent terrazine each round. A unit that holds within 3" of an active marker for the whole Movement phase gathers 1 terrazine. The AI hunts anything on the vents. Gather enough to win.',
-  briefing: (s) => [...baseBriefing(s), `Target: ${6 + 2 * (s.config.players - 1)} terrazine. Vents change every round.`],
+  blurb: 'Two markers vent terrazine each round, and the AI makes for them. Gather enough terrazine by the end of round 5 to win.',
+  briefing: (s) => [
+    ...baseBriefing(s),
+    `Gather ${6 + 2 * (s.config.players - 1)} terrazine to win.`,
+    'Each round two markers are active vents, and the vents change every round. A unit that holds within 3" of an active vent for the whole Movement phase gathers 1 terrazine.',
+    'Scoring: the AI scores 1 VP for each marker it controls.',
+  ],
   onSetup: (c) => {
     ms(c).terrazine = 0;
   },
@@ -421,7 +457,7 @@ export const mistOpportunities = withSideMarkers(coopMode({
     c.log(`Terrazine vents: markers ${ids.join(' and ')}.`);
   },
   roundNotes: (c) => [`Active vents: markers ${c.state.markers.filter((m) => m.active).map((m) => m.id).join(' and ')}. Terrazine: ${ms(c).terrazine}/${6 + 2 * (c.state.config.players - 1)}.`],
-  scoringPrompts: (c) => [...markerPrompts(c.state), { id: 'terrazine', kind: 'number', text: 'Terrazine gathered this round (1 per unit that held within 3" of an active vent through the Movement phase).', min: 0, max: 6, defaultValue: 0 }],
+  scoringPrompts: (c) => [...markerPrompts(c.state), { id: 'terrazine', kind: 'number', text: 'Terrazine gathered this round: 1 for each unit that held within 3" of an active vent through the Movement phase.', min: 0, max: 6, defaultValue: 0 }],
   onScoring: (c, a) => {
     applyMarkerControl(c.state, a);
     ms(c).terrazine += Number(a.extra['terrazine'] ?? 0);

@@ -5,6 +5,7 @@ import { classify } from './profiles';
 import { chargeOrder, deployOrder, headingText, moveOrder, rangedOrder, report, speedModFor } from './decide';
 import { drawFor, markOnceUsed, modsOf, noMap, primaryStep, usesDecks, type ActionCard, type CardStep, type MoveTo } from './actionDecks';
 import { findUnit, onTable } from '../director/selectors';
+import { aiBurrowed, aiHas, setAiBurrowed } from './burrow';
 import { speedFor } from '../units/speed';
 import { dist } from '../terrain/geometry';
 import type { Rng } from '../rng';
@@ -60,7 +61,8 @@ function orderFor(state: GameState, u: AiUnitInstance, base: AiOrder, card: Acti
     const to = step && (step.k === 'move' || step.k === 'run') ? step.to : 'objective';
     return deployOrder(state, aimed(u, aim(state, u, to === 'cover' ? 'objective' : to)));
   }
-  if (!step) return base;
+  // A card that is only an ability (a Burrow, a placement, a hide) is the whole activation: the unit stays put.
+  if (!step) return holdOrder(u);
   switch (step.k) {
     case 'move':
       return moveOrder(state, aimed(u, aim(state, u, step.to)), profile);
@@ -80,8 +82,8 @@ function orderFor(state: GameState, u: AiUnitInstance, base: AiOrder, card: Acti
 }
 
 /**
- * The AI plays from its action decks, in every kind of game: the unit the AI picked draws its type's card (or
- * follows the one its type already drew this phase), and the card decides what it does. Orders the engine keeps
+ * The AI plays from its action decks, in every kind of game: the unit the AI picked chooses a card from its type's
+ * pool to suit its situation, and the card decides what it does. Orders the engine keeps
  * for itself stand as they are: a Siege Tank changing stance, a unit breaking away or held in place, a unit engaged
  * in a fight.
  *
@@ -94,16 +96,42 @@ export function cardOrder(state: GameState, base: AiOrder, rng: Rng): AiOrder {
   const u = findUnit(state, base.unitId);
   if (base.type === 'special' || base.type === 'disengage' || base.held || u.objective.kind === 'lane' || (u.engaged && base.type !== 'deploy') || u.disengagedThisRound) return base;
   const card = drawFor(state, u, rng);
+  // A Burrowed unit cannot attack or charge: with no card it can play, it holds.
+  const lead = card ? primaryStep(card) : null;
+  if (aiBurrowed(u) && (!card || lead?.k === 'attack' || lead?.k === 'charge')) {
+    return { ...holdOrder(u), lines: ['BURROWED: it cannot attack or charge, so it holds where it is. It counts as activated.'] };
+  }
   if (!card) return base;
   u.cardMods = modsOf(card, state.round);
   markOnceUsed(state, card);
   // The card's buffs (the unit's reactions, as the AI never reacts) last until the End of the Round.
   for (const b of card.buffs) if (!(u.buffs ?? []).some((x) => x.name === b.name)) u.buffs = [...(u.buffs ?? []), b];
-  const order = orderFor(state, u, base, card, primaryStep(card), rng);
+  const order = burrowing(u, card, orderFor(state, u, base, card, primaryStep(card), rng));
   // With a map, the order reads as it always has; the card's own text follows it once the camera has had its say.
   if (!noMap(state)) return { ...order, card };
   const [abilities, extras] = cardText(card);
   return { ...order, card, lines: [...abilities, ...order.lines, ...extras], title: `${u.label}: ${card.name}` };
+}
+
+/**
+ * What the order does to BURROWED: a Move or Run ends it (Tunneling Claws keeps it), then the card's Burrow ability
+ * or a Rapid Burrowing boost burrows the unit, or brings a Burrowed one up.
+ */
+function burrowing(u: AiUnitInstance, card: ActionCard, order: AiOrder): AiOrder {
+  const lines: string[] = [];
+  if (aiBurrowed(u) && (order.type === 'move' || order.type === 'run') && !aiHas(u, 'Tunneling Claws')) {
+    setAiBurrowed(u, false);
+    lines.push('It surfaces to move: BURROWED ends.');
+  }
+  if (card.steps.some((s) => s.k === 'ability' && s.name === 'Burrow')) {
+    const on = !aiBurrowed(u);
+    setAiBurrowed(u, on);
+    lines.push(on ? 'It is now BURROWED.' : 'It surfaces: BURROWED ends.');
+  } else if (card.boost?.name === 'Rapid Burrowing' && !aiBurrowed(u)) {
+    setAiBurrowed(u, true);
+    lines.push('It is now BURROWED.');
+  }
+  return lines.length ? { ...order, lines: [...order.lines, ...lines] } : order;
 }
 
 /** What a card adds to its order in words: the abilities it plays, then its buffs and Faction boost. */

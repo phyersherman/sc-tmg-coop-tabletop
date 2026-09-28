@@ -11,6 +11,7 @@ import { currentSupply, poolForRound } from '../units/supply';
 import { effectiveSpeed, extraEntryPoints, hasAbility, isBurrowed, ownerOf } from '../abilities/index';
 import { availableWeapons, maxRange } from '../units/weapons';
 import { requisitionSupply } from '../missions/sideMarkers';
+import { aiBurrowed } from '../ai/burrow';
 
 export interface RuleCheck {
   ok: boolean;
@@ -229,7 +230,7 @@ export function damageHelpers(state: GameState, pu: PlayerUnit): DamageHelper[] 
  */
 export function aiEvadeReason(state: GameState, target: AiUnitInstance, phase: 'Assault' | 'Combat', attacker?: PlayerUnit): string | null {
   if (!unitById(target.defId).stats.evade) return null;
-  if (target.special?.burrowed) return 'Burrowed';
+  if (aiBurrowed(target)) return 'Burrowed';
   if (phase !== 'Assault') return null;
   if (target.engaged) return 'engaged target';
   const high = state.terrain.pieces.filter((t) => t.catalogId.includes('ramp'));
@@ -266,6 +267,8 @@ export function validTargets(state: GameState, pu: PlayerUnit, weapon: WeaponPro
       out.push({ unit: u, distance: d, longRange: false, visible: true });
       continue;
     }
+    // A BURROWED unit is HIDDEN: it can be targeted only from within 4".
+    if (aiBurrowed(u) && d > 4) continue;
     if (pu.engaged && !pu.engagedWith.includes(u.id)) continue;
     if (!pu.engaged && u.engaged && !pinpoint) continue;
     const r = weapon.range;

@@ -14,19 +14,26 @@ import { useUi } from '@tt/store/uiStore';
 import { Btn, Panel, Toggle } from '../components/Basics';
 import { TableMap, TerrainLegend } from '../components/TableMap';
 
+/** Rulebook text: **game terms** in bold. */
+function Prose({ text }: { text: string }) {
+  return <>{text.split(/\*\*(.+?)\*\*/g).map((t, i) => (i % 2 ? <b key={i}>{t}</b> : t))}</>;
+}
+
 export function RulebookScreen() {
   return (
     <div className="rulebook">
       <h1>AI Rulebook</h1>
-      <p className="muted">How the app's AI moves and fights on your table. Keep it open on a second device if you like.</p>
+      <p className="muted">How the AI moves, chooses its targets and fights on your table.</p>
       <div className="row" style={{ marginBottom: 12 }}>
         {RULEBOOK.map((s) => <a key={s.id} href={`#${s.id}`} className="tag">{s.title}</a>)}
       </div>
       {RULEBOOK.map((s) => (
         <section key={s.id} id={s.id}>
           <h2>{s.title}</h2>
-          {s.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
-          {s.bullets && <ul>{s.bullets.map((b, i) => <li key={i}>{b}</li>)}</ul>}
+          {s.summary && <p className="rule-summary"><i>{s.summary}</i></p>}
+          {s.paragraphs.map((p, i) => <p key={i}><Prose text={p} /></p>)}
+          {s.bullets && <ul>{s.bullets.map((b, i) => <li key={i}><Prose text={b} /></li>)}</ul>}
+          {s.note && <aside className="rule-note"><b>{s.note.label}:</b> <Prose text={s.note.text} /></aside>}
         </section>
       ))}
     </div>

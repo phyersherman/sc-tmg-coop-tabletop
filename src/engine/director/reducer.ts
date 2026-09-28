@@ -20,7 +20,8 @@ import { defaultSupply } from '../missions/framework';
 import type { PlayerUnit, Pt, SenseSnapshot } from '../sense/types';
 import { applySense } from '../ai/senseDecide';
 import { cardOrder, withCardText } from '../ai/cardOrders';
-import { noMap, reshuffleDecks } from '../ai/actionDecks';
+import { setAiBurrowed } from '../ai/burrow';
+import { noMap } from '../ai/actionDecks';
 import { aiModels, engagedWith } from '../sense/query';
 import { aiSegments, closestOnSegment, dist, segmentMidpoint, settleRamps } from '../terrain/geometry';
 import { clearMarkerSpot } from '../terrain/markers';
@@ -55,6 +56,8 @@ export type Command =
   /** Put a DEBUFF on an AI unit (amount 0 lifts that one). */
   | { t: 'aiDebuff'; unitId: string; stat: 'speed' | 'hit' | 'armour' | 'evade'; amount: number }
   | { t: 'setEngaged'; unitId: string; engaged: boolean; enemySupply?: number }
+  /** The table corrects whether an AI unit is BURROWED. */
+  | { t: 'setBurrowed'; unitId: string; on: boolean }
   | { t: 'setAtObjective'; unitId: string; at: boolean }
   | { t: 'checklistDone' }
   /** Use a side marker's reward this round: a unit reward names the unit, a Requisition without an owner names the player. */
@@ -220,8 +223,6 @@ function startRound(state: GameState, mode: MissionMode): void {
   lines.push(...returned);
   if (state.round > 1) lines.push(...refreshPlayerSide(state));
   state.orderDeck = drawCard(state.orderDeck, ctx.rng);
-  // Action decks that drew their reshuffle card go back together for the new round.
-  reshuffleDecks(state, ctx.rng);
   const card = currentCard(state.orderDeck);
   mode.onRoundStart(ctx);
   assignObjectives(state, mode, ctx);
@@ -234,7 +235,7 @@ function startRound(state: GameState, mode: MissionMode): void {
   lines.push(...notes);
   // Medic heal prompt (simplified ability kit).
   const medics = onTable(state).filter((u) => u.defId === 'medic');
-  if (medics.length) lines.push('Medics: each damaged Biological AI unit within 4" of a Medic unit heals 1 damage per Medic model (use the Heal button in the roster).');
+  if (medics.length) lines.push('Medics: each damaged Biological AI unit within 4" of a Medic unit heals 1 damage per Medic model. Heal it on the unit\'s card.');
   pushLog(state, 'system', `Round ${state.round} begins. Order card: ${card.name}.`);
   state.step = { kind: 'ROUND_START', lines };
 }
@@ -1305,6 +1306,12 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
     case 'damage':
       applyDamageCmd(state, mode, cmd);
       return state;
+    case 'setBurrowed': {
+      const u = findUnit(state, cmd.unitId);
+      setAiBurrowed(u, cmd.on);
+      pushLog(state, 'ai', `${u.label} ${cmd.on ? 'is BURROWED' : 'is no longer BURROWED'}.`);
+      return state;
+    }
     case 'setModels': {
       const u = findUnit(state, cmd.unitId);
       const def = unitById(u.defId);

@@ -4,17 +4,18 @@ import type { FocusRule, GameState } from '../types/game';
 import { CARDS, unitById } from '@data/index';
 import { classify, type Profile } from './profiles';
 import { availableWeapons } from '../units/weapons';
+import { chooseCard } from './cardChoice';
 import type { Rng } from '../rng';
 
 /**
- * Action decks: how the AI plays at a real table. Every unit type has a Movement deck and an Assault deck. The
- * first unit of a type to act in a phase draws a card, and every unit of that type follows it for the rest of the
- * phase. The Combat phase has no deck: engaged units fight as normal.
+ * Action decks: how the AI plays at a real table. Every unit type has a Movement deck and an Assault deck, a pool of
+ * the actions it has. Each unit chooses its card from the pool to suit its own situation (cardChoice.ts). The
+ * Combat phase has no deck: engaged units fight as normal.
  *
  * Cards are built from the unit's own profile and abilities. Active abilities are used for free (the AI never pays
  * Biomass, Command Points or Psionic Energy). The AI never reacts: its Reactions are printed on cards as buffs that
- * last until the End of the Round. Passive abilities simply apply. The AI's Faction card boosts ride on the cards
- * that reshuffle the deck.
+ * last until the End of the Round. Passive abilities simply apply. The AI's Faction card boosts sit on the cards
+ * whose timing fits them, and the ones it has no use for are left out.
  */
 
 export type DeckPhase = 'movement' | 'assault';
@@ -37,8 +38,6 @@ export interface ActionCard {
   defId: string;
   phase: DeckPhase;
   name: string;
-  /** Shuffle the whole deck back together at the End of the Round after this card is drawn. */
-  shuffle?: boolean;
   steps: CardStep[];
   /** Reactions (and Combat abilities) the unit gets as buffs until the End of the Round when this card is drawn. */
   buffs: CardBuff[];
@@ -46,14 +45,11 @@ export interface ActionCard {
   boost?: { name: string; text: string; use?: string };
 }
 
+/** One unit type's pool of cards for a phase. The pool is never shuffled or used up: each unit chooses from it. */
 export interface DeckState {
   cards: ActionCard[];
-  draw: string[];
-  discard: string[];
-  /** The card showing for this unit type in the current phase. */
-  face?: { round: number; phase: DeckPhase; cardId: string };
-  /** A reshuffle card was drawn: the deck is shuffled at the next round's start. */
-  reshuffle?: boolean;
+  /** The last cards this type played, newest last: they count for less, so the same card does not come up every time. */
+  recent?: string[];
   /** Once-per-game effects already used from this deck. */
   used?: string[];
 }
@@ -76,15 +72,14 @@ export interface CardMods {
 /** One line each, printed on the cards and in the AI Rulebook: how the table runs an AI action. */
 export const REMINDERS = {
   focus: 'Focus: the nearest enemy unit by the shortest path. Ties: fewest models, then lowest HP, then the players choose.',
-  move: 'Move: the leading model goes by the shortest path (round Size 2+ terrain, through grass and scatter), the rest follow in coherency. Never end within 1" of an enemy or in your Zone of Influence.',
+  move: 'Move: the Leading Model takes the shortest path, around Size 2+ terrain and through grass and scatter. The rest follow in Coherency. Never end within 1" of an enemy or in the players\' Zone of Influence.',
   run: 'Run: a move at full Speed in the Assault phase instead of attacking.',
-  attack: 'Attack: only models in range and in line of sight of the focus fire. The app rolls the dice.',
-  charge: 'Charge: needs a Ground enemy within Speed + 6" of the leading model by path. The app rolls the distance.',
-  hold: 'Hold: the unit stays where it is; it still counts as activated.',
+  attack: 'Attack: only models in range and line of sight of the focus fire. Roll the AI\'s dice in the app.',
+  charge: 'Charge: needs a Ground enemy within Speed + 6" of the Leading Model by path. Roll the Charge distance in the app.',
+  hold: 'Hold: the Unit stays where it is. It still counts as activated.',
   ability: 'Abilities cost the AI nothing: ignore Biomass, Command Points and Psionic Energy.',
-  buff: 'Buffs last until the End of the Round. The AI never reacts: these replace its reactions.',
-  shuffle: 'Reshuffle: at the start of the next round this deck is shuffled back together.',
-  objective: 'Objective: the Mission Marker the app gives the unit; hold it once there.',
+  buff: 'Buffs last until the End of the Round. The AI never reacts, so these replace its Reactions.',
+  objective: 'Objective: the Mission Marker named on the order. Once there, the Unit holds it.',
 } as const;
 export type ReminderKey = keyof typeof REMINDERS;
 
@@ -118,7 +113,7 @@ const AI_USE: Record<string, string> = {
   'Corrosive Bile': 'On the enemy models nearest to it, one token per model.',
   'Deep Tunnel': 'Burrow token: 12" toward its objective.',
   'Spawn Creep Tumor': 'Beside the unit, toward its objective.',
-  'Burrow': 'Burrows if an enemy is within 12", otherwise surfaces.',
+  'Burrow': 'Burrows. A unit already Burrowed surfaces instead.',
 };
 
 /**
@@ -134,6 +129,33 @@ export function boostUse(text: string): string | undefined {
   if (/(Select|Target|Choose)[^.]*Friendly/i.test(body) || /a Friendly Unit/i.test(body) || /the active( Biological)? Unit/i.test(body)) return 'this unit.';
   if (/(Select|Target|Choose)[^.]*Enemy/i.test(body)) return 'its focus.';
   return undefined;
+}
+
+/**
+ * Where each Faction card boost goes in the AI's decks: the phase, and the card it follows (after an attack, a
+ * move, or on the card that sends the unit into cover). A boost with no place here is never used by the AI: one
+ * that pulls its own units off the table, summons what the enemy army does not field, needs rules the AI does not
+ * play (disengaging, the First Player Marker), breaks the turn order, or belongs to army building (Zerg Creep).
+ * `fits` limits it to the units it can help; `use` says how the AI plays it when the card text leaves a choice.
+ */
+type BoostPlace = { phase: DeckPhase; after: 'attack' | 'move' | 'cover'; fits?: (def: UnitDef) => boolean; use?: string };
+const tagged = (def: UnitDef, tag: string) => (def.tags as string[]).includes(tag);
+const BOOST_PLACES: Record<string, BoostPlace> = {
+  'Dae’Uhl': { phase: 'assault', after: 'attack' },
+  'Brood Instinct': { phase: 'assault', after: 'attack' },
+  'Might Of The Nerazim': { phase: 'assault', after: 'attack', fits: (d) => tagged(d, 'Biological') || d.abilities.some((a) => /HIDDEN/.test(a.text)) },
+  'Darkness Descends': { phase: 'movement', after: 'move', fits: (d) => tagged(d, 'Biological') },
+  'Wild Mutation': { phase: 'movement', after: 'move', fits: (d) => d.faction === 'Zerg' && tagged(d, 'Ground'), use: 'this unit before it moves, if it starts ON CREEP.' },
+  'Rapid Burrowing': { phase: 'movement', after: 'cover', fits: (d) => tagged(d, 'Ground') && d.abilities.some((a) => /Burrow/i.test(a.name)) },
+};
+
+/** The card of a deck a boost follows, if the deck has one. */
+function boostCard(cards: ActionCard[], place: BoostPlace): ActionCard | undefined {
+  const lead = (c: ActionCard) => primaryStep(c);
+  const pick = (ok: (c: ActionCard) => boolean) => cards.find(ok);
+  if (place.after === 'attack') return pick((c) => lead(c)?.k === 'attack') ?? pick((c) => lead(c)?.k === 'charge');
+  if (place.after === 'move') return pick((c) => lead(c)?.k === 'move' && (lead(c) as { to: MoveTo }).to !== 'cover');
+  return pick((c) => lead(c)?.k === 'hold' || (lead(c)?.k === 'move' && (lead(c) as { to: MoveTo }).to === 'cover'));
 }
 
 /** Numbers an ability hands the card: a Speed buff, extra attack dice, a better charge roll. */
@@ -162,27 +184,27 @@ function baseCards(profile: Profile, phase: DeckPhase, ranged: boolean): Base[] 
           { name: 'Advance', steps: [{ k: 'move', mod: 0, to: 'objective' }] },
           { name: 'Close to Range', steps: [{ k: 'move', mod: 0, to: 'focus' }] },
           { name: 'Take the Ground', steps: [{ k: 'move', mod: 1, to: 'marker' }] },
-          { name: 'Dig In', shuffle: true, steps: [{ k: 'move', mod: -2, to: 'cover' }] },
+          { name: 'Dig In', steps: [{ k: 'move', mod: -2, to: 'cover' }] },
         ];
       case 'meleeRusher':
         return [
           { name: 'Close In', steps: [{ k: 'move', mod: 0, to: 'focus' }] },
           { name: 'Rush', steps: [{ k: 'move', mod: 2, to: 'focus' }] },
           { name: 'Swarm the Objective', steps: [{ k: 'move', mod: 1, to: 'objective' }] },
-          { name: 'Lie in Wait', shuffle: true, steps: [{ k: 'move', mod: -2, to: 'cover' }] },
+          { name: 'Lie in Wait', steps: [{ k: 'move', mod: -2, to: 'cover' }] },
         ];
       case 'brawler':
         return [
           { name: 'Advance', steps: [{ k: 'move', mod: 0, to: 'objective' }] },
           { name: 'Hunt', steps: [{ k: 'move', mod: 1, to: 'focus' }] },
           { name: 'Take the Ground', steps: [{ k: 'move', mod: 0, to: 'marker' }] },
-          { name: 'Hold Fast', shuffle: true, steps: [{ k: 'hold' }] },
+          { name: 'Hold Fast', steps: [{ k: 'hold' }] },
         ];
       case 'support':
         return [
           { name: 'Stay Close', steps: [{ k: 'move', mod: 0, to: 'friend' }] },
           { name: 'Advance', steps: [{ k: 'move', mod: 0, to: 'objective' }] },
-          { name: 'Hang Back', shuffle: true, steps: [{ k: 'move', mod: -1, to: 'cover' }] },
+          { name: 'Hang Back', steps: [{ k: 'move', mod: -1, to: 'cover' }] },
         ];
     }
   }
@@ -192,28 +214,28 @@ function baseCards(profile: Profile, phase: DeckPhase, ranged: boolean): Base[] 
         { name: 'Open Fire', steps: [{ k: 'attack', otherwise: 'run' }] },
         { name: 'Focus Fire', steps: [{ k: 'attack', focus: 'weakest', hit: 1, otherwise: 'run' }] },
         { name: 'Suppressing Fire', steps: [{ k: 'attack', focus: 'highestSupply', otherwise: 'hold' }] },
-        { name: 'Reposition', shuffle: true, steps: [{ k: 'run', mod: 0, to: 'objective' }] },
+        { name: 'Reposition', steps: [{ k: 'run', mod: 0, to: 'objective' }] },
       ];
     case 'meleeRusher':
       return [
         { name: 'Onslaught', steps: [{ k: 'charge', otherwise: 'run' }] },
         { name: 'Go for the Weak', steps: [{ k: 'charge', focus: 'weakest', otherwise: 'run' }] },
         { name: 'Overrun the Objective', steps: [{ k: 'charge', focus: 'onMarker', otherwise: 'run' }] },
-        { name: 'Regroup', shuffle: true, steps: [{ k: 'run', mod: 0, to: 'objective' }] },
+        { name: 'Regroup', steps: [{ k: 'run', mod: 0, to: 'objective' }] },
       ];
     case 'brawler':
       return [
         { name: 'Onslaught', steps: [{ k: 'charge', orFire: ranged, otherwise: 'run' }] },
         ...(ranged ? [{ name: 'Open Fire', steps: [{ k: 'attack', otherwise: 'run' } as CardStep] }] : []),
         { name: 'Go for the Weak', steps: [{ k: 'charge', focus: 'weakest', orFire: ranged, otherwise: 'run' }] },
-        { name: 'Press On', shuffle: true, steps: [{ k: 'run', mod: 0, to: 'objective' }] },
+        { name: 'Press On', steps: [{ k: 'run', mod: 0, to: 'objective' }] },
       ];
     case 'support':
       return [
         ...(ranged ? [{ name: 'Covering Fire', steps: [{ k: 'attack', otherwise: 'run' } as CardStep] }] : []),
         { name: 'Stay Close', steps: [{ k: 'run', mod: 0, to: 'friend' }] },
         { name: 'Keep Low', steps: [{ k: 'hold' }] },
-        { name: 'Fall In', shuffle: true, steps: [{ k: 'run', mod: 0, to: 'objective' }] },
+        { name: 'Fall In', steps: [{ k: 'run', mod: 0, to: 'objective' }] },
       ];
   }
 }
@@ -240,8 +262,8 @@ const deckOf = (a: AbilityDef): DeckPhase | null => (a.phase === 'Movement' || a
 
 /**
  * Build one unit type's deck for a phase. `upgrades`: every upgrade any AI unit of this type has, so a card for an
- * upgrade ability is in the deck only when the AI bought it. `faction`: the AI's Faction card, whose boosts ride on
- * the reshuffle cards.
+ * upgrade ability is in the deck only when the AI bought it. `faction`: the unit's race's Faction card, whose
+ * boosts go on the cards whose timing fits them (see BOOST_PLACES).
  */
 export function buildDeck(def: UnitDef, upgrades: string[], phase: DeckPhase, faction?: CardDef): ActionCard[] {
   const profile = classify(def);
@@ -264,17 +286,19 @@ export function buildDeck(def: UnitDef, upgrades: string[], phase: DeckPhase, fa
     ids.add(id);
     return { ...c, id, defId: def.id, phase, buffs: [] };
   });
-  // Each buff is printed on two cards: the first card of the deck and the next one along, never the reshuffle card.
-  const plain = out.filter((c) => !c.shuffle);
+  // Each buff is printed on two cards: the first card of the deck and the next one along.
+  const plain = out;
   buffsHere.forEach((b, i) => {
     for (const c of [plain[i % plain.length], plain[(i + 1) % plain.length]]) if (c && !c.buffs.some((x) => x.name === b.name)) c.buffs.push(b);
   });
-  // Faction boosts: the first on the Movement reshuffle card, the second on the Assault one.
-  const boost = faction?.boosts?.[phase === 'movement' ? 0 : 1];
-  const shuffleCard = out.find((c) => c.shuffle);
-  if (boost && shuffleCard) {
-    const use = boostUse(boost.text);
-    shuffleCard.boost = { name: boost.name, text: boost.text, ...(use ? { use } : {}) };
+  // Faction boosts go where their timing makes sense, one card each; the ones the AI has no use for stay off.
+  for (const boost of faction?.boosts ?? []) {
+    const place = BOOST_PLACES[boost.name];
+    if (!place || place.phase !== phase || (place.fits && !place.fits(def))) continue;
+    const card = boostCard(out, place);
+    if (!card || card.boost) continue;
+    const use = place.use ?? boostUse(boost.text);
+    card.boost = { name: boost.name, text: boost.text, ...(use ? { use } : {}) };
   }
   return out;
 }
@@ -297,7 +321,7 @@ function typeUpgrades(state: GameState, defId: string): string[] {
   return [...new Set(state.army.units.filter((u) => u.defId === defId).flatMap((u) => u.upgrades))];
 }
 
-function ensureDeck(state: GameState, defId: string, phase: DeckPhase, rng: Rng): DeckState {
+function ensureDeck(state: GameState, defId: string, phase: DeckPhase): DeckState {
   state.aiDecks ??= {};
   const key = deckKey(defId, phase);
   let d = state.aiDecks[key];
@@ -307,52 +331,34 @@ function ensureDeck(state: GameState, defId: string, phase: DeckPhase, rng: Rng)
     const cardId = state.army.factionCards?.[def.faction] ?? (state.army.faction === def.faction ? state.army.factionCardId : undefined);
     const faction = cardId ? CARDS.find((c) => c.id === cardId) : undefined;
     const cards = buildDeck(def, typeUpgrades(state, defId), phase, faction);
-    d = { cards, draw: rng.shuffle(cards.map((c) => c.id)), discard: [] };
+    d = { cards };
     state.aiDecks[key] = d;
   }
   return d;
 }
 
 /**
- * The card this unit follows in the current phase: the one its type already drew this phase, or a fresh draw.
- * Returns null outside the Movement and Assault phases.
+ * The card this unit plays in the current phase: chosen from its type's pool to suit its own situation (see
+ * cardChoice), or the one it already chose this phase. Returns null outside the Movement and Assault phases, or when
+ * nothing in the pool can be played.
  */
 export function drawFor(state: GameState, unit: AiUnitInstance, rng: Rng): ActionCard | null {
   const phase = state.phase;
   if (phase !== 'movement' && phase !== 'assault') return null;
-  const d = ensureDeck(state, unit.defId, phase, rng);
-  if (d.face && d.face.round === state.round && d.face.phase === phase) return d.cards.find((c) => c.id === d.face!.cardId) ?? null;
-  if (d.face) d.discard.push(d.face.cardId);
-  if (!d.draw.length) {
-    d.draw = rng.shuffle(d.discard);
-    d.discard = [];
-  }
-  const id = d.draw.shift();
-  const card = d.cards.find((c) => c.id === id) ?? null;
-  if (!card) return null;
-  d.face = { round: state.round, phase, cardId: card.id };
-  if (card.shuffle) d.reshuffle = true;
+  const d = ensureDeck(state, unit.defId, phase);
+  const now = unit.cardMods;
+  if (now && now.round === state.round && now.phase === phase) return d.cards.find((c) => c.id === now.cardId) ?? null;
+  const card = chooseCard(state, unit, d.cards, d.recent ?? [], rng);
+  if (card) d.recent = [...(d.recent ?? []), card.id].slice(-2);
   return card;
 }
 
-/** At a round's start: every deck that drew its reshuffle card is shuffled back together. */
-export function reshuffleDecks(state: GameState, rng: Rng): void {
-  for (const d of Object.values(state.aiDecks ?? {})) {
-    if (!d.reshuffle) continue;
-    d.draw = rng.shuffle([...d.draw, ...d.discard, ...(d.face ? [d.face.cardId] : [])]);
-    d.discard = [];
-    delete d.face;
-    d.reshuffle = false;
-  }
-}
-
-/** The card a unit type is showing this phase, if it has drawn one. */
-export function faceCard(state: GameState, defId: string): ActionCard | null {
+/** The card an AI unit is playing this phase, if it has chosen one. */
+export function faceCard(state: GameState, unit: AiUnitInstance): ActionCard | null {
   const phase = state.phase;
-  if (phase !== 'movement' && phase !== 'assault') return null;
-  const d = state.aiDecks?.[deckKey(defId, phase)];
-  if (!d?.face || d.face.round !== state.round || d.face.phase !== phase) return null;
-  return d.cards.find((c) => c.id === d.face!.cardId) ?? null;
+  const m = unit.cardMods;
+  if ((phase !== 'movement' && phase !== 'assault') || !m || m.round !== state.round || m.phase !== phase) return null;
+  return state.aiDecks?.[deckKey(unit.defId, phase)]?.cards.find((c) => c.id === m.cardId) ?? null;
 }
 
 /** What a card does to the unit's numbers for this phase. */
@@ -392,7 +398,6 @@ export function remindersFor(card: ActionCard): ReminderKey[] {
     if (s.k === 'charge') { add('focus'); add('charge'); if (s.orFire) add('attack'); if (s.otherwise === 'run') add('run'); }
   }
   if (card.buffs.length) add('buff');
-  if (card.shuffle) add('shuffle');
   return keys;
 }
 
