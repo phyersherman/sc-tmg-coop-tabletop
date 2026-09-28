@@ -284,7 +284,7 @@ function startPhase(state: GameState, mode: MissionMode, phase: Phase): void {
     state.step = { kind: 'SCORING_FORM', prompts: prompts.map(({ auto: _auto, ...rest }) => rest) };
     return;
   }
-  const lines = [`${PHASE_NAME[phase]} phase. ${state.firstPlayer === 'ai' ? 'The AI' : 'You'} activate first.`];
+  const lines = [`${PHASE_NAME[phase]} phase. ${state.firstPlayer === 'ai' ? 'The AI activates' : 'You activate'} first.`];
   if (phase === 'movement') lines.push(`AI Supply available to deploy: ${availableNow(state) === Infinity ? 'unlimited' : availableNow(state)} of ${poolNow(state) === Infinity ? '∞' : poolNow(state)}.`);
   if (phase === 'assault') lines.push('Ranged Attacks, Charges and Runs. The AI\'s dice are rolled on each order.');
   state.step = { kind: 'PHASE_START', lines };
