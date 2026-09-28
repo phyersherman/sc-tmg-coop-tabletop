@@ -11,7 +11,7 @@ import { grantReward, takeCounter, withSideMarkers } from './sideMarkers';
 
 const ms = (c: MissionCtx) => c.state.modeState as Record<string, any>;
 
-function coopMode(p: Partial<MissionMode> & Pick<MissionMode, 'id' | 'name' | 'blurb' | 'briefing' | 'onSetup' | 'onRoundStart' | 'scoringPrompts' | 'onScoring' | 'winCheck'>): MissionMode {
+function coopMode(p: Partial<MissionMode> & Pick<MissionMode, 'id' | 'name' | 'blurb' | 'sc2Inspiration' | 'briefing' | 'onSetup' | 'onRoundStart' | 'scoringPrompts' | 'onScoring' | 'winCheck'>): MissionMode {
   return { scales: ['skirmish', 'standard', 'grand'], rounds: 5, ...p };
 }
 
@@ -38,6 +38,7 @@ function highestCostDefs(state: GameState, n: number, excludeHero = true): AiUni
 export const templeOfThePast = withSideMarkers(coopMode({
   id: 'temple-of-the-past',
   name: 'Temple of the Past',
+  sc2Inspiration: 'Temple of the Past',
   blurb: 'Hold Mission Marker 5 (the Temple). The AI sends everything at it, with extra waves in rounds 2–4. Win by holding the Temple at three Scoring phases; lose if the AI holds it twice in a row.',
   briefing: (s) => [...baseBriefing(s), 'Marker 5 is the Temple. Every AI unit heads for it. Waves: in rounds 2, 3 and 4 one extra AI unit deploys ignoring the Supply Pool (one more per extra player).'],
   onSetup: (c) => {
@@ -84,6 +85,7 @@ export const templeOfThePast = withSideMarkers(coopMode({
 export const oblivionExpress = withSideMarkers(coopMode({
   id: 'oblivion-express',
   name: 'Oblivion Express',
+  sc2Inspiration: 'Oblivion Express',
   blurb: 'Three armoured trains cross the table from left to right in rounds 1, 3 and 5. Destroy at least two before they leave. A train that escapes gives the AI 3 VP and faster reinforcements.',
   briefing: (s) => [...baseBriefing(s), 'Trains enter from the left edge at the table\'s vertical centre and move straight for the right edge every phase. They fight only if engaged.'],
   onSetup: (c) => {
@@ -148,6 +150,7 @@ const NIGHT = new Set([2, 4, 5]);
 export const deadOfNight = withSideMarkers(coopMode({
   id: 'dead-of-night',
   name: 'Dead of Night',
+  sc2Inspiration: 'Dead of Night',
   blurb: 'Days (rounds 1 and 3) are quiet: the AI deploys one unit and holds. Nights (rounds 2, 4, 5) are brutal: all destroyed AI units return, the Supply Pool jumps, and everything charges. Score markers by day and survive the nights.',
   briefing: (s) => [...baseBriefing(s), 'Day rounds: 1 VP per marker you control. Night rounds: +3 VP if at least half of your starting Supply is still on the table at the end of the round.'],
   onSetup: () => undefined,
@@ -206,6 +209,7 @@ export const deadOfNight = withSideMarkers(coopMode({
 export const voidThrashing = withSideMarkers(coopMode({
   id: 'void-thrashing',
   name: 'Void Thrashing',
+  sc2Inspiration: 'Void Thrashing',
   blurb: 'Three Thrashers (the AI\'s biggest units) march on Mission Marker 2, your base. Each Scoring phase a Thrasher is within 3" of it, the base loses 1 of 3 HP. Destroy all three Thrashers to win.',
   briefing: (s) => [...baseBriefing(s), 'Marker 2 is your base (3 HP). Thrashers arrive in rounds 1, 2 and 4 and never respawn. Other AI units fight normally.'],
   onSetup: (c) => {
@@ -272,6 +276,7 @@ export const voidThrashing = withSideMarkers(coopMode({
 export const riftsToKorhal = withSideMarkers(coopMode({
   id: 'rifts-to-korhal',
   name: 'Rifts to Korhal',
+  sc2Inspiration: 'Rifts to Korhal',
   blurb: 'A void rift opens somewhere on the table each round. Close a rift by ending the Movement phase with a unit within 3" of it and holding there through the Assault phase. Every open rift scores for the AI. Close four to win.',
   briefing: (s) => [...baseBriefing(s), 'Rift positions are announced at the start of each round and shown on the map. AI units deployed that round defend the newest rift.'],
   onSetup: (c) => {
@@ -360,6 +365,7 @@ export const riftsToKorhal = withSideMarkers(coopMode({
 export const lockAndLoad = withSideMarkers(coopMode({
   id: 'lock-and-load',
   name: 'Lock & Load',
+  sc2Inspiration: 'Lock & Load',
   blurb: 'Lock a Mission Marker by controlling it at Scoring with units from two different players (solo: two different units). Locked markers can never flip. Lock all five, or hold three locks with a VP lead at the end.',
   briefing: (s) => [...baseBriefing(s), 'Report locks at Scoring. The AI ignores locked markers and piles onto the rest.', 'Each lock also earns a reward for the next round only (you choose who takes it; unused, it is lost): Marker 2 or 4, Reinforce (a destroyed unit returns to Reserves); Marker 1 or 3, Firepower (one unit: +1 Rate of Attack on its ranged weapons); Marker 5, Requisition (+2 Supply for one player).'],
   onSetup: () => undefined,
@@ -396,6 +402,7 @@ export const lockAndLoad = withSideMarkers(coopMode({
 export const mistOpportunities = withSideMarkers(coopMode({
   id: 'mist-opportunities',
   name: 'Mist Opportunities',
+  sc2Inspiration: 'Mist Opportunities',
   blurb: 'Two markers vent terrazine each round. A unit that holds within 3" of an active marker for the whole Movement phase gathers 1 terrazine. The AI hunts anything on the vents. Gather enough to win.',
   briefing: (s) => [...baseBriefing(s), `Target: ${6 + 2 * (s.config.players - 1)} terrazine. Vents change every round.`],
   onSetup: (c) => {
