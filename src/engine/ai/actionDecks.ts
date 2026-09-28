@@ -7,9 +7,9 @@ import { availableWeapons } from '../units/weapons';
 import type { Rng } from '../rng';
 
 /**
- * Action decks: how the AI plays at a real table, after Frosthaven's monster ability cards. Every unit type has a
- * Movement deck and an Assault deck. The first unit of a type to act in a phase draws a card, and every unit of
- * that type follows it for the rest of the phase. The Combat phase has no deck: engaged units fight as normal.
+ * Action decks: how the AI plays at a real table. Every unit type has a Movement deck and an Assault deck. The
+ * first unit of a type to act in a phase draws a card, and every unit of that type follows it for the rest of the
+ * phase. The Combat phase has no deck: engaged units fight as normal.
  *
  * Cards are built from the unit's own profile and abilities. Active abilities are used for free (the AI never pays
  * Biomass, Command Points or Psionic Energy). The AI never reacts: its Reactions are printed on cards as buffs that

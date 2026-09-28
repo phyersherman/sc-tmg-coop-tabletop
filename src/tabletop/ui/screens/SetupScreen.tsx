@@ -186,7 +186,6 @@ export function SetupScreen() {
               <div key={m.id} className={`panel mode-card ${m.id === modeId ? 'selected' : ''}`} onClick={() => setModeId(m.id)}>
                 <div className="panel-title"><h3>{m.name}</h3><span className="tag">{m.rounds} rounds</span></div>
                 <p className="small">{m.blurb}</p>
-                <p className="small muted">Inspired by SC2 co-op: {m.sc2Inspiration}</p>
               </div>
             ))}
           </div>

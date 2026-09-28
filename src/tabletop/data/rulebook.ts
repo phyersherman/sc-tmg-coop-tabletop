@@ -38,7 +38,7 @@ export const RULEBOOK: RuleSection[] = [
     id: 'decks',
     title: 'Running the AI: action cards',
     paragraphs: [
-      'The AI plays from action cards, like the monsters in Frosthaven. Every enemy unit type has a Movement deck and an Assault deck built from its own abilities. When the AI activates a unit, the app draws that type\'s card; every other unit of the same type follows the same card for the rest of the phase. The Combat phase has no deck: engaged units fight as normal and the app rolls their dice.',
+      'The AI plays from action cards. Every enemy unit type has a Movement deck and an Assault deck built from its own abilities. When the AI activates a unit, the app draws that type\'s card; every other unit of the same type follows the same card for the rest of the phase. The Combat phase has no deck: engaged units fight as normal and the app rolls their dice.',
       'The app picks which enemy unit activates, draws its card and rolls its dice. You move its models on the table as the card says, using the rules below, and tap what happened.',
     ],
     bullets: [

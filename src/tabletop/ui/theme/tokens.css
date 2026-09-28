@@ -600,7 +600,7 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .battle-feed.in-console .feed-item { box-shadow: none; padding: 3px 6px; font-size: 11px; }
 .battle-feed.in-console .feed-head b { font-weight: 600; }
 
-/* Tactical cards above the console, like StarCraft II control groups */
+/* Tactical cards above the console */
 .hud-cards { position: absolute; display: flex; gap: 3px; pointer-events: auto; z-index: 14; }
 .hud-card { position: relative; width: 34px; height: 38px; padding: 0; cursor: pointer; border: 1px solid rgba(148,163,184,0.45); border-radius: 3px; background: linear-gradient(180deg, #1c2c4a, #0b1424); color: #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; transition: transform 0.12s, filter 0.2s; }
 .hud-card:hover, .hud-card.open { transform: translateY(-3px); border-color: var(--hud-accent, var(--cyan)); }

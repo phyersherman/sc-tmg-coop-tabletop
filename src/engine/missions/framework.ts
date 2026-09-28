@@ -71,7 +71,6 @@ export const noop = (): void => undefined;
 
 export function officialMode(partial: Partial<MissionMode> & Pick<MissionMode, 'id' | 'name' | 'blurb'>): MissionMode {
   return {
-    sc2Inspiration: 'Official mission card',
     official: true,
     scales: ['skirmish', 'standard', 'grand'],
     rounds: 5,

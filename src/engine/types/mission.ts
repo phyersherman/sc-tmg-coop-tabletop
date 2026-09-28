@@ -12,7 +12,6 @@ export interface MissionCtx {
 export interface MissionMode {
   id: string;
   name: string;
-  sc2Inspiration: string;
   blurb: string;
   official?: boolean;
   scales: Scale[];

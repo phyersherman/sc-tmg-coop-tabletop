@@ -2,7 +2,7 @@
 
 A companion app for the **StarCraft: Tabletop Miniatures Game** that lets one or two players play co-op against an
 app-driven enemy on a real table. The app builds a hidden enemy army from the miniatures you are not fielding,
-plays it from Frosthaven-style action cards, rolls its dice, keeps the score and referees the rules; you play the
+plays it from action cards, rolls its dice, keeps the score and referees the rules; you play the
 miniatures. No LLM, no backend, no account: it runs in the browser (offline too, as a PWA) or as a desktop app.
 
 ## Download
@@ -45,8 +45,8 @@ npm run desktop:mac   # or desktop:win: a desktop app in release/
 Unit stats, costs and mission facts are snapshotted from the official Command Center app into `src/data/*.json`. No
 card art is reproduced. Official cards and rules: https://starcraft-tmg.com/downloads. The terrain pictures in
 `public/terrain-ref/` are the Lost Temple pieces as shown in the core rulebook's terrain key. The faction dice in
-`public/dice/` are original artwork made for this project. This edition contains no art, audio, sprites or story
-content from the StarCraft video games.
+`public/dice/` are original artwork made for this project. This edition contains no other art, audio or
+sprites.
 
 StarCraft is a trademark of Blizzard Entertainment. StarCraft: Tabletop Miniatures Game is published by Archon
 Studio. This is an unofficial fan project, not affiliated with or endorsed by either.
