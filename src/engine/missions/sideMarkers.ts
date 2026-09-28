@@ -192,7 +192,8 @@ export function withSideMarkers(mode: MissionMode, specs: SideSpec[]): MissionMo
     briefing: (s) => !specs.length ? mode.briefing(s) : [
       ...mode.briefing(s),
       `Side markers: a guard or a Structure stands on each one. Destroy it, then hold the marker at a Scoring phase. The player with the most Supply on the marker earns its reward for the next round only. An unused reward is lost. If two players are level, choose which one takes it. The rest of the AI's force leaves side markers alone.${s.config.playMode === 'video' ? '' : ' Set each guard and Structure on its marker before the battle.'}`,
-      ...specs.map((sp) => {
+      // Only the markers this deployment card puts on the table: a small table has fewer.
+      ...specs.filter((sp) => s.markers.some((m) => m.id === sp.marker)).map((sp) => {
         const o = sideState(s).objects[sp.marker];
         return o ? objectLine(s, sp.marker, o) : `Marker ${sp.marker}: ${sp.object === 'guard' ? 'a guard' : 'a Structure'}. Reward: ${REWARDS[sp.reward].name}, ${REWARDS[sp.reward].text}.`;
       }),

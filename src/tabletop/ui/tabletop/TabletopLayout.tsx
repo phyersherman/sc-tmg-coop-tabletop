@@ -25,10 +25,10 @@ import { aiBurrowed, aiHas } from '@engine/ai/burrow';
 const PHASES = ['movement', 'assault', 'combat', 'scoring'] as const;
 
 /**
- * The game is on your table and the app is the opponent across it. The enemy's units are laid out as cards, each
- * with the action card its type follows this phase; one card on the right says what happens now — your
- * activation, or the AI's order and the result it needs. Picking an enemy card enters the damage it took. The
- * table itself is the map: the app only shows the layout again when asked.
+ * The game is on your table and the app is the opponent across it. What happens now (the AI's order and its dice,
+ * or your activation) takes the stage at the top of the screen, at a size the room reads; the enemy's Units are laid
+ * out as cards below it. The operator's tools (damage entry, rewards) keep to the side panel. The table itself is
+ * the map: the app only shows the layout again when asked.
  */
 export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
   g: GameState;
@@ -50,6 +50,11 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
   return (
     <div className="tt-root tt-mode-aiOnly">
       <div className="tt-map">
+        {/* The one thing the whole table reads: the dice being rolled, then the order or the turn in front of you. */}
+        <section className="tt-stage" aria-label="Now" aria-live="polite">
+          <CombatTray g={g} dispatch={dispatch} pendingEvent={pendingEvent} className="inline tt-tray" />
+          <div className="tt-now">{now ?? (pendingEvent ? <p className="tt-hint muted">Apply the result on the table, then Continue.</p> : null)}</div>
+        </section>
         <EnemyBoard g={g} selected={inspected?.id ?? null} onPick={(id) => ui.inspect(id === ui.inspectId ? null : id)} />
       </div>
 
@@ -83,17 +88,13 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
       {/* The mission's objective, under the scoreboard: the whole table should know what it is playing for. */}
       <Stakes g={g} className="tt-stakes" />
 
+      {/* The operator's side: what happened to an enemy Unit, and rewards waiting for a choice. With nothing to do
+          there it is not drawn, and the stage and the enemy take the whole width. */}
       <aside className="tt-panel">
-        {/* The dice first, then the AI unit you clicked: the rolls and its damage entry are what you are doing
-            right now, and whose turn it is can wait below them. */}
-        <CombatTray g={g} dispatch={dispatch} pendingEvent={pendingEvent} className="inline tt-tray" />
         {inspected && <EnemyCard g={g} unitId={inspected.id} dispatch={dispatch} onClose={() => ui.inspect(null)} />}
         <HitsBattle g={g} dispatch={dispatch} />
         {/* A side marker's reward waits here for its one choice (which unit, which player) until it is used or lost. */}
         <Rewards g={g} dispatch={dispatch} />
-        {/* Nothing to decide here while a result waits above: the tray's Continue is the one button. */}
-        <div className="tt-now">{now ?? (pendingEvent ? <p className="tt-hint small muted">Apply the result on the table, then Continue above.</p> : null)}</div>
-        {!inspected && <p className="tt-hint small muted">To enter damage, pick the enemy Unit on the left.</p>}
       </aside>
 
       {overlays}
@@ -110,7 +111,7 @@ export function TabletopTurn({ g, dispatch }: { g: GameState; dispatch: (c: Comm
     const a = g.step.attack;
     return (
       <div className="tt-card tt-you">
-        <span className="tt-kicker">Your saves · {g.phase}</span>
+        <h2>Your saves</h2>
         <p>{a.attacker.label} hit {a.defender.label} {a.hits} time{a.hits === 1 ? '' : 's'}. Roll your saves in the tray above.</p>
         <Btn size="sm" variant="ghost" onClick={() => dispatch(autoSaves(g, a))}>Roll my saves for me</Btn>
       </div>
@@ -135,13 +136,11 @@ export function TabletopTurn({ g, dispatch }: { g: GameState; dispatch: (c: Comm
     <>
       {justPassed && (
         <div className="tt-card tt-pass" role="status">
-          <span className="tt-kicker red">AI · {g.phase}</span>
           <h2>The AI passes</h2>
           <p className="small">It has nothing left to activate this phase. {g.nextFirstPlayer === 'ai' ? 'Passing first, it goes first next phase.' : ''}</p>
         </div>
       )}
       <div className="tt-card tt-you">
-        <span className="tt-kicker">Your turn · {g.phase}</span>
         <h2>{aiPassed ? 'Finish your activations' : 'Activate a Unit on the table'}</h2>
         <p>{what}</p>
         {aiPassed && <p className="small warn">The AI has passed. Activate your remaining Units one after another, then pass to end the phase.</p>}
@@ -192,11 +191,10 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
   };
   return (
     <div className="tt-card tt-enemy">
-      <div className="row between">
-        <span className="tt-kicker red">AI Unit</span>
+      <div className="row between tt-card-head">
+        <h2>{u.label}</h2>
         <button type="button" className="tt-close" onClick={onClose} aria-label="Close">×</button>
       </div>
-      <h2>{u.label}</h2>
       <p className="small muted">{def.name} · {u.models}/{u.maxModels} models · HP {def.stats.hp}{def.stats.shields ? ` +${def.stats.shields}` : ''} · Armour {def.stats.armour}+{def.stats.evade ? ` · Evade ${def.stats.evade}+` : ''}</p>
       {u.damageMarker > 0 && <p className="small">Damage marker: <b>{u.damageMarker}</b></p>}
 

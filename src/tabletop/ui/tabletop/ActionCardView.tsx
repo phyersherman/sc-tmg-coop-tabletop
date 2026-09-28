@@ -5,6 +5,7 @@ import { REMINDERS, remindersFor, usedOnce, type ActionCard, type CardStep, type
 import { headingText, speedModFor } from '@engine/ai/decide';
 import { bestWeapon } from '@engine/units/weapons';
 import { speedFor } from '@engine/units/speed';
+import { StepIcon } from './StepIcon';
 
 const FOCUS: Record<Focus, string> = {
   nearest: 'the nearest enemy',
@@ -25,7 +26,6 @@ function whereTo(g: GameState, u: AiUnitInstance | undefined, to: MoveTo): strin
   }
 }
 
-const ICON: Record<CardStep['k'], string> = { move: '➜', run: '»', hold: '■', attack: '✹', charge: '⚡', ability: '◆' };
 
 /** One line of a card, in the words a player reads it out at the table. */
 export function stepText(g: GameState, card: ActionCard, s: CardStep, u?: AiUnitInstance): { title: string; detail?: string } {
@@ -63,7 +63,7 @@ export function ActionCardView({ g, card, unit, full = false, entry }: { g: Game
       <ol className="ac-steps">
         {entry && (
           <li className="ac-step ac-enter">
-            <span className="ac-icon" aria-hidden="true">⤓</span>
+            <span className="ac-icon"><StepIcon mark="enter" /></span>
             <span><b>Arrives from Reserves</b><span className="ac-detail">{entry}</span></span>
           </li>
         )}
@@ -75,7 +75,7 @@ export function ActionCardView({ g, card, unit, full = false, entry }: { g: Game
           const once = s.k === 'ability' && /Once per Game/i.test(s.text) && usedOnce(g, card.defId, s.name);
           return (
             <li key={i} className={`ac-step ac-${s.k} ${once ? 'used' : ''}`}>
-              <span className="ac-icon" aria-hidden="true">{ICON[s.k]}</span>
+              <span className="ac-icon"><StepIcon mark={s.k} /></span>
               <span><b>{t.title}</b>{full && t.detail && <span className="ac-detail">{t.detail}</span>}</span>
             </li>
           );
@@ -83,10 +83,10 @@ export function ActionCardView({ g, card, unit, full = false, entry }: { g: Game
       </ol>
       {card.buffs.length > 0 && (
         <div className="ac-buffs">
-          {card.buffs.map((b) => <p key={b.name}><b>✚ {b.name}</b>{full ? `: ${b.text}` : ''}</p>)}
+          {card.buffs.map((b) => <p key={b.name}><b><StepIcon mark="buff" className="inline" />{b.name}</b>{full ? `: ${b.text}` : ''}</p>)}
         </div>
       )}
-      {card.boost && <p className="ac-boost"><b>★ {card.boost.name}</b>{full ? `: ${card.boost.text}` : ''}{full && card.boost.use && <span className="ac-use">AI uses it on {card.boost.use}</span>}</p>}
+      {card.boost && <p className="ac-boost"><b><StepIcon mark="boost" className="inline" />{card.boost.name}</b>{full ? `: ${card.boost.text}` : ''}{full && card.boost.use && <span className="ac-use">AI uses it on {card.boost.use}</span>}</p>}
       {full && (
         <ul className="ac-reminders">
           {remindersFor(card).map((k) => <li key={k}>{REMINDERS[k]}</li>)}

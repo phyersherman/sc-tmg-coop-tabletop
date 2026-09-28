@@ -7,6 +7,7 @@ import { speedFor } from '@engine/units/speed';
 import { currentSupply } from '@engine/units/supply';
 import { ActionCardView } from './ActionCardView';
 import { REWARDS, sideState } from '@engine/missions/sideMarkers';
+import { StepIcon } from './StepIcon';
 
 const STAT_DEBUFFS = ['speed', 'hit', 'armour', 'evade'] as const;
 
@@ -24,6 +25,7 @@ export function EnemyBoard({ g, selected, onPick }: { g: GameState; selected: st
       <div className="eb-head">
         <h2>Enemy</h2>
         {!g.config.options.hideAiRoster && reserves.length > 0 && <span className="eb-reserves">In Reserves: {reserves.map((u) => u.label).join(', ')}</span>}
+        {onTable.length > 0 && <span className="eb-hint">Pick a Unit to enter the damage it took.</span>}
       </div>
       {onTable.length === 0 && <p className="eb-empty">No enemy Units on the table yet. They arrive in the Movement phase.</p>}
       <div className="eb-grid">
@@ -65,11 +67,11 @@ function EnemyTile({ g, u, active, selected, onPick }: { g: GameState; u: AiUnit
           {u.engaged && <span className="eb-flag engaged">Engaged</span>}
           {(u.statuses ?? []).map((s) => <span key={s} className="eb-flag">{s}</span>)}
           {debuffs.map((s) => <span key={s} className="eb-flag debuff">DEBUFF {s} {aiDebuff(u, s)}</span>)}
-          {(u.buffs ?? []).map((b) => <span key={b.name} className="eb-flag buff" title={b.text}>✚ {b.name}</span>)}
+          {(u.buffs ?? []).map((b) => <span key={b.name} className="eb-flag buff" title={b.text}><StepIcon mark="buff" className="inline" />{b.name}</span>)}
           {done && <span className="eb-flag muted">Activated</span>}
         </div>
       </button>
-      {card ? <ActionCardView g={g} card={card} unit={u} /> : phase === 'combat' ? <p className="eb-nocard">{u.engaged ? 'Engaged: it fights.' : 'Not Engaged: no fight.'}</p> : <p className="eb-nocard">No card drawn yet this phase.</p>}
+      {card ? <ActionCardView g={g} card={card} unit={u} /> : phase === 'combat' ? <p className="eb-nocard">{u.engaged ? 'Engaged: it fights.' : 'Not Engaged: no fight.'}</p> : <p className="eb-nocard">No card yet this phase.</p>}
     </article>
   );
 }

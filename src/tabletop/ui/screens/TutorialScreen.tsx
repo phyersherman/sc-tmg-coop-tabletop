@@ -7,6 +7,7 @@ import { useUi } from '@tt/store/uiStore';
 import { Btn } from '../components/Basics';
 import { RewardToken, Token } from '../components/Tokens';
 import { ActionCardView } from '../tabletop/ActionCardView';
+import { StepIcon } from '../tabletop/StepIcon';
 
 /** A card to show, outside any battle: the Marines' Stimpack card from their Movement deck. */
 function SampleCard() {
@@ -47,10 +48,10 @@ const CHAPTERS: Chapter[] = [
         <p>Each enemy Unit on the table has a card with its Speed, Armour, Evade and HP, the models it has left, and whether it is damaged, Engaged, buffed or DEBUFFed.</p>
         <p>Every enemy Unit type has two decks of action cards, one for the Movement phase and one for the Assault phase. When a Unit activates, it plays the card from its deck that best suits its state. A Unit holding its marker digs in. A badly hurt Unit takes cover or falls back. A fresh Unit presses the attack. Read a card from the top down.</p>
         <ul>
-          <li><b>➜ » ■ ✹ ⚡</b> Move, run, hold, fire or charge. The card also says what to do if the Unit cannot.</li>
-          <li><b>◆</b> An ability, used for free. The AI never pays Biomass, Command Points or Psionic Energy.</li>
-          <li><b>✚</b> A buff until the End of the Round. The AI never reacts, so its reactions come as buffs instead.</li>
-          <li><b>★</b> A Faction card boost, and the Unit it goes to.</li>
+          <li><span className="legend-marks"><StepIcon mark="move" /><StepIcon mark="run" /><StepIcon mark="hold" /><StepIcon mark="attack" /><StepIcon mark="charge" /></span> Move, run, hold, fire or charge. The card also says what to do if the Unit cannot.</li>
+          <li><span className="legend-marks"><StepIcon mark="ability" /></span> An ability, used for free. The AI never pays Biomass, Command Points or Psionic Energy.</li>
+          <li><span className="legend-marks"><StepIcon mark="buff" /></span> A buff until the End of the Round. The AI never reacts, so its reactions come as buffs instead.</li>
+          <li><span className="legend-marks"><StepIcon mark="boost" /></span> A Faction card boost, and the Unit it goes to.</li>
         </ul>
       </>
     ),

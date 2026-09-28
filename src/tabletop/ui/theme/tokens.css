@@ -731,9 +731,10 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .cutscene-text p { margin: 0 auto; max-width: 900px; font-size: clamp(16px, 2.2vw, 24px); line-height: 1.45; text-shadow: 0 2px 6px #000; }
 @keyframes cutscene-words { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-/* Tabletop mode: the table map, a slim status bar, and one card for what happens now */
+/* The tabletop screen: the scoreboard strip, then the stage (what happens now, at room scale) over the enemy's
+   Unit cards, and the operator's narrow panel at the right. */
 .tt-root { position: fixed; inset: 0; background: #04060b; color: var(--text); }
-.tt-map { position: absolute; inset: 0; }
+.tt-map { position: absolute; top: 100px; left: 0; right: 440px; bottom: 0; overflow-y: auto; padding: 18px 24px 32px; display: flex; flex-direction: column; gap: 28px; }
 .tt-banners { position: absolute; left: 50%; top: 74px; transform: translateX(calc(-50% - 220px)); width: min(560px, 60vw); z-index: 20; }
 /* The top strip is the scoreboard the whole table reads from across the room: round, phase, VP and Supply at a
    size that carries; the operator's controls (menu, mode, sound) stay small at either end. */
@@ -760,25 +761,41 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .tt-menu { position: absolute; top: 36px; left: 0; min-width: 220px; display: flex; flex-direction: column; gap: 4px; padding: 10px; background: var(--panel); border: 1px solid var(--line-2); box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
 .tt-menu button { text-align: left; background: transparent; color: var(--text); border: none; padding: 6px 4px; font: inherit; cursor: pointer; }
 .tt-menu button:hover { background: var(--panel-2); }
+.tt-panel:empty { display: none; }
+.tt-root:has(> .tt-panel:empty) .tt-map, .tt-root:has(> .tt-panel:empty) .tt-stakes { right: 0; }
 .tt-panel { position: absolute; top: 56px; right: 0; bottom: 0; width: 440px; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; background: rgba(5, 10, 20, 0.9); border-left: 1px solid var(--line); z-index: 25; font-size: 16px; }
-.tt-panel .tt-tray { position: static; width: auto; }
-/* In the narrow side panel the battle stacks: the two sides face each other, the dice run beneath, then the button. */
-.tt-panel .combat-tray { flex-wrap: wrap; justify-content: space-between; margin: 0; animation: tt-in 0.2s ease-out; }
-.tt-panel .combat-tray .ct-pools { order: 3; flex-basis: 100%; flex-wrap: wrap; justify-content: center; }
-.tt-panel .combat-tray .ct-command { order: 4; flex-basis: 100%; flex-direction: row; justify-content: flex-end; align-items: center; }
-/* The current card is read from the far side of the table: its title and its one action step up in size;
-   the numbers you type and the debuff grid stay at the operator's size. */
+/* The stage: the dice, then the order or the turn. It is the one place the room looks, so it gets the width and
+   the largest type on the screen; it holds its measure rather than stretching across a wide TV. */
+.tt-stage { display: flex; flex-direction: column; gap: 16px; max-width: 1080px; }
+.tt-stage:not(:has(> .tt-tray, > .combat-tray, .tt-now > *)) { display: none; }
+.tt-stage .tt-tray { position: static; width: auto; }
+.tt-stage .combat-tray { flex-wrap: wrap; justify-content: space-between; margin: 0; animation: tt-in 0.2s ease-out; }
+.tt-stage .combat-tray .ct-pools { order: 3; flex-basis: 100%; flex-wrap: wrap; justify-content: center; }
+.tt-stage .combat-tray .ct-command { order: 4; flex-basis: 100%; flex-direction: row; justify-content: flex-end; align-items: center; }
+.tt-now { display: flex; flex-direction: column; gap: 14px; }
+.tt-now:empty { display: none; }
 .tt-card { background: var(--panel); border: 1px solid var(--line-2); padding: 14px 16px; }
 .tt-card h2 { margin: 4px 0 8px; font-size: 26px; letter-spacing: 0.05em; line-height: 1.1; text-wrap: balance; }
 .tt-card > p { font-size: 17px; line-height: 1.4; }
 .tt-card > p.small, .tt-card .small { font-size: 14px; }
-.tt-now .btn-lg { min-height: 60px; font-size: 19px; padding: 14px 24px; }
-.tt-now .btn kbd, .tt-now .ct-btn kbd { font-family: var(--font-mono); font-size: 11px; opacity: 0.7; text-transform: none; letter-spacing: 0; }
-.tt-now .cmd .cmd-head h2 { font-size: 26px; letter-spacing: 0.05em; line-height: 1.1; }
-.tt-now .cmd .cmd-sub { font-size: 19px; line-height: 1.3; }
-.tt-now .cmd .ask { font-size: 18px; line-height: 1.35; }
-.tt-now .banner h2 { font-size: 26px; }
-.tt-now .banner .banner-lines p { font-size: 17px; }
+.tt-card-head { align-items: flex-start; gap: 12px; }
+.tt-card-head h2 { margin: 0; }
+/* Room scale: read from the far side of the table. The numbers the operator types stay at the operator's size. */
+.tt-now .tt-card { padding: 20px 24px; }
+.tt-now .tt-card h2, .tt-now .cmd .cmd-head h2, .tt-now .banner h2 { font-size: 36px; letter-spacing: 0.05em; line-height: 1.05; }
+.tt-now .tt-card > p, .tt-now .cmd .cmd-sub, .tt-now .banner .banner-lines p { font-size: 21px; line-height: 1.4; max-width: 60ch; }
+.tt-now .tt-card > p.small, .tt-now .tt-card .small { font-size: 17px; }
+.tt-now .cmd .ask { font-size: 22px; line-height: 1.35; max-width: 60ch; }
+.tt-now .ac-full { padding: 16px 20px 18px; }
+.tt-now .ac-full .ac-phase { font-size: 14px; }
+.tt-now .ac-full .ac-name { font-size: 36px; }
+.tt-now .ac-full .ac-steps { gap: 12px; margin-top: 14px; }
+.tt-now .ac-full .ac-step { font-size: 26px; grid-template-columns: 34px 1fr; gap: 12px; line-height: 1.25; }
+.tt-now .ac-full .ac-detail { font-size: 18px; line-height: 1.4; margin-top: 4px; max-width: 62ch; }
+.tt-now .ac-full .ac-buffs p, .tt-now .ac-full .ac-boost { font-size: 18px; }
+.tt-now .ac-full .ac-reminders { font-size: 15px; max-width: 90ch; }
+.tt-now .btn-lg { min-height: 64px; font-size: 20px; padding: 14px 28px; }
+.tt-now .btn kbd, .tt-now .ct-btn kbd { font-family: var(--font-mono); font-size: 12px; opacity: 0.7; text-transform: none; letter-spacing: 0; }
 .tt-wait p { margin: 0; animation: pulseText 1.6s ease-in-out infinite; }
 .tt-takeback { margin: -4px 2px 0; font-size: 14px; }
 .tt-link { background: none; border: none; padding: 0; color: var(--cyan-2); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
@@ -786,8 +803,6 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .tt-link:disabled { color: var(--muted); text-decoration: none; cursor: default; }
 .tt-you { border-left: 3px solid var(--blue-side); }
 .tt-enemy { border-left: 3px solid var(--red-side); }
-.tt-kicker { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue-side); font-family: var(--font-head); }
-.tt-kicker.red { color: var(--red-side); }
 .tt-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
 .tt-seg { display: flex; margin: 8px 0; border: 1px solid var(--line-2); }
 .tt-seg button { flex: 1; background: transparent; color: var(--muted); border: none; padding: 6px; font: inherit; font-size: 12px; cursor: pointer; }
@@ -818,9 +833,15 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 /* Past a laptop (a TV mirrored at 1800px and up) the panel widens and the readable sizes take one more step. */
 @media (min-width: 1800px) {
   .tt-panel { width: 480px; font-size: 17px; }
-  .tt-card h2, .tt-now .cmd .cmd-head h2, .tt-now .banner h2 { font-size: 30px; }
-  .tt-card > p, .tt-now .cmd .cmd-sub { font-size: 19px; }
-  .tt-now .cmd .ask { font-size: 19px; }
+  .tt-map { right: 480px; padding: 24px 36px 40px; }
+  .tt-stage { max-width: 1240px; }
+  .tt-now .tt-card h2, .tt-now .cmd .cmd-head h2, .tt-now .banner h2, .tt-now .ac-full .ac-name { font-size: 46px; }
+  .tt-now .tt-card > p, .tt-now .cmd .cmd-sub, .tt-now .banner .banner-lines p { font-size: 25px; }
+  .tt-now .cmd .ask { font-size: 26px; }
+  .tt-now .ac-full .ac-step { font-size: 32px; grid-template-columns: 42px 1fr; }
+  .tt-now .ac-full .ac-detail, .tt-now .ac-full .ac-buffs p, .tt-now .ac-full .ac-boost { font-size: 21px; }
+  .tt-now .ac-full .ac-reminders { font-size: 17px; }
+  .tt-now .btn-lg { min-height: 72px; font-size: 23px; }
   .tt-round b { font-size: 30px; } .tt-vp b { font-size: 32px; } .tt-supply b { font-size: 22px; }
   .tt-phase { font-size: 13px; }
 }
@@ -830,8 +851,14 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .tt-top img.tt-status { flex: 1 1 auto; min-width: 0; }
 @media (max-width: 1280px) { .tt-status { gap: 14px; } .tt-phase span { padding: 5px 6px; } .tt-supply .small { display: none; } .tt-top { gap: 12px; } .tt-phase span:not(.on) { display: none; } .tt-round small { display: none; } .tt-vp { margin-inline: 4px; } }
 @media (max-width: 800px) {
-  .tt-panel { top: auto; left: 0; width: auto; max-height: 55vh; border-left: none; border-top: 1px solid var(--line); }
+  .tt-panel { top: auto; left: 0; width: auto; max-height: 45vh; border-left: none; border-top: 1px solid var(--line); }
   .tt-status { display: none; }
+  .tt-map { top: 96px; right: 0; padding: 12px 12px 24px; gap: 20px; }
+  .tt-now .tt-card h2, .tt-now .cmd .cmd-head h2, .tt-now .banner h2, .tt-now .ac-full .ac-name { font-size: 28px; }
+  .tt-now .ac-full .ac-step { font-size: 21px; grid-template-columns: 28px 1fr; }
+  .tt-now .ac-full .ac-detail, .tt-now .tt-card > p, .tt-now .cmd .ask { font-size: 17px; }
+  /* On a phone the one action stays in reach; "Full rules for this order" still opens the reminders. */
+  .tt-now .ac-full .ac-reminders { display: none; }
 }
 /* Round and phase banners sit in the Now card in tabletop mode, not over the map. */
 .tt-now .banner { position: static; transform: none; width: auto; margin: 0; animation: tt-in 0.2s ease-out; }
@@ -1165,11 +1192,11 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .hud-icon-fallback { border: 1px solid var(--line-2); background: rgba(56,189,248,0.08); color: var(--text); font-family: var(--font-head); font-weight: 700; letter-spacing: 0.04em; flex: none; }
 
 /* ---------------------------------------------------------------- The enemy board: the AI's units as cards */
-.tt-map { overflow-y: auto; }
-.eb { position: absolute; top: 100px; left: 0; right: 440px; bottom: 0; overflow-y: auto; padding: 16px 20px 24px; }
+.eb { min-width: 0; }
 .eb-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
 .eb-head h2 { margin: 0; font-size: 22px; color: var(--red-side); }
 .eb-reserves { color: var(--muted); font-size: 15px; }
+.eb-hint { color: var(--muted); font-size: 15px; }
 .eb-empty { color: var(--muted); font-size: 18px; }
 .eb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; align-items: start; }
 .eb-tile { background: var(--panel); border: 1px solid var(--line-2); border-top: 3px solid var(--red-side); display: flex; flex-direction: column; transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s; }
@@ -1196,8 +1223,7 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .eb-flag.buff { border-color: #34d399; color: #6ee7b7; }
 .eb-flag.muted { color: var(--muted); }
 .eb-nocard { margin: 0; padding: 10px 14px 12px; color: var(--muted); font-size: 14px; border-top: 1px dashed var(--line-2); }
-@media (min-width: 1800px) { .eb { right: 480px; } .eb-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); } }
-@media (max-width: 800px) { .eb { position: static; padding: 96px 12px 12px; } }
+@media (min-width: 1800px) { .eb-grid { grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); } }
 
 /* ---------------------------------------------------------------- Action cards */
 .ac { border-top: 1px solid var(--line-2); background: linear-gradient(180deg, rgba(239,106,106,0.08), rgba(239,106,106,0.02)); padding: 10px 14px 12px; }
@@ -1210,7 +1236,7 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .ac-step { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; font-size: 16px; line-height: 1.35; }
 .ac-full .ac-step { font-size: 19px; }
 .ac-step.used { opacity: 0.45; text-decoration: line-through; }
-.ac-icon { color: var(--red-side); font-size: 18px; text-align: center; line-height: 1.3; }
+.ac-icon { color: var(--red-side); display: flex; justify-content: center; line-height: 1.25; }
 .ac-ability .ac-icon { color: #c4b5fd; }
 .ac-detail { display: block; font-size: 14px; color: var(--muted); font-weight: 400; margin-top: 2px; }
 .ac-full .ac-detail { font-size: 15px; }
@@ -1219,7 +1245,7 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 .ac-boost b { color: #fcd34d; }
 .ac-reminders { margin: 10px 0 0; padding: 8px 0 0 18px; border-top: 1px dashed var(--line-2); color: var(--muted); font-size: 13px; line-height: 1.45; }
 /* The mission line wraps onto two lines on a narrower screen: the enemy board starts below it. */
-@media (max-width: 1280px) { .eb { top: 124px; } }
+@media (max-width: 1280px) and (min-width: 801px) { .tt-map { top: 124px; } }
 .ac-use { display: block; margin-top: 4px; color: var(--text); font-weight: 700; }
 
 /* ---------------------------------------------------------------- Printable side-marker tokens */
@@ -1268,3 +1294,10 @@ abbr.kw { text-decoration: underline dotted rgba(147,197,253,0.7); text-underlin
 /* The rulebook's own devices: an italic summary under a heading, and a boxed tip or designer's note. */
 .rulebook .rule-summary { margin-top: -4px; color: var(--muted); }
 .rulebook .rule-note { margin: 10px 0 4px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--panel); }
+
+/* The marks on an action card: one drawn set, sized by the text they sit in. */
+.step-icon { width: 1em; height: 1em; display: block; }
+.step-icon.inline { display: inline-block; width: 0.95em; height: 0.95em; margin-right: 0.3em; vertical-align: -0.12em; }
+.ac-icon .step-icon { width: 1.05em; height: 1.05em; margin-top: 0.12em; }
+.legend-marks { display: inline-flex; gap: 4px; margin-right: 8px; vertical-align: -4px; color: var(--red-side); }
+.legend-marks .step-icon { width: 20px; height: 20px; }
