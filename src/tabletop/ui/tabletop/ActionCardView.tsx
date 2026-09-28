@@ -57,10 +57,11 @@ export function stepText(g: GameState, card: ActionCard, s: CardStep, u?: AiUnit
  * it brings. `full` adds the ability texts and the rule reminders for resolving it.
  */
 export function ActionCardView({ g, card, unit, full = false, reminders = true, entry }: { g: GameState; card: ActionCard; unit?: AiUnitInstance; full?: boolean; /** The rule reminders under a full card (the order card keeps them behind its Full rules toggle). */ reminders?: boolean; /** Arriving from Reserves: where it comes on, before the card's move. */ entry?: string }) {
+  // The step the table carries out: the card's lead action (its abilities are free and come first).
+  const current = card.steps.findIndex((s) => s.k !== 'ability');
   return (
     <div className={`ac ${full ? 'ac-full' : 'ac-mini'} ac-${card.phase}`} role="group" aria-label={`Action card: ${card.name}`}>
       <div className="ac-head">
-        <span className="ac-phase">{card.phase === 'movement' ? 'Movement' : 'Assault'}</span>
         <b className="ac-name">{card.name}</b>
       </div>
       <ol className="ac-steps">
@@ -77,7 +78,7 @@ export function ActionCardView({ g, card, unit, full = false, reminders = true, 
           const t = stepText(g, card, s, unit);
           const once = s.k === 'ability' && /Once per Game/i.test(s.text) && usedOnce(g, card.defId, s.name);
           return (
-            <li key={i} className={`ac-step ac-${s.k} ${once ? 'used' : ''}`}>
+            <li key={i} className={`ac-step ac-${s.k} ${once ? 'used' : ''} ${i === current ? 'current' : ''}`} aria-current={i === current ? 'step' : undefined}>
               <span className="ac-icon"><StepIcon mark={s.k} /></span>
               <span><b>{t.title}</b>{full && t.detail && <span className="ac-detail">{t.detail}</span>}</span>
             </li>

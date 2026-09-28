@@ -143,7 +143,6 @@ export function TutorialScreen() {
         ))}
       </div>
       <article className="tut-page">
-        <span className="tut-kicker">Learn to play · {i + 1} of {CHAPTERS.length}</span>
         <h1>{c.title}</h1>
         <div className={`tut-body ${c.aside ? 'with-aside' : ''}`}>
           <div className="tut-text">{c.body}</div>

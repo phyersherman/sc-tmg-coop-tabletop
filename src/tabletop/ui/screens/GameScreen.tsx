@@ -36,7 +36,7 @@ import { actableUnits, playerAvailable, playerCanAct } from '@engine/player/rule
 import { unitsWithActions } from '@engine/player/actions';
 
 import { unitById as defOf } from '@data/index';
-import { ChargeRoll } from '../components/DiceRoll';
+import { ChargeRoll, DieFace } from '../components/DiceRoll';
 
 const VERB: Record<AiOrder['type'], string> = { deploy: 'Deploy', move: 'Advance', run: 'Run', disengage: 'Fall back', ranged: 'Open fire', charge: 'Charge', closeCombat: 'Melee', hold: 'Hold', pass: 'Pass', special: 'Special' };
 
@@ -81,6 +81,7 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
   return (
     <Panel className="cmd cmd-ai">
       <div className="cmd-head">
+        <span className="cmd-face" aria-hidden="true"><DieFace faction={def.faction} value={6} /></span>
         <h2 style={{ margin: 0 }}>{u.label}{order.card ? '' : `: ${VERB[order.type]}`}</h2>
       </div>
       {order.card

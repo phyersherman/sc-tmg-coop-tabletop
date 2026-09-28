@@ -1,8 +1,8 @@
 /**
- * The marks on an action card, drawn as one set (24 × 24, 2px stroke, round joins) so every step reads the same on
- * any machine: a platform's emoji never stands in for one.
+ * The marks on an action card and the tray's small controls, drawn as one set (24 × 24, 2px stroke, round joins)
+ * so every one reads the same on any machine: a platform's emoji or a Unicode glyph never stands in for one.
  */
-export type StepMark = 'move' | 'run' | 'hold' | 'attack' | 'charge' | 'ability' | 'buff' | 'boost' | 'enter';
+export type StepMark = 'move' | 'run' | 'hold' | 'attack' | 'charge' | 'ability' | 'buff' | 'boost' | 'enter' | 'next' | 'close' | 'replay';
 
 const PATHS: Record<StepMark, string> = {
   move: 'M4 12h14M13 6l6 6-6 6',
@@ -14,6 +14,9 @@ const PATHS: Record<StepMark, string> = {
   buff: 'M12 5v14M5 12h14',
   boost: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z',
   enter: 'M12 3v11M7 9l5 5 5-5M4 20h16',
+  next: 'M9 6l6 6-6 6',
+  close: 'M6 6l12 12M18 6L6 18',
+  replay: 'M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5',
 };
 
 export function StepIcon({ mark, className }: { mark: StepMark; className?: string }) {

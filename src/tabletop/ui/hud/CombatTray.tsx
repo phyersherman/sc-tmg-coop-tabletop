@@ -8,6 +8,7 @@ import { useGame } from '@tt/store/gameStore';
 import { Stepper } from '../components/Basics';
 import { DieFace, DieTumble } from '../components/DiceRoll';
 import { buildPools, chargeAckId, commandFor, facesFromCount, planAttack, planCharge, resultItem, saveOptions, type CombatItem, type Pool, type PoolId } from './combatPools';
+import { StepIcon } from '../tabletop/StepIcon';
 
 /** Whether the tray is open and what its main button does, so the command card can mirror it. */
 /** The fight in words, for the turn line while the tray is open: who hits whom, and what it waits on now. */
@@ -314,7 +315,7 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
           const faction = p.roller === 'attacker' ? cur.meta.attackerFaction : cur.meta.defenderFaction;
           return (
             <div key={p.id} className="ct-step">
-              {i > 0 && <span className={`ct-arrow ${state === 'hidden' ? 'dim' : ''}`}>▸</span>}
+              {i > 0 && <span className={`ct-arrow ${state === 'hidden' ? 'dim' : ''}`}><StepIcon mark="next" /></span>}
               <div className={`ct-pool ${state} owner-${p.owner} pool-${p.id}`}>
                 <div className="ct-pool-head">
                   <b>{p.label}</b>

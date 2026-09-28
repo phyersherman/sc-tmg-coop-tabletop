@@ -49,6 +49,7 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
   const [menu, setMenu] = useState(false);
   const [layout, setLayout] = useState(false);
   const last = useLastAiAction(g);
+  const battleUnit = useBattle((s) => s.b?.unitId ?? null);
   useStageKeys(undoLast);
 
   const inspected = g.army.units.find((u) => u.id === ui.inspectId && u.location === 'table');
@@ -87,25 +88,23 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
       <Stakes g={g} className="tt-stakes" />
 
       <div className="tt-map">
-        {/* What happens now: the dice being rolled, then the order or the turn in front of you. What the AI did last
-            stays in view until its next order, so a player still moving its models can read it. */}
+        {/* The stage: rewards waiting for a choice, the dice, and your turn. The AI's order is not here: it is dealt
+            onto the acting Unit's card below, and what the AI did last stays on that Unit's card until its next. */}
         <section className="tt-stage" aria-label="Now">
           <p className="sr-only" aria-live="polite">{announce(g)}</p>
-          {!inOrder && last && <LastAiAction last={last} />}
+          {/* A side marker's reward waits here for its one choice (which unit, which player) until it is used or lost. */}
+          <Rewards g={g} dispatch={dispatch} />
           <CombatTray g={g} dispatch={dispatch} pendingEvent={pendingEvent} className="inline tt-tray" />
-          <div className="tt-now">{now ?? (pendingEvent ? <p className="tt-hint muted">Apply the result on the table, then Continue.</p> : null)}</div>
+          <div className="tt-now">{inOrder ? null : now ?? (pendingEvent ? <p className="tt-hint muted">Apply the result on the table, then Continue.</p> : null)}</div>
         </section>
-        <EnemyBoard g={g} selected={inspected?.id ?? null} lastId={inOrder ? null : last?.unitId ?? null} onPick={(id) => ui.inspect(id === ui.inspectId ? null : id)} />
+        {/* Damage entry and the dice for it open on the Unit's own card, the way you would mark the card on the table. */}
+        <EnemyBoard g={g} selected={inspected?.id ?? null} lastId={inOrder ? null : last?.unitId ?? null} onPick={(id) => ui.inspect(id === ui.inspectId ? null : id)}
+          dealt={g.step.kind === 'AI_ORDER' && now ? { unitId: g.step.order.unitId, node: now } : null}
+          extra={(id) => (inspected?.id === id || battleUnit === id) ? <>
+            {inspected?.id === id && <EnemyCard g={g} unitId={id} dispatch={dispatch} onClose={() => ui.inspect(null)} />}
+            {battleUnit === id && <HitsBattle g={g} dispatch={dispatch} />}
+          </> : null} />
       </div>
-
-      {/* The operator's side: what happened to an enemy Unit, and rewards waiting for a choice. With nothing to do
-          there it is not drawn, and the stage and the enemy take the whole width. */}
-      <aside className="tt-panel">
-        {inspected && <EnemyCard g={g} unitId={inspected.id} dispatch={dispatch} onClose={() => ui.inspect(null)} />}
-        <HitsBattle g={g} dispatch={dispatch} />
-        {/* A side marker's reward waits here for its one choice (which unit, which player) until it is used or lost. */}
-        <Rewards g={g} dispatch={dispatch} />
-      </aside>
 
       {overlays}
       {layout && <TableSetup g={g} onDone={() => setLayout(false)} doneLabel="Close" />}
@@ -142,14 +141,6 @@ function useLastAiAction(g: GameState): LastAction | null {
   return last;
 }
 
-function LastAiAction({ last }: { last: LastAction }) {
-  return (
-    <div className="tt-last" key={last.key}>
-      <span className="tt-last-mark"><StepIcon mark={last.mark} /></span>
-      <p><b>Last: {last.label}</b><span className="tt-last-head">{last.head}</span><span className="tt-last-line">{last.line}</span></p>
-    </div>
-  );
-}
 
 /** One quiet sentence for a screen reader when the stage changes, instead of the whole card read out again. */
 function announce(g: GameState): string {
@@ -175,7 +166,7 @@ function useStageKeys(undoLast: () => void): void {
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoLast(); return; }
       if (e.key !== ' ' || document.querySelector('.combat-tray')) return;
-      const primary = document.querySelector<HTMLButtonElement>('.tt-now .tt-primary:not(:disabled)');
+      const primary = document.querySelector<HTMLButtonElement>('.eb-deal .tt-primary:not(:disabled), .tt-now .tt-primary:not(:disabled)');
       if (!primary) return;
       e.preventDefault();
       primary.click();
@@ -293,7 +284,7 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
     <div className="tt-card tt-enemy" ref={card} onKeyDown={onKey} role="group" aria-label={`Damage to ${u.label}`}>
       <div className="row between tt-card-head">
         <h2>{u.label}</h2>
-        <button type="button" className="tt-close" onClick={close} aria-label="Close (Esc)">×</button>
+        <button type="button" className="tt-close" onClick={close} aria-label="Close (Esc)"><StepIcon mark="close" /></button>
       </div>
       <p className="small muted">{u.label.includes(def.name) ? '' : `${def.name} · `}{u.models}/{u.maxModels} models · HP {def.stats.hp}{shields} · Armour {def.stats.armour}+{def.stats.evade ? ` · Evade ${def.stats.evade}+` : ''}{u.damageMarker > 0 ? <> · damage marker <b>{u.damageMarker}</b></> : null}</p>
 
@@ -406,7 +397,7 @@ function HitsBattle({ g, dispatch }: { g: GameState; dispatch: (c: Command) => v
         </div>
         {b.rolls && (
           <div className="ct-step">
-            <span className="ct-arrow">▸</span>
+            <span className="ct-arrow"><StepIcon mark="next" /></span>
             <div className={`ct-pool ${settled ? 'done' : 'active'} owner-ai pool-armour`}>
               <div className="ct-pool-head"><b>Armour</b><span>{b.rolls.length} {b.rolls.length === 1 ? 'die' : 'dice'} · {b.armour}+</span></div>
               <div className={`ct-dice ${b.rolls.length > 14 ? 'many' : ''}`}>
@@ -423,7 +414,7 @@ function HitsBattle({ g, dispatch }: { g: GameState; dispatch: (c: Command) => v
         )}
         {b.evade && evadeDice.length > 0 && (
           <div className="ct-step">
-            <span className="ct-arrow">▸</span>
+            <span className="ct-arrow"><StepIcon mark="next" /></span>
             <div className={`ct-pool ${settled ? 'done' : 'active'} owner-ai pool-evade`}>
               <div className="ct-pool-head"><b>Evade</b><span>{evadeDice.length} {evadeDice.length === 1 ? 'die' : 'dice'} · {b.evade.value}+ · {b.evade.reason}</span></div>
               <div className={`ct-dice ${evadeDice.length > 14 ? 'many' : ''}`}>
@@ -439,7 +430,7 @@ function HitsBattle({ g, dispatch }: { g: GameState; dispatch: (c: Command) => v
           </div>
         )}
         <div className="ct-step">
-          <span className="ct-arrow">▸</span>
+          <span className="ct-arrow"><StepIcon mark="next" /></span>
           <div className={`ct-pool ${o ? 'active' : 'hidden'} pool-damage`}>
             <div className="ct-pool-head"><b>Damage</b></div>
             {o ? (

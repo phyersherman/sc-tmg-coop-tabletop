@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Rng, hashSeed } from '@engine/rng';
 import type { Faction } from '@engine/types/units';
+import { StepIcon } from '../tabletop/StepIcon';
 
 const FACTION_KEY: Record<Faction, string> = { Terran: 'terran', Zerg: 'zerg', Protoss: 'protoss' };
 const base = () => `${import.meta.env.BASE_URL}dice/`;
@@ -65,7 +66,7 @@ export function DiceRoll({ faction, rolls, need, surge, size = 44 }: { faction: 
     <div className="dice3d">
       {rolls.map((r, i) => <Die key={`${replayKey}-${i}`} faction={faction} value={r} hit={need === null ? null : r >= need} delay={500 + (i * 45) % 700} size={size} replayKey={replayKey} />)}
       {surge && <Die key={`${replayKey}-s`} faction={faction} value={Math.max(1, Math.min(6, surge.value))} hit={null} delay={total} size={size + 8} label={`Surge ${surge.die}`} replayKey={replayKey} />}
-      <button type="button" className="die3d-replay" onClick={() => setReplayKey((k) => k + 1)} title="Roll again (same result)">↻</button>
+      <button type="button" className="die3d-replay" onClick={() => setReplayKey((k) => k + 1)} title="Roll again (same result)"><StepIcon mark="replay" /></button>
     </div>
   );
 }
