@@ -68,3 +68,19 @@ export function DiceRoll({ faction, rolls, need, surge, size = 44 }: { faction: 
     </div>
   );
 }
+
+/**
+ * The AI's charge distance, rolled by the app as it rolls the AI's attack dice: the die (the higher of two when the
+ * AI rolls 2D6), then how far that takes the charge. Rolled once, when the order comes up.
+ */
+export function ChargeRoll({ faction, dice, speed, bonus = 0 }: { faction: Faction; dice: '1d6' | '2d6high'; speed: number; bonus?: number }) {
+  const [rolls] = useState(() => Array.from({ length: dice === '2d6high' ? 2 : 1 }, () => 1 + Math.floor(Math.random() * 6)));
+  const roll = Math.max(...rolls);
+  const reach = speed + roll + bonus;
+  return (
+    <div className="charge-roll">
+      <DiceRoll faction={faction} rolls={rolls} need={null} size={40} />
+      <p className="ask">The AI rolls {roll}{rolls.length > 1 ? ' (the higher die)' : ''}: its charge reaches <b>{reach}"</b>, the roll plus its Speed of {speed}{bonus ? ` and ${bonus} from its card` : ''}. An enemy within {reach}": the charge is made. Farther: the charge fails and the Unit stays where it is.</p>
+    </div>
+  );
+}

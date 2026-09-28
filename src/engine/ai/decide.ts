@@ -379,12 +379,28 @@ export function rangedOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
 }
 
 /**
- * How far an AI charge goes, in the words the players read it: they roll for the AI on the table. `speed` is the
- * unit's Speed; `bonus` what its cards add.
+ * How far an AI charge goes: the die, whoever rolls it (the app, or the table when it rolls the AI's dice), plus the
+ * unit's Speed and what its cards add.
  */
+/**
+ * The Unit an attack or a charge goes for, as the order's prompt names it: the same choice its card or order card
+ * made, so the prompt never says "nearest" under a card that says "weakest".
+ */
+export function targetText(focus: FocusRule | undefined, ground = false): string {
+  const kind = ground ? 'enemy Ground Unit' : 'enemy Unit';
+  switch (focus?.primary ?? 'nearest') {
+    case 'weakest': return `the ${kind} with the fewest models`;
+    case 'highestSupply': return `the ${kind} with the most Supply`;
+    case 'onMarker': return `an ${kind} on Mission Marker ${focus?.markerId ?? ''}`.trim();
+    case 'lastAttacker': return `the ${kind} that last damaged it`;
+    case 'nearestToMarker': return `the ${kind} nearest a Mission Marker`;
+    default: return `the nearest ${kind}`;
+  }
+}
+
 export function chargeRollText(dice: '1d6' | '2d6high', speed: number, bonus = 0): string {
-  const roll = dice === '2d6high' ? 'roll 2D6 for the AI and keep the higher' : 'roll a D6 for the AI';
-  return `Charge distance: ${roll}, then add its Speed of ${speed}${bonus ? ` and ${bonus} from its card` : ''}.`;
+  const roll = dice === '2d6high' ? 'the higher of 2D6' : 'a D6';
+  return `Charge distance: ${roll}, plus its Speed of ${speed}${bonus ? ` and ${bonus} from its card` : ''}.`;
 }
 
 export function chargeOrder(state: GameState, unit: AiUnitInstance, rng: Rng, profile: Profile, alsoRanged: boolean): AiOrder {

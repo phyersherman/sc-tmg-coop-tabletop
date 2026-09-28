@@ -28,7 +28,6 @@ export const RULEBOOK: RuleSection[] = [
     paragraphs: ['Each round follows the official sequence, and the two sides alternate one Unit at a time.'],
     bullets: [
       '**Round start:** the AI draws an order card, its stance for the round. Its **Supply Pool** grows and its reinforcements return to **Reserves**.',
-      '**Terran Tenacity:** when a phase opens with the AI holding the **First Player Marker** and a player\'s Faction card still has Terran Tenacity, the players may claim the marker and go first in that phase. Once per game.',
       '**Movement and Assault phases:** each AI Unit acts from its action card. Resolve it on the table, then report what happened.',
       '**Combat phase:** first mark which AI Units are **Engaged**. Engaged Units then fight in turn.',
       '**Scoring & Cleanup:** report who controls each marker and the Supply the players lost. The round\'s report gives each side\'s score and who holds the **First Player Marker** next.',
@@ -106,7 +105,7 @@ export const RULEBOOK: RuleSection[] = [
   {
     id: 'charging',
     title: 'Charges and IMPACT',
-    paragraphs: ['Measure the path from the **Leading Model**. If a valid enemy Ground Unit is within the charge range, declare the charge, roll the charge dice and add the Unit\'s Speed.'],
+    paragraphs: ['Measure the path from the **Leading Model**. If a valid enemy Ground Unit is within the charge range, the AI declares the charge. The app rolls the charge die with the AI\'s other dice and adds the Unit\'s Speed; with **App rolls the AI\'s dice** off in Settings, the table rolls it.'],
     bullets: [
       '**Success:** the **Leading Model** ends within **1"** of the target, base to base if possible. Set the others in **Coherency**, with as many as possible in contact. Report the charge, and enter the combined Supply of the enemy Units it is now **Engaged** with when asked.',
       '**Failure:** the Unit does not move. It cannot act again this phase.',

@@ -75,7 +75,7 @@ export const REMINDERS = {
   move: 'Move: the Leading Model takes the shortest path, around Size 2+ terrain and through grass and scatter. The rest follow in Coherency. Never end within 1" of an enemy or in the players\' Zone of Influence.',
   run: 'Run: a move at full Speed in the Assault phase instead of attacking.',
   attack: 'Attack: only models with the target in range and Line of Sight fire. The app rolls the AI\'s attack dice.',
-  charge: 'Charge: the target must be a Ground Unit within the AI\'s Speed + 6" of the Leading Model. Otherwise, do not charge. Charge distance: roll a D6 for the AI and add its Speed.',
+  charge: 'Charge: the target must be a Ground Unit within the AI\'s Speed + 6" of the Leading Model. Otherwise, do not charge. Charge distance: a D6 plus its Speed.',
   hold: 'Hold: the Unit stays where it is. It still counts as activated.',
   ability: 'Abilities cost the AI nothing: ignore Biomass, Command Points and Psionic Energy.',
   buff: 'Buffs last until the End of the Round. The AI never reacts, so these replace its Reactions.',

@@ -9,7 +9,7 @@ import { modeById } from '@engine/missions/index';
 import { DIFFICULTIES } from '@engine/difficulty';
 import { currentCard } from '@engine/ai/orderDeck';
 import { aiOrderKey, availableNow, onTable, poolNow } from '@engine/director/selectors';
-import { chargeRollText, focusText } from '@engine/ai/decide';
+import { chargeRollText, focusText, targetText } from '@engine/ai/decide';
 import { tenacityOffer } from '@engine/abilities/index';
 import type { AiOrder, GameState, MarkerControl, ScoringAnswers, ScoringPrompt, Step } from '@engine/types/game';
 import type { Command } from '@engine/director/reducer';
@@ -36,6 +36,7 @@ import { actableUnits, playerAvailable, playerCanAct } from '@engine/player/rule
 import { unitsWithActions } from '@engine/player/actions';
 
 import { unitById as defOf } from '@data/index';
+import { ChargeRoll } from '../components/DiceRoll';
 
 const VERB: Record<AiOrder['type'], string> = { deploy: 'Deploy', move: 'Advance', run: 'Run', disengage: 'Fall back', ranged: 'Open fire', charge: 'Charge', closeCombat: 'Melee', hold: 'Hold', pass: 'Pass', special: 'Special' };
 
@@ -91,7 +92,7 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
 
       {needsAsk && order.type === 'ranged' && (
         <div className="stack">
-          <p className="ask">{camLine ? 'Roll the attack.' : `Fire at the nearest enemy Unit in Line of Sight within ${range}" of any of its models. Otherwise, do not fire.`}</p>
+          <p className="ask">{camLine ? 'Roll the attack.' : `Fire at ${targetText(order.focus)} in Line of Sight within ${range}" of any of its models. Otherwise, do not fire.`}</p>
           {!camLine && main?.longRange ? <p className="ask">{`LONG RANGE: if no enemy Unit is that close, fire at one within ${main.longRange + (main.rangeMod ?? 0)}" instead, at -1 to hit.`}</p> : null}
           <div className="row">
             <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>{camLine ? 'Roll' : 'Open fire'}</Btn>
@@ -101,8 +102,12 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
       )}
       {needsAsk && !askFighters && order.type === 'charge' && (
         <div className="stack">
-          <p className="ask">{camLine ? 'Roll the AI\'s charge distance on the table.' : `Charge the nearest enemy Ground Unit within ${order.charge?.max ?? '?'}" of the Leading Model. Otherwise, do not charge.`}</p>
-          {!camLine && order.charge && <p className="ask">{chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>}
+          <p className="ask">{camLine ? 'Roll the AI\'s charge distance on the table.' : `Charge ${targetText(order.focus, true)} within ${order.charge?.max ?? '?'}" of the Leading Model. Otherwise, do not charge.`}</p>
+          {/* The charge die goes the way the attack dice go: rolled by the app when it rolls the AI's dice, by the table
+              otherwise. */}
+          {!camLine && order.charge && (showRolls
+            ? <ChargeRoll key={order.unitId} faction={def.faction} dice={order.charge.dice} speed={order.charge.speed} bonus={order.charge.min - 1 - order.charge.speed} />
+            : <p className="ask">Roll the AI's charge on the table. {chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>)}
           <div className="row">
             {order.impact ? <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge made, roll IMPACT</Btn> : <Btn variant="primary" size="lg" className="tt-primary" onClick={() => report('charged')}>Charge made</Btn>}
             {hasReport('chargeFailed') && <Btn size="lg" onClick={() => report('chargeFailed')}>Charge failed</Btn>}
