@@ -57,7 +57,7 @@ export default defineConfig(({ mode, command }) => {
         manifest: {
           name: tabletop ? 'Co-op Command · Tabletop' : 'SC TMG Co-op Command',
           short_name: tabletop ? 'Co-op Tabletop' : 'SC Co-op',
-          description: 'Unofficial co-op AI companion for the StarCraft Tabletop Miniatures Game',
+          description: 'A fan-developed companion app for StarCraft TMG: new co-op missions inspired by SC2, against enemy forces piloted by the app',
           theme_color: '#050a14',
           background_color: '#050a14',
           display: 'standalone',

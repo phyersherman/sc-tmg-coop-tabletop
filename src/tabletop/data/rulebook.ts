@@ -13,9 +13,9 @@ export interface RuleSection {
 export const RULEBOOK: RuleSection[] = [
   {
     id: 'about',
-    title: 'What this app does',
+    title: 'About Co-op Command',
     paragraphs: [
-      'This is an unofficial fan companion for the StarCraft: Tabletop Miniatures Game. It plays an AI army against one or two players, by the normal rules of the game, across a real table.',
+      'Co-op Command is a fan-developed companion app for StarCraft TMG. It takes its inspiration from the SC2 co-op game mode to create new missions where you alone, or you and a friend, can take on a new challenge together. The app pilots the enemy forces with an AI system that does not need to know where the Units stand on the battlefield: you play the miniatures on your own table, and the app tells you what the enemy does. The enemy follows the normal rules of the game.',
       'The AI knows the table layout and its own army. It never knows where the models stand. Each AI activation is an action card that the players resolve on the table with the rules on this page. The players then tell the app what happened.',
       'The enemy army is hidden. It is built from the models in your Collection that the players are not fielding, of any race. Its Units are revealed as they deploy.',
       'Unit stats and costs are taken from the official Command Center app. The official downloads hold the real cards and the full rules.',

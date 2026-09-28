@@ -1,9 +1,11 @@
 # Co-op Command, tabletop edition (unofficial)
 
-Co-op Command plays the enemy in the **StarCraft: Tabletop Miniatures Game**, so one or two players can fight together
-against it on a real table.
+Co-op Command is a fan-developed companion app for StarCraft TMG. It takes its inspiration from the SC2 co-op game
+mode to create new missions where you alone, or you and a friend, can take on a new challenge together. The app pilots
+the enemy forces with an AI system that does not need to know where the Units stand on the battlefield: you play the
+miniatures on your own table, and the app tells you what the enemy does.
 
-Before the battle, you tell it which miniatures you own. Each player builds an army of any race, and the enemy is built
+Before the battle, you tell the app which miniatures you own. Each player builds an army of any race, and the enemy is built
 in secret from the models you are not fielding. It can be any race, and it takes upgrades that counter your armies.
 You meet its Units as they arrive.
 

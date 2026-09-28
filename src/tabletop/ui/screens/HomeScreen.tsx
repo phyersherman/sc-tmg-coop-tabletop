@@ -30,7 +30,7 @@ export function HomeScreen() {
         <div className="home-deck-art" aria-hidden="true" />
         <div className="home-deck-body">
           <h1 className="hero-title home-title">Co-op Command</h1>
-          <p className="home-lede">An enemy army for the StarCraft Tabletop Miniatures Game. It decides what the enemy does, rolls its dice and keeps the score. You play the miniatures.</p>
+          <p className="home-lede">A fan-developed companion app for StarCraft TMG. New missions inspired by SC2 co-op, for you alone or you and a friend, against enemy forces the app pilots without needing to know where the Units stand.</p>
           {game && (
             <div className="home-saved">
               <div className="home-saved-facts">

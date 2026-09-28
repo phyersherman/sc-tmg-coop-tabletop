@@ -22,8 +22,8 @@ const CHAPTERS: Chapter[] = [
     title: 'An opponent that never tires',
     body: (
       <>
-        <p>Co-op Command plays the enemy army in the StarCraft Tabletop Miniatures Game, so one or two players can fight side by side against it. The battlefield is the table in front of you. Where the app and the table disagree, the table is right.</p>
-        <p>The app decides what each enemy Unit does, rolls its dice, and keeps the Supply and the score. The players move the enemy models the way its cards say, and tell the app what happened.</p>
+        <p>Co-op Command is a fan-developed companion app for StarCraft TMG. It takes its inspiration from the SC2 co-op game mode: new missions where you alone, or you and a friend, take on a new challenge together. The battlefield is the table in front of you. Where the app and the table disagree, the table is right.</p>
+        <p>The app pilots the enemy forces without needing to know where the Units stand. It decides what each enemy Unit does, rolls its dice, and keeps the Supply and the score. The players move the enemy models the way its cards say, and tell the app what happened.</p>
       </>
     ),
   },
