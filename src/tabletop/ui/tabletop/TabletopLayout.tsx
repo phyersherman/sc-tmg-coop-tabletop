@@ -50,6 +50,8 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
   const [layout, setLayout] = useState(false);
   const last = useLastAiAction(g);
   const battleUnit = useBattle((s) => s.b?.unitId ?? null);
+  // The dice land on the stage, above the cards; the card that was just marked may be far below it.
+  useEffect(() => { if (battleUnit) document.querySelector('.tt-battle')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [battleUnit]);
   useStageKeys(undoLast);
 
   const inspected = g.army.units.find((u) => u.id === ui.inspectId && u.location === 'table');
@@ -95,15 +97,14 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
           {/* A side marker's reward waits here for its one choice (which unit, which player) until it is used or lost. */}
           <Rewards g={g} dispatch={dispatch} />
           <CombatTray g={g} dispatch={dispatch} pendingEvent={pendingEvent} className="inline tt-tray" />
+          {/* Your hits on an AI Unit roll here, above the cards, where every result is read: entered on the card, rolled on the stage. */}
+          {battleUnit && <HitsBattle g={g} dispatch={dispatch} />}
           <div className="tt-now">{inOrder ? null : now ?? (pendingEvent ? <p className="tt-hint muted">Apply the result on the table, then Continue.</p> : null)}</div>
         </section>
-        {/* Damage entry and the dice for it open on the Unit's own card, the way you would mark the card on the table. */}
+        {/* Damage entry opens on the Unit's own card, the way you would mark the card on the table. */}
         <EnemyBoard g={g} selected={inspected?.id ?? null} lastId={inOrder ? null : last?.unitId ?? null} onPick={(id) => ui.inspect(id === ui.inspectId ? null : id)}
           dealt={g.step.kind === 'AI_ORDER' && now ? { unitId: g.step.order.unitId, node: now } : null}
-          extra={(id) => (inspected?.id === id || battleUnit === id) ? <>
-            {inspected?.id === id && <EnemyCard g={g} unitId={id} dispatch={dispatch} onClose={() => ui.inspect(null)} />}
-            {battleUnit === id && <HitsBattle g={g} dispatch={dispatch} />}
-          </> : null} />
+          extra={(id) => inspected?.id === id ? <EnemyCard g={g} unitId={id} dispatch={dispatch} onClose={() => ui.inspect(null)} /> : null} />
       </div>
 
       {overlays}

@@ -47,7 +47,6 @@ export function TerrainLabScreen() {
   // A rulebook map, or 'remix' for one built the way they are.
   const [mapId, setMapId] = useState('remix');
   // The table as the setup step shows it: each piece drawn with the rulebook's own picture.
-  const [pictures, setPictures] = useState(false);
   const deployment = DEPLOYMENTS.find((d) => d.id === deploymentId)!;
   const scale = deployment.scale === 'grand' ? 'standard' : deployment.scale;
   const maps = mapsFor(deployment.scale);
@@ -70,8 +69,7 @@ export function TerrainLabScreen() {
         <TerrainLegend terrain={terrain} />
       </Panel>
       <Panel title={deployment.name}>
-        <Toggle on={pictures} onChange={setPictures}>Rulebook pictures</Toggle>
-        <TableMap deployment={deployment} terrain={terrain} refArt={pictures} />
+        <TableMap deployment={deployment} terrain={terrain} />
       </Panel>
       <Panel title="Your terrain collection" className="span-all"><TerrainInventory /></Panel>
     </div>

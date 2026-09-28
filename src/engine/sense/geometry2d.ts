@@ -1,6 +1,6 @@
 import type { Pt } from './types';
 import type { Rect, TerrainPiece } from '../types/terrain';
-import { dist, distToPiece, distToRect, pieceLocal, rampBlocks, rampLevel } from '../terrain/geometry';
+import { dist, distToPiece, distToRect, pieceLocal, rampBlocks, rampLevel, pieceParts } from '../terrain/geometry';
 
 /**
  * A binary min-heap of lattice keys by priority. The path searches used to scan their whole open list for the
@@ -121,16 +121,23 @@ export function losBlocked(a: Pt, sizeA: number, b: Pt, sizeB: number, pieces: T
   for (const p of pieces) {
     if (p.size < 1 || p.catalogId.startsWith('token:')) continue;
     if (p === onA || p === onB) continue;
-    const r = { x: p.x, y: p.y, w: p.w, h: p.h };
-    // Measure in the piece's own frame, so a wall set at an angle blocks exactly what it covers.
-    const la = pieceLocal(a, p);
-    const lb = pieceLocal(b, p);
-    if (!segmentHitsRect(la, lb, r)) continue;
+    // Measure in each part's own frame, so a wall set at an angle blocks exactly what it covers, and an L wall
+    // only where its arms stand.
+    let nearA = Infinity, nearB = Infinity, hit = false;
+    for (const r of pieceParts(p)) {
+      const la = pieceLocal(a, r);
+      const lb = pieceLocal(b, r);
+      if (!segmentHitsRect(la, lb, r)) continue;
+      hit = true;
+      nearA = Math.min(nearA, distToRect(la, r));
+      nearB = Math.min(nearB, distToRect(lb, r));
+    }
+    if (!hit) continue;
     if (p.size >= sizeA && p.size >= sizeB) return true;
-    const closeQuarters = distToRect(la, r) <= 1 && distToRect(lb, r) <= 1 && dist(a, b) <= 3;
+    const closeQuarters = nearA <= 1 && nearB <= 1 && dist(a, b) <= 3;
     if (closeQuarters) continue;
-    if (distToRect(la, r) <= 1 && p.size >= sizeA) return true;
-    if (distToRect(lb, r) <= 1 && p.size >= sizeB) return true;
+    if (nearA <= 1 && p.size >= sizeA) return true;
+    if (nearB <= 1 && p.size >= sizeB) return true;
   }
   return false;
 }
@@ -239,7 +246,11 @@ export function bestEffortToward(from: Pt, to: Pt, pieces: TerrainPiece[], table
   return coarse === from ? bestEffortOnGrid(from, to, pieces, table, speed, 0.25, opts) : coarse;
 }
 
-function bestEffortOnGrid(from: Pt, to: Pt, pieces: TerrainPiece[], table: { width: number; height: number }, speed: number, cell: number, opts?: PathOptions): Pt {
+/**
+ * How far it is, walking, to every lattice point within `speed` of `from`: Dijkstra over the lattice, stopped at
+ * `speed`. `visit` sees each point as it is settled.
+ */
+function walkField(from: Pt, pieces: TerrainPiece[], table: { width: number; height: number }, speed: number, cell: number, opts: PathOptions | undefined, to: Pt, visit?: (k: number, p: Pt) => void) {
   const free = freeCheck(pieces, from, to, opts);
   const W = Math.ceil(table.width / cell);
   const H = Math.ceil(table.height / cell);
@@ -249,12 +260,10 @@ function bestEffortOnGrid(from: Pt, to: Pt, pieces: TerrainPiece[], table: { wid
   const sy = Math.max(0, Math.min(H, Math.round(from.y / cell)));
   const lat = lattice(W, H, cell, free, [key(sx, sy)]);
   const blocked = (k: number) => lat.blocked(k);
-  // Dijkstra out to `speed`, keeping the node that ends nearest the goal.
   const g = new Float64Array((W + 1) * (H + 1)).fill(Infinity);
   g[key(sx, sy)] = 0;
   const queue = new KeyHeap();
   queue.push(key(sx, sy), 0, lat.order(key(sx, sy)));
-  let best = { k: key(sx, sy), d: dist(from, to) };
   while (queue.size) {
     const pri = queue.topPriority;
     const k = queue.pop();
@@ -262,8 +271,7 @@ function bestEffortOnGrid(from: Pt, to: Pt, pieces: TerrainPiece[], table: { wid
     if (pri > g[k]!) continue;
     const x = k % (W + 1);
     const y = Math.floor(k / (W + 1));
-    const d = dist(at(x, y), to);
-    if (d < best.d - 1e-9) best = { k, d };
+    visit?.(k, at(x, y));
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dy) continue;
@@ -280,7 +288,41 @@ function bestEffortOnGrid(from: Pt, to: Pt, pieces: TerrainPiece[], table: { wid
         }
       }
   }
-  return best.k === key(sx, sy) ? from : at(best.k % (W + 1), Math.floor(best.k / (W + 1)));
+  return { g, W, H, key, at, start: key(sx, sy), free };
+}
+
+function bestEffortOnGrid(from: Pt, to: Pt, pieces: TerrainPiece[], table: { width: number; height: number }, speed: number, cell: number, opts?: PathOptions): Pt {
+  // The settled node that ends nearest the goal.
+  let best = { k: -1, d: dist(from, to) };
+  const f = walkField(from, pieces, table, speed, cell, opts, to, (k, p) => { const d = dist(p, to); if (d < best.d - 1e-9) best = { k, d }; });
+  return best.k < 0 || best.k === f.start ? from : f.at(best.k % (f.W + 1), Math.floor(best.k / (f.W + 1)));
+}
+
+/**
+ * The edge of where a mover can get to within `speed` of walking: a ring, pushed in where terrain stands in the
+ * way and where going round it uses up the distance. One point per ray, out from `from`, at the farthest spot on
+ * that ray reached within `speed`, so ground round the end of a wall still shows.
+ */
+export function reachOutline(from: Pt, pieces: TerrainPiece[], table: { width: number; height: number }, speed: number, opts?: PathOptions, rays = 180): Pt[] {
+  const cell = 0.25;
+  const f = walkField(from, pieces, table, speed, cell, opts, from);
+  // A spot in a clear straight line is measured exactly; the lattice's walk (which overestimates an angled
+  // line) counts for the spots behind something.
+  const reached = (p: Pt): boolean => {
+    if (p.x < 0 || p.y < 0 || p.x > table.width || p.y > table.height) return false;
+    if (f.free(p) && clearWith(from, p, f.free)) return true;
+    const x = Math.round(p.x / cell), y = Math.round(p.y / cell);
+    return f.g[f.key(x, y)]! <= speed + 1e-9;
+  };
+  const out: Pt[] = [];
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * Math.PI * 2;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    let t = 0;
+    for (let s = cell; s <= speed + 1e-9; s += cell) if (reached({ x: from.x + dx * s, y: from.y + dy * s })) t = s;
+    out.push({ x: from.x + dx * t, y: from.y + dy * t });
+  }
+  return out;
 }
 
 export function shortestPath(from: Pt, to: Pt, pieces: TerrainPiece[], table: { width: number; height: number }, opts?: PathOptions): { length: number; path: Pt[] } {

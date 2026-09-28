@@ -12,7 +12,7 @@ import path from 'node:path';
  *   the files it uses — no StarCraft art, audio or campaign media.
  * Where the full app's entry does not exist (the published tabletop branch), the tabletop edition is all there is.
  */
-const TABLETOP_PUBLIC = ['dice', 'terrain-ref', 'icons'];
+const TABLETOP_PUBLIC = ['dice', 'terrain-ref', 'icons', 'models'];
 
 function filesUnder(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -66,7 +66,7 @@ export default defineConfig(({ mode, command }) => {
         },
         // The campaign's voices and video are optional local media: they are not part of the offline bundle.
         workbox: tabletop
-          ? { globPatterns: ['**/*.{js,css,html,svg,png,json,webmanifest}'], maximumFileSizeToCacheInBytes: 4 * 1024 * 1024 }
+          ? { globPatterns: ['**/*.{js,css,html,svg,png,webp,json,webmanifest}'], maximumFileSizeToCacheInBytes: 4 * 1024 * 1024 }
           : { globPatterns: ['**/*.{js,css,html,svg,json,webmanifest}'], globIgnores: ['**/campaign/**'] },
       }),
     ],

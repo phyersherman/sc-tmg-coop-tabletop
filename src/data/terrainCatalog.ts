@@ -14,6 +14,11 @@ export interface TerrainCatalogItem {
   /** Footprint is an estimate, not a published value. */
   approx?: boolean;
   /**
+   * An L-shaped piece: its arms, as rectangles in the piece's own frame (offsets from its top-left corner). Sight,
+   * movement and standing are measured against the arms, not the box around them; the empty corner is open ground.
+   */
+  parts?: { x: number; y: number; w: number; h: number }[];
+  /**
    * The same piece in the rulebook's terrain key (its picture in public/terrain-ref), matched by footprint: the
    * Command Center editor and the rulebook name the Lost Temple pieces differently.
    */
@@ -41,8 +46,9 @@ export const TERRAIN_CATALOG: TerrainCatalogItem[] = [
   { id: 'lt-wall-i-1', size: 2, grass: false, w: 5.1, h: 1.7, label: 'Wall I type 1', sets: { 'lost-temple': 1 }, ref: 'wall-set-3' },
   { id: 'lt-wall-i-2', size: 2, grass: false, w: 7, h: 1.2, label: 'Wall I type 2', sets: { 'lost-temple': 1 }, ref: 'wall-set-1' },
   { id: 'lt-wall-i-3', size: 2, grass: false, w: 8.7, h: 2.2, label: 'Wall I type 3', sets: { 'lost-temple': 1 }, ref: 'wall-set-2' },
-  { id: 'lt-wall-l-1', size: 2, grass: false, w: 7.5, h: 4, label: 'Wall L type 1', sets: { 'lost-temple': 1 }, ref: 'wall-set-4' },
-  { id: 'lt-wall-l-2', size: 2, grass: false, w: 7.5, h: 4, label: 'Wall L type 2', sets: { 'lost-temple': 1 }, ref: 'wall-set-5' },
+  // The two L walls (their arms read off the rulebook's terrain key): a long arm along the top, a short arm down one end.
+  { id: 'lt-wall-l-1', size: 2, grass: false, w: 7.5, h: 4, label: 'Wall L type 1', sets: { 'lost-temple': 1 }, ref: 'wall-set-4', parts: [{ x: 0, y: 0.5, w: 6.6, h: 1.4 }, { x: 6.2, y: 0.5, w: 1.3, h: 3.5 }] },
+  { id: 'lt-wall-l-2', size: 2, grass: false, w: 7.5, h: 4, label: 'Wall L type 2', sets: { 'lost-temple': 1 }, ref: 'wall-set-5', parts: [{ x: 0, y: 0, w: 7.5, h: 1.4 }, { x: 0, y: 0, w: 1.3, h: 4 }] },
   { id: 'lt-wall-short', size: 2, grass: false, w: 3.2, h: 1, label: 'Wall short', sets: { 'lost-temple': 1 }, ref: 'wall-set-6' },
   { id: 'lt-scatter-1', size: 1, grass: false, w: 4.2, h: 2.9, label: 'Scatter type 1', sets: { 'lost-temple': 1 }, ref: 'head-statue' },
   { id: 'lt-scatter-2', size: 1, grass: false, w: 3.2, h: 2.6, label: 'Scatter type 2', sets: { 'lost-temple': 1 }, ref: 'statue-shard' },
@@ -61,4 +67,10 @@ export function setContents(setId: TerrainSetId): Record<string, number> {
     if (n) out[i.id] = n;
   }
   return out;
+}
+
+/** The arms of an L-shaped piece by catalog id, with the box they are laid out in; null for a piece that is one rectangle. */
+export function partsOf(catalogId: string): { arms: { x: number; y: number; w: number; h: number }[]; box: { w: number; h: number } } | null {
+  const c = TERRAIN_CATALOG.find((x) => x.id === catalogId);
+  return c?.parts ? { arms: c.parts, box: { w: c.w, h: c.h } } : null;
 }

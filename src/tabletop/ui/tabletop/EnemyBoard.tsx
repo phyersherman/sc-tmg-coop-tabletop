@@ -9,6 +9,7 @@ import { ActionCardView } from './ActionCardView';
 import { REWARDS, sideState } from '@engine/missions/sideMarkers';
 import { StepIcon } from './StepIcon';
 import { DieFace } from '../components/DiceRoll';
+import { modelPhoto } from '@data/modelPhotos';
 import type { ReactNode } from 'react';
 
 const STAT_DEBUFFS = ['speed', 'hit', 'armour', 'evade'] as const;
@@ -49,8 +50,8 @@ function EnemyTile({ g, u, active, last, selected, onPick, extra, dealt }: { g: 
     <article className={`eb-tile ${active ? 'active' : ''} ${dealt ? 'dealing' : ''} ${last ? 'last' : ''} ${selected ? 'selected' : ''} ${done ? 'done' : ''}`}>
       {/* The top of the card opens its damage entry. A role, not a <button>: it holds a stat list and blocks. */}
       <div role="button" tabIndex={0} className="eb-tile-top" onClick={onPick} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(); } }} aria-pressed={selected} aria-label={`${u.label}: enter damage, models lost and DEBUFFs`} data-unit={u.id}>
-        {/* The card's face: its race's die, the one picture the edition owns. */}
-        <div className="eb-face" aria-hidden="true"><DieFace faction={def.faction} value={6} /></div>
+        {/* The card's face: the painted model from its official unit card, or its race's die for a mission object. */}
+        <div className={`eb-face ${modelPhoto(def.id) ? 'photo' : ''}`} aria-hidden="true">{(() => { const src = modelPhoto(def.id); return src ? <img src={src} alt="" loading="lazy" draggable={false} /> : <DieFace faction={def.faction} value={6} />; })()}</div>
         <div className="eb-name">
           <b>{u.label}</b>
           <span>{def.role} · {currentSupply(def, u.models)} Supply</span>

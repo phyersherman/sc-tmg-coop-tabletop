@@ -14,6 +14,7 @@ export interface UnitAction {
   id: ActionId;
   label: string;
   enabled: boolean;
+  /** Why it cannot be taken; or, for one that can, what still stands in its way (no target in sight yet). */
   reason?: string;
 }
 
@@ -31,7 +32,7 @@ export function availableActions(state: GameState, pu: PlayerUnit): UnitAction[]
     : pu.destroyed ? 'Destroyed'
     : pu.summoned ? 'Structures do not activate'
     : undefined;
-  const add = (id: ActionId, label: string, reason?: string) => out.push({ id, label, enabled: !reason, reason });
+  const add = (id: ActionId, label: string, reason?: string, hint?: string) => out.push({ id, label, enabled: !reason, reason: reason ?? hint });
 
   if (state.activeUnitId === pu.id && turn) add('endActivation', 'End activation');
 
@@ -53,8 +54,9 @@ export function availableActions(state: GameState, pu: PlayerUnit): UnitAction[]
     for (const w of playerWeapons(state, pu)) {
       // Once it has fired, a unit may still use each SIDEARM (and its main weapon after a SIDEARM) in the same activation.
       const spent = acted ? weaponSpent(state, pu, w) : null;
-      const reason = blocked ?? spent ?? (burrowed ? 'Burrowed. Unburrow first' : pu.disengagedThisRound ? 'Disengaged this round' : validTargets(state, pu, w).length ? undefined : 'No target in range and Line of Sight');
-      add(`weapon:${w.id}`, w.name, reason);
+      // With no target in sight the weapon can still be picked, to see its range on the map.
+      const reason = blocked ?? spent ?? (burrowed ? 'Burrowed. Unburrow first' : pu.disengagedThisRound ? 'Disengaged this round' : undefined);
+      add(`weapon:${w.id}`, w.name, reason, validTargets(state, pu, w).length ? undefined : 'No target in range and Line of Sight');
     }
     if (!pu.engaged) {
       const reachable = chargeOptions(state, pu).some((c) => checkCharge(state, pu, c.unit).ok);

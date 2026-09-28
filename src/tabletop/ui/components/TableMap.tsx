@@ -1,6 +1,6 @@
 import type { DeploymentLayout, TerrainLayout } from '@engine/types/terrain';
 import type { MarkerState } from '@engine/types/game';
-import { rampLane, zoiRect } from '@engine/terrain/geometry';
+import { rampLane, zoiRect, pieceParts } from '@engine/terrain/geometry';
 import { TerrainThumb } from './TerrainInventory';
 import { isLSide, KEY_COLOUR, refSlug, refUrl, useRefArt } from './refArt';
 
@@ -13,11 +13,19 @@ export interface MapOverlayPoint {
 
 const FACTION_COLOR: Record<string, string> = { Terran: '#4ea8de', Zerg: '#b06bd6', Protoss: '#e0b23c' };
 
-export function TableMap({ deployment, terrain, markers, overlays = [], models, spriteTerrain = false, hideNumbers = false, beaconMarkers = false, hideOutlines = false, margin = 1, subtleEntry = false, aiFaction, playerFaction, refArt = false }: { deployment: DeploymentLayout; terrain?: TerrainLayout; markers?: MarkerState[]; overlays?: MapOverlayPoint[]; models?: { ai: { x: number; y: number }[]; players: { x: number; y: number }[] }; spriteTerrain?: boolean; /** Video game mode: no piece numbers (they are for matching the physical table). */ hideNumbers?: boolean; /** The battlefield draws markers as beacons; the map keeps only the control radius and lock. */ beaconMarkers?: boolean; /** Hide terrain footprint outlines. */ hideOutlines?: boolean; /** Ground drawn around the table, in inches (the battlefield matches its own margin). */ margin?: number; /** Entry zones as small corner brackets in faction colours instead of coloured bands. */ subtleEntry?: boolean; aiFaction?: string; playerFaction?: string; /** Draw each piece with the rulebook's own picture of it (table setup). */ refArt?: boolean }) {
+export function TableMap({ deployment, terrain, markers, overlays = [], models, spriteTerrain = false, hideNumbers = false, beaconMarkers = false, hideOutlines = false, margin = 1, subtleEntry = false, aiFaction, playerFaction, refArt: refArtProp }: { deployment: DeploymentLayout; terrain?: TerrainLayout; markers?: MarkerState[]; overlays?: MapOverlayPoint[]; models?: { ai: { x: number; y: number }[]; players: { x: number; y: number }[] }; spriteTerrain?: boolean; /** Video game mode: no piece numbers (they are for matching the physical table). */ hideNumbers?: boolean; /** The battlefield draws markers as beacons; the map keeps only the control radius and lock. */ beaconMarkers?: boolean; /** Hide terrain footprint outlines. */ hideOutlines?: boolean; /** Ground drawn around the table, in inches (the battlefield matches its own margin). */ margin?: number; /** Entry zones as small corner brackets in faction colours instead of coloured bands. */ subtleEntry?: boolean; aiFaction?: string; playerFaction?: string; /** Draw each piece with the rulebook's own picture of it: always, unless the battlefield draws it in sprites. */ refArt?: boolean }) {
+  const refArt = refArtProp ?? !spriteTerrain;
   const aiColor = FACTION_COLOR[aiFaction ?? ''] ?? '#ef6a6a';
   const playerColor = FACTION_COLOR[playerFaction ?? ''] ?? '#60a5fa';
   const t = deployment.table;
   const art = useRefArt();
+  // Whether a piece is drawn with its picture (or, for an arm of an L without one, its key colour): then no box.
+  const pictured = (p: { label: string }) => {
+    if (!refArt || !art) return false;
+    const l = isLSide(p.label);
+    const base = refSlug(p.label);
+    return l || !!art.images[`${base}--footprint`];
+  };
   const W = t.width;
   const H = t.height;
   const grid: number[] = [];
@@ -86,13 +94,13 @@ export function TableMap({ deployment, terrain, markers, overlays = [], models, 
           const turn = p.rot ? `rotate(${p.rot} ${cx} ${cy})` : undefined;
           const size = art.images[`${slug}--footprint`];
           if (size && slug === 'lost-temple-ramp') {
-            // The picture's ramp opens at its left end and runs along its bottom side. Lay it on the piece the way the
-            // rules see it (rampLane): left end at the access end, bottom side on the ramp's side, so a ramp that lies
-            // mirrored on the table is drawn mirrored too.
+            // The picture's ramp opens at its right end and runs along its top side (the plateau fills the left and
+            // the bottom). Lay it on the piece the way the rules see it (rampLane): right end at the access end, top
+            // side on the ramp's side, so a ramp that lies mirrored on the table is drawn mirrored too.
             const r = rampLane(p);
             const o = r.toTable(0, 0), ua = r.toTable(1, 0), na = r.toTable(0, 1);
-            const X = { x: o.x - ua.x, y: o.y - ua.y };
-            const Y = { x: r.side * (na.x - o.x), y: r.side * (na.y - o.y) };
+            const X = { x: ua.x - o.x, y: ua.y - o.y };
+            const Y = { x: -r.side * (na.x - o.x), y: -r.side * (na.y - o.y) };
             return <image key={`ref${p.n}`} href={refUrl(slug, 'footprint')} x={-r.hl} y={-r.ht} width={r.hl * 2} height={r.ht * 2} preserveAspectRatio="none" transform={`matrix(${X.x} ${X.y} ${Y.x} ${Y.y} ${o.x} ${o.y})`} />;
           }
           if (lSide && !size) return <rect key={`ref${p.n}`} x={p.x} y={p.y} width={p.w} height={p.h} transform={turn} fill={KEY_COLOUR[base] ?? '#94a3b8'} opacity={0.9} />;
@@ -113,7 +121,8 @@ export function TableMap({ deployment, terrain, markers, overlays = [], models, 
           const boxless = spriteTerrain;
           return (
           <g key={p.n}>
-            {!hideOutlines && !bare && !boxless && <rect x={p.x} y={p.y} width={p.w} height={p.h} transform={p.rot ? `rotate(${p.rot} ${p.x + p.w / 2} ${p.y + p.h / 2})` : undefined} fill={spriteTerrain || (refArt && art) ? 'none' : fill(p.size, p.grass)} stroke={stroke(p.size, p.grass)} opacity={spriteTerrain ? 0.3 : 1} strokeWidth={p.size >= 2 && !p.grass ? 0.25 : 0.15} strokeDasharray={p.grass || p.size === 0 ? '0.5 0.4' : undefined} />}
+            {/* An L wall is drawn as its two arms, each turned where the piece's turn puts it. */}
+            {!hideOutlines && !bare && !boxless && !pictured(p) && pieceParts(p).map((r, i) => <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} transform={r.rot ? `rotate(${r.rot} ${r.x + r.w / 2} ${r.y + r.h / 2})` : undefined} fill={spriteTerrain || (refArt && art) ? 'none' : fill(p.size, p.grass)} stroke={stroke(p.size, p.grass)} opacity={spriteTerrain ? 0.3 : 1} strokeWidth={p.size >= 2 && !p.grass ? 0.25 : 0.15} strokeDasharray={p.grass || p.size === 0 ? '0.5 0.4' : undefined} />)}
             {!hideOutlines && !spriteTerrain && p.accessPoints?.map((a, i) => <polygon key={i} points={`${a.x - 0.8},${a.y + 0.8} ${a.x + 0.8},${a.y + 0.8} ${a.x},${a.y - 0.8}`} fill="#eab308" />)}
             {!hideNumbers && !spriteTerrain && <text x={p.x + p.w / 2} y={p.y + p.h / 2 + 0.6} fontSize={spriteTerrain ? 1.3 : 1.8} textAnchor="middle" fill="#e5ecf5" fontWeight={700} opacity={spriteTerrain ? 0.75 : 1} stroke={spriteTerrain ? 'rgba(0,0,0,0.8)' : undefined} strokeWidth={spriteTerrain ? 0.25 : undefined} paintOrder="stroke">{p.n}</text>}
           </g>

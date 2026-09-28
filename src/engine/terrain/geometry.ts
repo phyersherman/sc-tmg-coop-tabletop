@@ -1,3 +1,4 @@
+import { partsOf } from '@data/terrainCatalog';
 import type { DeploymentLayout, Edge, EdgeSegment, Rect, TableSpec } from '../types/terrain';
 
 export interface Pt {
@@ -110,9 +111,32 @@ export function pieceLocal(p: Pt, t: Turnable): Pt {
   return { x: cx + dx * Math.cos(a) - dy * Math.sin(a), y: cy + dx * Math.sin(a) + dy * Math.cos(a) };
 }
 
-/** Distance from a point to a (possibly turned) piece's footprint; 0 inside. */
-export function distToPiece(p: Pt, t: Turnable): number {
-  return distToRect(pieceLocal(p, t), t);
+/**
+ * The rectangles a piece is measured by: itself, or for an L-shaped wall its two arms, each turned about its own
+ * centre where the piece's turn would put it. Every check that measures a piece runs over these.
+ */
+export function pieceParts(t: Turnable & { catalogId?: string }): Turnable[] {
+  const parts = t.catalogId ? partsOf(t.catalogId) : null;
+  // The arms are laid out in the catalog piece's own box: a piece given another footprint is one rectangle.
+  if (!parts || Math.abs(t.w - parts.box.w) > 0.05 || Math.abs(t.h - parts.box.h) > 0.05) return [t];
+  const cx = t.x + t.w / 2;
+  const cy = t.y + t.h / 2;
+  const a = ((t.rot ?? 0) * Math.PI) / 180;
+  return parts.arms.map((q) => {
+    // The arm's centre in the piece's frame, turned with the piece about the piece's centre.
+    const dx = t.x + q.x + q.w / 2 - cx;
+    const dy = t.y + q.y + q.h / 2 - cy;
+    const mx = cx + dx * Math.cos(a) - dy * Math.sin(a);
+    const my = cy + dx * Math.sin(a) + dy * Math.cos(a);
+    return { x: mx - q.w / 2, y: my - q.h / 2, w: q.w, h: q.h, rot: t.rot };
+  });
+}
+
+/** Distance from a point to a (possibly turned) piece's footprint; 0 inside. An L wall: to the nearer arm. */
+export function distToPiece(p: Pt, t: Turnable & { catalogId?: string }): number {
+  let best = Infinity;
+  for (const part of pieceParts(t)) best = Math.min(best, distToRect(pieceLocal(p, part), part));
+  return best;
 }
 
 /** The four corners of a piece's footprint on the table. */
