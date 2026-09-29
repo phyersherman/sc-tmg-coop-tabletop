@@ -106,6 +106,7 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
         {/* Damage entry opens on the Unit's own card, the way you would mark the card on the table. */}
         <EnemyBoard g={g} selected={inspected?.id ?? null} lastId={inOrder ? null : last?.unitId ?? null} onPick={(id) => ui.inspect(id === ui.inspectId ? null : id)}
           dealt={g.step.kind === 'AI_ORDER' && now ? { unitId: g.step.order.unitId, node: now } : null}
+          onEngaged={(id, on) => { const x = g.army.units.find((a) => a.id === id); dispatch({ t: 'setEngaged', unitId: id, engaged: on, enemySupply: x?.engagedEnemySupply || 1 }); }}
           extra={(id) => inspected?.id === id ? <EnemyCard g={g} unitId={id} dispatch={dispatch} onClose={() => ui.inspect(null)} /> : null} />
       </div>
 
@@ -249,8 +250,6 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
   const [per, setPer] = useState(1);
   /** ANTI-EVADE (X) on the weapon you fired, if any: it raises what the AI's Evade dice need. */
   const [anti, setAnti] = useState(0);
-  /** The rarer entries (models, statuses, DEBUFFs): opened on demand, and open anyway while one is in effect. */
-  const [more, setMore] = useState(false);
   const card = useRef<HTMLDivElement>(null);
   const armour = def.stats.armour + aiDebuff(u, 'armour');
   // Whether the AI rolls Evade against this attack: engaged and shot at, burrowed, or high ground over you.
@@ -268,8 +267,6 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
     const evade = evadeReason && evadeValue ? { value: evadeValue, reason: evadeReason, rolls: Array.from({ length: n }, d6) } : null;
     useBattle.setState({ b: { key: Date.now(), unitId: u.id, hits: n, per, armour, rolls, evade, stage: 'rolling', outcome: null } });
   };
-  const inEffect = u.engaged || aiBurrowed(u) || STATS.some((st) => aiDebuff(u, st.stat) > 0) || anti > 0;
-  const open = more || inEffect;
   // Opened from a tile: focus moves in, Esc closes it and hands focus back to the tile, Enter applies.
   useEffect(() => {
     card.current?.querySelector<HTMLElement>('.tt-seg [aria-checked="true"]')?.focus();
@@ -305,16 +302,13 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
           {evadeReason ? <>The AI rolls Evade <b>{evadeValue}+</b> against hits that get past Armour ({evadeReason}).</> : <>No Evade roll. It is not Engaged, Burrowed or on high ground above the attacker.</>}
         </p>
       ) : null}
-      {/* While something here is in effect (Engaged, Burrowed, a DEBUFF) it stays open, so it is never hidden. */}
-      {!inEffect && <button type="button" className="tt-more" aria-expanded={open} onClick={() => setMore((v) => !v)}>{open ? 'Fewer options' : 'More: models, statuses, ANTI-EVADE, DEBUFFs'}</button>}
-      {open && <>
+      {/* Everything the table marks on the Unit is here, in plain view: nothing hides behind a "More". */}
       {entry === 'hits' && def.stats.evade ? <label className="row small">ANTI-EVADE on your weapon <Stepper value={anti} onChange={setAnti} min={0} max={3} /></label> : null}
       <div className="row" style={{ marginTop: 4 }}>
         <Btn size="sm" title="A model removed outright, without damage (a SUMMON gone, a model taken off by an ability)" onClick={() => dispatch({ t: 'setModels', unitId: u.id, models: Math.max(0, u.models - 1) })}>−1 model</Btn>
         {/* Medics and the like: damage comes back off the marker. */}
         {u.damageMarker > 0 && <Btn size="sm" variant="ok" title="Take 1 damage off its marker (a Medic, a heal)" onClick={() => dispatch({ t: 'heal', unitId: u.id, amount: 1 })}>Heal 1</Btn>}
-        {/* The state, not the action: on while the unit is Engaged, and the map keeps it right when it knows where things stand. */}
-        <Toggle on={u.engaged} onChange={(v) => dispatch({ t: 'setEngaged', unitId: u.id, engaged: v, enemySupply: u.engagedEnemySupply || 1 })}>Engaged</Toggle>
+        {/* Engaged is marked on the card itself, with its switch, so it is not repeated here. */}
         {aiHas(u, 'Burrow') && <Toggle on={aiBurrowed(u)} onChange={(v) => dispatch({ t: 'setBurrowed', unitId: u.id, on: v })}>Burrowed</Toggle>}
       </div>
 
@@ -329,7 +323,6 @@ export function EnemyCard({ g, unitId, dispatch, onClose }: { g: GameState; unit
           );
         })}
       </div>
-      </>}
     </div>
   );
 }

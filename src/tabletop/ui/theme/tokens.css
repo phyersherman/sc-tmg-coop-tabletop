@@ -644,16 +644,14 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .eb-empty { color: var(--muted); font-size: 17px; }
 /* The acting card leads the row, and the rest pack in behind it with no hole. */
 .eb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); grid-auto-flow: row dense; gap: 16px; align-items: start; }
-/* Rank is depth: the acting card is lifted and lit; the rest sit one step back and still. */
-.eb-tile { display: flex; flex-direction: column; opacity: 0.78; transition: opacity 0.2s, transform 0.2s, border-color 0.2s, box-shadow 0.2s; }
+/* Every card stands at full strength, ready to be picked; the acting card is lifted and takes the red edge. */
+.eb-tile { display: flex; flex-direction: column; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }
 /* Under the pointer a card comes up to full strength and takes the cyan edge: this is the one a click opens. */
 .eb-tile:hover, .eb-tile:focus-within { opacity: 1; border-color: rgba(95, 211, 245, 0.6); }
 .eb-tile:hover .eb-tile-top { background: rgba(95, 211, 245, 0.05); }
 .eb-tile.active { opacity: 1; transform: translateY(-6px); border-color: rgba(226, 59, 59, 0.75); box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55); }
 .eb-tile.last { opacity: 1; border-color: rgba(226, 59, 59, 0.55); }
 .eb-tile.selected { opacity: 1; --bracket: var(--cyan); border-color: rgba(95, 211, 245, 0.6); }
-.eb-tile.done:not(.active) { opacity: 0.55; }
-.eb-tile:hover { opacity: 1; }
 .eb-tile-top { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 68px 1fr; gap: 6px 14px; padding: 14px 16px 12px; cursor: pointer; }
 .eb-tile-top:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
 .eb-face { grid-row: 1 / span 2; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line-2); background: rgba(0, 0, 0, 0.35); }
@@ -675,6 +673,13 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .eb-stats dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; font-family: var(--font-head); white-space: nowrap; }
 .eb-stats dd { margin: 0; font-family: var(--font-head); font-size: 18px; }
 .eb-flags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+/* What the table marks on the card itself: Engaged at one click, and the way to damage and DEBUFFs. */
+.eb-quick { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 12px; }
+.eb-quick button { min-height: 34px; padding: 4px 12px; background: var(--plate-2); border: 1px solid var(--line-2); color: var(--text); font-family: var(--font-head); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.eb-quick button:hover { border-color: var(--cyan); }
+.eb-quick button[aria-checked] i { width: 10px; height: 10px; border: 1px solid var(--line-2); transform: rotate(45deg); }
+.eb-quick button[aria-checked='true'] { border-color: var(--red-edge); color: var(--red-side); }
+.eb-quick button[aria-checked='true'] i { background: var(--red-edge); border-color: var(--red-edge); }
 .eb-flag { font-size: 13px; padding: 2px 8px; border: 1px solid var(--line-2); font-weight: 600; }
 .eb-flag.hurt { border-color: var(--warn); color: #fde5b0; }
 .eb-flag.engaged { border-color: var(--red-edge); color: var(--red-side); }
