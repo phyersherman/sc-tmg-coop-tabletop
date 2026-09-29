@@ -8,6 +8,8 @@ import { processReturns } from '../respawn';
 import { makeInstance, instanceCost } from '../army/builder';
 import { dist } from '../terrain/geometry';
 import { grantReward, takeCounter, withSideMarkers } from './sideMarkers';
+import { aiHolding } from '../sense/query';
+import { isStructure } from '../director/selectors';
 
 const ms = (c: MissionCtx) => c.state.modeState as Record<string, any>;
 
@@ -163,7 +165,7 @@ export const deadOfNight = withSideMarkers(coopMode({
   blurb: 'By day, in rounds 1 and 3, the AI deploys one unit and holds. By night, in rounds 2, 4 and 5, every destroyed AI unit returns, the AI Supply Pool grows, and the whole force attacks. The side with the most VP after round 5 wins.',
   briefing: (s) => [
     ...baseBriefing(s),
-    'Day scoring: each side scores 1 VP for each marker it controls.',
+    'Day scoring: each side scores 1 VP for each marker it controls. A marker with a guard or Structure still on it scores for neither side, unless another AI Unit stands within 3" of it: then it scores for the AI.',
     'Night scoring: the players score 3 VP if at least half of their starting Supply is still on the table at the end of the round.',
   ],
   onSetup: () => undefined,
@@ -201,14 +203,26 @@ export const deadOfNight = withSideMarkers(coopMode({
   scoringPrompts: (c) => [
     ...markerPrompts(c.state),
     ...(NIGHT.has(c.state.round) ? [{ id: 'survived', kind: 'yesno', text: 'Is at least half of the players\' starting Supply still on the table?', defaultValue: true } as ScoringPrompt] : []),
+    // By day a guarded marker scores only when another AI Unit has come onto it: ask for each one still guarded.
+    ...(!NIGHT.has(c.state.round) ? c.state.markers.filter((m) => m.side && m.active).map((m) => ({
+      id: `escort:${m.id}`,
+      kind: 'yesno',
+      text: `Marker ${m.id} is still guarded. Does an AI Unit other than its guard stand within 3" of it?`,
+      defaultValue: false,
+      auto: (s: GameState) => aiHolding(s, m).some((u) => u.special?.sideMarker !== m.id && !isStructure(u)),
+    }) as ScoringPrompt) : []),
   ],
   onScoring: (c, a) => {
     applyMarkerControl(c.state, a);
     if (NIGHT.has(c.state.round)) {
       if (a.extra['survived']) c.state.vp.players += 3;
     } else {
-      c.state.vp.players += controlled(c.state, 'players').length;
-      c.state.vp.ai += controlled(c.state, 'ai').length;
+      // A marker still guarded (its guard or Structure standing) scores for nobody: the AI does not earn VP from a
+      // marker the players have not yet had the chance to fight for, unless another of its Units has come onto it.
+      // Once cleared, it scores like any other.
+      const open = (id: number) => !c.state.markers.find((m) => m.id === id)?.side;
+      c.state.vp.players += controlled(c.state, 'players').filter(open).length;
+      c.state.vp.ai += controlled(c.state, 'ai').filter((id) => open(id) || a.extra[`escort:${id}`] === true).length;
     }
   },
   winCheck: (c, final) => (final ? vpResult(c.state) : null),
