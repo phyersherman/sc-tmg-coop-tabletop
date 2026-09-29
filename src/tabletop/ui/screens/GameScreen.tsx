@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { TableSetup } from '../hud/TableSetup';
 import { TabletopLayout, TabletopTurn } from '../tabletop/TabletopLayout';
 import { ActionCardView } from '../tabletop/ActionCardView';
@@ -59,6 +60,20 @@ function FightersAsk({ max, impact, onRoll }: { max: number; impact: boolean; on
   );
 }
 
+/**
+ * Dice are rolled in the tray at the top of the table, never inside a card: the AI's order says what to do on its
+ * Unit's card, and its dice land up there, where every roll is read. Falls back to the card if there is no tray.
+ */
+function InTray({ children }: { children: ReactNode }) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = document.getElementById('tt-roll-slot');
+    setSlot(el);
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, []);
+  return slot ? createPortal(children, slot) : <>{children}</>;
+}
+
 function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dispatch: (c: Command) => void }) {
   const showRolls = useSettings((s) => s.appRollsAiDice);
   const [enemySupply, setEnemySupply] = useState(1);
@@ -107,7 +122,7 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
           {/* The charge die goes the way the attack dice go: rolled by the app when it rolls the AI's dice, by the table
               otherwise. */}
           {!camLine && order.charge && (showRolls
-            ? <ChargeRoll faction={def.faction} dice={order.charge.dice} speed={order.charge.speed} bonus={order.charge.min - 1 - order.charge.speed} seed={`${g.config.seed}:${g.round}:${g.phase}:${order.unitId}:charge`} />
+            ? <InTray><ChargeRoll faction={def.faction} dice={order.charge.dice} speed={order.charge.speed} bonus={order.charge.min - 1 - order.charge.speed} seed={`${g.config.seed}:${g.round}:${g.phase}:${order.unitId}:charge`} /></InTray>
             : <p className="ask">Roll the AI's charge on the table. {chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>)}
           <div className="row">
             {order.impact ? <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge made, roll IMPACT</Btn> : <Btn variant="primary" size="lg" className="tt-primary" onClick={() => report('charged')}>Charge made</Btn>}
@@ -130,8 +145,8 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
         <div className="row"><Btn variant="primary" size="lg" className="tt-primary" onClick={() => setStage('roll')}>Roll</Btn></div>
       )}
 
-      {stage === 'roll' && rollWhat === 'batches' && order.batches.map((b, i) => <DiceBlock key={i} batch={b} showRolls={showRolls} faction={def.faction} models={order.type === 'closeCombat' ? fighters ?? undefined : undefined} />)}
-      {stage === 'roll' && rollWhat === 'impact' && order.impact && <DiceBlock batch={order.impact} showRolls={showRolls} title="IMPACT" faction={def.faction} models={fighters ?? undefined} />}
+      {stage === 'roll' && rollWhat === 'batches' && <InTray key="batches">{order.batches.map((b, i) => <DiceBlock key={i} batch={b} showRolls={showRolls} faction={def.faction} models={order.type === 'closeCombat' ? fighters ?? undefined : undefined} />)}</InTray>}
+      {stage === 'roll' && rollWhat === 'impact' && order.impact && <InTray key="impact"><DiceBlock batch={order.impact} showRolls={showRolls} title="IMPACT" faction={def.faction} models={fighters ?? undefined} /></InTray>}
 
 
       {(!hasDice || stage === 'roll') && (

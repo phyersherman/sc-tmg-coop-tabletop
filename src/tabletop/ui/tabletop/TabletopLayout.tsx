@@ -99,6 +99,8 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
           <CombatTray g={g} dispatch={dispatch} pendingEvent={pendingEvent} className="inline tt-tray" />
           {/* Your hits on an AI Unit roll here, above the cards, where every result is read: entered on the card, rolled on the stage. */}
           {battleUnit && <HitsBattle g={g} dispatch={dispatch} />}
+          {/* The AI's dice: its order is on its Unit's card below, its rolls land here (see InTray). */}
+          <div id="tt-roll-slot" className="tt-rolls" />
           <div className="tt-now">{inOrder ? null : now ?? (pendingEvent ? <p className="tt-hint muted">Apply the result on the table, then Continue.</p> : null)}</div>
         </section>
         {/* Damage entry opens on the Unit's own card, the way you would mark the card on the table. */}
