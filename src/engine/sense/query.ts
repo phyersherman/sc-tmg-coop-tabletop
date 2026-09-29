@@ -129,11 +129,24 @@ export function aiHolding(state: GameState, m: Pt & { contestIn?: number }): AiU
   });
 }
 
+/**
+ * Who holds a marker from the Supply within 3" of it. A side-marker guard's Supply never counts, but where it
+ * stands alone against the players' Units the marker is contested, never theirs: they take it from the guard only
+ * with other AI Units there to outnumber, or once the guard is destroyed.
+ */
+export function markerHolder(ai: number, players: number, guard = false): MarkerControl {
+  if (ai === 0 && players === 0) return 'none';
+  if (guard && ai === 0) return 'contested';
+  return ai > players ? 'ai' : players > ai ? 'players' : 'contested';
+}
+
 export function suggestedMarkerControl(state: GameState): Record<number, MarkerControl> {
   const out: Record<number, MarkerControl> = {};
   for (const m of state.markers) {
     let ai = 0;
     let pl = 0;
+    /** A side-marker guard within reach: it adds no Supply, but the players cannot take the marker from it alone. */
+    let guard = false;
     for (const u of state.army.units) {
       // A Structure never controls or contests a marker, not even unopposed.
       // Burrowed units cannot control or contest markers either.
@@ -143,6 +156,7 @@ export function suggestedMarkerControl(state: GameState): Record<number, MarkerC
       const def = unitById(u.defId);
       // Within 3" of the marker, measured from the base edge to the marker's edge.
       if (unitShapes(state, 'ai', u.id).some((s) => edgeToPoint(s, m) - MARKER_RADIUS_IN <= (m.contestIn ?? 3) && !losBlocked(s, def.stats.size, m, 0, state.terrain.pieces))) {
+        if (typeof u.special?.sideMarker === 'number') { guard = true; continue; }
         ai += currentSupply(def, u.models) + (def.abilities.some((a) => a.name === 'Commander') ? 1 : 0);
         if (currentSupply(def, u.models) === 0) ai += 0.01; // supply 0 still counts when unopposed
       }
@@ -152,7 +166,7 @@ export function suggestedMarkerControl(state: GameState): Record<number, MarkerC
       if (pu.destroyed || playerUnitFlying(pu) || (pu.statuses ?? []).includes('Burrowed')) continue;
       if (unitShapes(state, 'players', pu.id).some((s) => edgeToPoint(s, m) - MARKER_RADIUS_IN <= (m.contestIn ?? 3) && !losBlocked(s, playerUnitSize(pu), m, 0, state.terrain.pieces))) pl += playerUnitSupply(pu) + 0.01;
     }
-    out[m.id] = ai === 0 && pl === 0 ? 'none' : ai > pl ? 'ai' : pl > ai ? 'players' : 'contested';
+    out[m.id] = markerHolder(ai, pl, guard);
   }
   return out;
 }

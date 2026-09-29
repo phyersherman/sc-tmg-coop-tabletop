@@ -20,7 +20,7 @@ export function applyMarkerControl(state: GameState, answers: ScoringAnswers): {
 
 export function markerPrompts(state: GameState): ScoringPrompt[] {
   return [
-    { id: 'markers', kind: 'markers', text: 'Who has the higher total Supply within 3" of each active Mission Marker? An AI unit led by a Commander hero counts +1.' },
+    { id: 'markers', kind: 'markers', text: `Who has the higher total Supply within 3" of each active Mission Marker? An AI unit led by a Commander hero counts +1.${state.markers.some((m) => m.side) ? ' A side-marker guard adds no Supply, but a marker where it stands alone against your Units is contested.' : ''}` },
     { id: 'playerSupplyLost', kind: 'number', text: 'Player Supply destroyed this round: the Supply brackets the players\' units dropped by, added together.', min: 0, max: 30, defaultValue: 0, auto: (s) => s.playerSupplyLostThisRound ?? 0 },
     ...(state.round >= state.finalRound ? [{ id: 'playerReserveSupply', kind: 'number', text: 'Final round: total Supply of player units still in Reserves. These count as destroyed.', min: 0, max: 30, defaultValue: 0, auto: (s) => s.playerUnits.filter((p) => p.location === 'reserves' && !p.destroyed).reduce((a, p) => a + playerUnitSupply(p), 0) } as ScoringPrompt] : []),
   ];
