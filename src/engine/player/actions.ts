@@ -58,6 +58,11 @@ export function availableActions(state: GameState, pu: PlayerUnit): UnitAction[]
       const reason = blocked ?? spent ?? (burrowed ? 'Burrowed. Unburrow first' : pu.disengagedThisRound ? 'Disengaged this round' : undefined);
       add(`weapon:${w.id}`, w.name, reason, validTargets(state, pu, w).length ? undefined : 'No target in range and Line of Sight');
     }
+    // Lightning Dash: a second Charge, while Engaged, after the first one succeeded.
+    if (pu.dashFrom && state.activeUnitId === pu.id) {
+      const dashable = chargeOptions(state, pu).some((c) => checkCharge(state, pu, c.unit).ok);
+      add('charge', 'Charge', blocked ?? (dashable ? undefined : 'No other Enemy Unit within charge reach'));
+    }
     if (!pu.engaged) {
       const reachable = chargeOptions(state, pu).some((c) => checkCharge(state, pu, c.unit).ok);
       add('charge', 'Charge', blocked ?? (acted ? 'Already acted this phase' : burrowed ? 'Burrowed. Unburrow first' : playerUnitFlying(pu) ? 'Flying units cannot charge' : pu.disengagedThisRound ? 'Disengaged this round' : reachable ? undefined : 'No enemy within charge reach'));

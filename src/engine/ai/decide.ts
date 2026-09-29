@@ -130,15 +130,15 @@ export function report(id: OrderReportOption['id'], label: string): OrderReportO
   return { id, label } as OrderReportOption;
 }
 
-/** Units the AI could deploy right now: in Reserves, within its Supply, under the order card's cap and the mission's filters. */
+/**
+ * Units the AI could deploy right now: in Reserves, within its Supply, and under the mission's own rules. The AI
+ * brings Units on until its Supply Pool is full, as an opponent at the table would; only a mission that says so
+ * (Dead of Night's day) limits how many arrive in a round.
+ */
 export function deployable(state: GameState, mode: MissionMode, ctx: MissionCtx): AiUnitInstance[] {
-  const card = currentCard(state.orderDeck);
-  // An official mission is played as against a real opponent, who deploys until the Supply Pool is full; the order
-  // card paces the AI's arrivals in the co-op missions only.
-  const cardCap = mode.official || card.deployMax === 'all' ? 99 : card.deployMax;
-  const cap = mode.deployCap?.(ctx) ?? cardCap;
+  const cap = mode.deployCap?.(ctx);
   const deployedThisRound = state.army.units.filter((u) => u.deployedRound === state.round).length;
-  if (deployedThisRound >= cap && state.round < state.finalRound) return [];
+  if (cap !== undefined && deployedThisRound >= cap && state.round < state.finalRound) return [];
   const pool = poolNow(state);
   const available = pool - aiSupplyOnTable(state);
   let cands = reserves(state).filter((u) => !u.activated.movement && (u.special?.freeSupply || currentSupply(def(u), u.models) <= available));

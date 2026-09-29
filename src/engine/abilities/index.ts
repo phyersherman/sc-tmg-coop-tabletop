@@ -501,6 +501,7 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
   'Concussive Shells': { target: 'none', automated: false, apply: ({ unit }) => reminder(unit, 'Concussive Shells', 'An enemy charging a friendly unit within 8" suffers −2 Speed.') },
   'Zealous Round': { target: 'none', automated: false, apply: ({ unit }) => reminder(unit, 'Zealous Round', 'When damaged while not activated: flip its activation to reduce damage by 2.') },
   Hallucination: { target: 'none', automated: false, apply: ({ unit }) => reminder(unit, 'Hallucination', 'A friendly unit within 4" targeted by a ranged attack may Evade.') },
+  // Offered when its moment comes (engine/player/reactions): the command card only reminds you of it.
   "Hierarch’s Stand": { target: 'none', automated: false, apply: ({ unit }) => reminder(unit, "Hierarch's Stand", 'Redirect a ranged attack at a friendly unit within 8" to Artanis (he may Evade).') },
   'Lightning Dash': { target: 'none', automated: false, apply: ({ unit }) => reminder(unit, 'Lightning Dash', 'After a successful charge, declare a second charge at another enemy.') },
   Lunge: { target: 'none', automated: false, apply: ({ unit }) => reminder(unit, 'Lunge', 'After a friendly unit within 10" is shot, move directly toward the attacker.') },
@@ -756,7 +757,7 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
 };
 
 /** Boosts offered in the saves panel: TOUGH saves or damage reduction. */
-export const SAVE_BOOSTS: Record<string, { tough?: number; reduce?: number; dodge?: number; minDamage?: number; filter: (pu: PlayerUnit) => boolean; text: string }> = {
+export const SAVE_BOOSTS: Record<string, { tough?: number; reduce?: number; dodge?: number; minDamage?: number; /** +X to the Evade Roll: offered only when the unit makes one. */ evadeBonus?: number; filter: (pu: PlayerUnit) => boolean; text: string }> = {
   'Ground Armor': { tough: 1, filter: isGround, text: 'TOUGH (1): one failed save succeeds.' },
   'Infantry Armor': { tough: 1, filter: isBio, text: 'TOUGH (1): one failed save succeeds.' },
   'Vehicle Plating': { tough: 1, filter: isMech, text: 'TOUGH (1): one failed save succeeds.' },
@@ -764,6 +765,7 @@ export const SAVE_BOOSTS: Record<string, { tough?: number; reduce?: number; dodg
   'Guardian Shell': { dodge: 2, filter: isGround, text: 'DODGE (2): up to 2 Surge/Critical hits go back to the Armour pool.' },
   'Dae’Uhl': { reduce: 2, minDamage: 1, filter: () => true, text: 'Reduce the total damage by 2 (minimum 1).' },
   'Plasma Shields': { tough: 1, dodge: 1, filter: (pu) => isMech(pu) && isGround(pu) && isShielded(pu), text: 'TOUGH (1) and DODGE (1) while it is still Shielded.' },
+  'Brood Instinct': { evadeBonus: 1, filter: () => true, text: 'A +1 Modifier to the Evade Roll.' },
 };
 
 // ------------------------------------------------------------------ queries
@@ -869,6 +871,7 @@ export function unitAbilities(state: GameState, pu: PlayerUnit): UsableAbility[]
     const cost = ab.cost ? (ab.cost.amount === 'X' ? 1 : ab.cost.amount) : 0;
     let reason: string | undefined;
     if (ab.kind === 'Passive') reason = 'Passive';
+    else if (PROMPTED_REACTIONS.has(ab.name)) reason = 'Offered when it triggers';
     else if (!spec) reason = 'Resolve on the table';
     else if (pu.location !== 'table') reason = 'On the battlefield only';
     else if (pu.summoned) reason = 'Structures cannot activate';
@@ -883,6 +886,15 @@ export function unitAbilities(state: GameState, pu: PlayerUnit): UsableAbility[]
   }
   return out;
 }
+
+/**
+ * Reactions the game offers at the moment they trigger (engine/player/reactions, and the saves step for the ones
+ * that answer an attack on the unit), never from the command card, where they would be spent for nothing.
+ */
+export const PROMPTED_REACTIONS = new Set([
+  "Hierarch’s Stand", 'Lightning Dash', 'Hallucination', 'Debilitating Saliva', 'Lunge', 'Concussive Shells',
+  'Life Support', 'Transfusion', 'Zealous Round', 'Shield Overcharge', 'Improved Barrier', 'Prophetic Vision',
+]);
 
 export interface UsableBoost {
   card: PlayerCard;
@@ -1123,6 +1135,11 @@ export function evadeFor(state: GameState, pu: PlayerUnit, attack: { phase: stri
   if (isHidden(pu)) reason = isBurrowed(pu) ? 'Burrowed' : 'Hidden';
   else if (attack.phase === 'Assault' && pu.engaged) reason = 'engaged against a ranged attack';
   else if (attack.phase === 'Combat' && hasAbility(pu, 'Combat Shield')) reason = 'Combat Shield';
+  else {
+    // Hallucination and Hierarch's Stand: eligible against the enemy attack they answered.
+    const grant = activeEffects(pu).find((e) => e.mods.mayEvade);
+    if (grant) reason = grant.source;
+  }
   if (!reason) return null;
   const ai = state.army.units.find((u) => u.id === attack.attacker.unitId);
   const w = ai ? unitById(ai.defId).weapons.find((x) => x.name === attack.weapon) : undefined;
@@ -1148,6 +1165,7 @@ export function refreshPlayerSide(state: GameState): string[] {
     pu.effects = (pu.effects ?? []).filter((e) => e.until !== 'round' && e.until !== 'charge' && e.until !== 'action');
     pu.bonusMove = 0;
     pu.placeRange = 0;
+    pu.dashFrom = undefined;
     if (pu.expiresEndOfRound && pu.location === 'table') {
       pu.location = 'destroyed';
       pu.destroyed = true;

@@ -53,6 +53,8 @@ export interface PlayerUnit {
   expiresEndOfRound?: boolean;
   /** Next deploy may use any non-player table edge (Warp In and similar), ending >10" from enemies. */
   deployAnyEdge?: boolean;
+  /** Lightning Dash: the Enemy Unit its first Charge hit. It may declare a second Charge against a different one. */
+  dashFrom?: string;
 }
 
 export type UnitStatus = 'Burrowed' | 'Hidden' | 'Siege Mode';
@@ -88,6 +90,8 @@ export interface EffectMods {
   longRange?: number;
   /** Coordinated Strike: the friendly unit this weapon may range from instead of measuring its own Range. */
   spotter?: string;
+  /** Hallucination / Hierarch's Stand: the unit may make an Evade Roll against the current enemy attack. */
+  mayEvade?: boolean;
 }
 
 export interface UnitEffect {

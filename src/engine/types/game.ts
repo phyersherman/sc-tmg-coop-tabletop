@@ -274,8 +274,12 @@ export interface GameState {
   tokens?: BoardToken[];
   /** HITS X (Y) waiting to be resolved against AI units (Corrosive Bile, Shadow Strike). */
   pendingHits?: { targetId: string; hits: number; dmgPer: number; source: string; armourMod?: number }[];
-  /** Damage a unit of yours has just suffered outside an attack (Stimpack), waiting on a Reaction that could reduce it. */
-  pendingReaction?: { unitId: string; amount: number; source: string };
+  /**
+   * A moment one of your Reactions can answer, held until you use it or decline. `kind` absent (or 'damage'):
+   * Damage a unit of yours has just suffered outside an attack (Stimpack). The other kinds hold the game at an
+   * enemy's declared attack or charge, after an attack, after your own charge or after a PLACE effect.
+   */
+  pendingReaction?: PendingReaction;
   /** Round in which a Pylon's Warp Conduit / Omega Network was used for a deploy. */
   conduitUsedRound?: number;
   /** Your unit that has taken its action but is still active: it can use abilities until you end its activation. */
@@ -284,6 +288,30 @@ export interface GameState {
   /** The last charge rolled, with the round it happened in: what waits for your Continue is that charge, not
    *  the same one again next round. */
   lastCharge?: { side: Side; unitId: string; targetId: string; rolls: number[]; reach: number; needed: number; success: boolean; round: number };
+}
+
+/** When a Reaction is offered (see engine/player/reactions). */
+export type ReactionTrigger = 'damage' | 'aiRanged' | 'afterAiRanged' | 'aiCharge' | 'afterCharge' | 'afterPlace';
+
+export interface PendingReaction {
+  kind?: ReactionTrigger;
+  /** Your unit the moment is about: the one damaged, targeted, charged, or the one that charged or was PLACEd. */
+  unitId: string;
+  /** Damage waiting to be reduced ('damage'), otherwise 0. */
+  amount: number;
+  /** What caused it, in words (an ability, or the enemy Unit). */
+  source: string;
+  /** The enemy Unit attacking or charging ('aiRanged', 'afterAiRanged', 'aiCharge'). */
+  aiUnitId?: string;
+  /** The Enemy Unit your charge hit ('afterCharge'). */
+  targetId?: string;
+  /** Your units the enemy's Ranged Attack could have targeted (Hierarch's Stand needs a valid target). */
+  validTargets?: string[];
+  /** A Charge-order unit falling back on its guns fires only its first weapon. */
+  firstOnly?: boolean;
+  /** How the AI's order ends once the Reaction is answered ('afterAiRanged'). */
+  report?: string;
+  enemySupply?: number;
 }
 
 /** A presentation event: something that happened on the table. */

@@ -419,8 +419,11 @@ export function checkCharge(state: GameState, pu: PlayerUnit, target: AiUnitInst
   if (state.step.kind !== 'PLAYERS_TURN') return no('Wait for your activation.');
   if (state.phase !== 'assault') return no('Charges happen in the Assault phase.');
   if (pu.location !== 'table') return no(`${pu.name} is not on the table.`);
-  if (pu.activated.assault) return no(`${pu.name} already acted this phase.`);
-  if (pu.engaged) return no(`${pu.name} is already engaged.`);
+  // Lightning Dash: a second Charge in the same Activation, while Engaged, against a different Enemy Unit.
+  const dash = !!pu.dashFrom && state.activeUnitId === pu.id;
+  if (dash && (target.id === pu.dashFrom || pu.engagedWith.includes(target.id))) return no('Lightning Dash needs a different Enemy Unit.');
+  if (pu.activated.assault && !dash) return no(`${pu.name} already acted this phase.`);
+  if (pu.engaged && !dash) return no(`${pu.name} is already engaged.`);
   const planted = statusBlocks(pu, 'charge');
   if (planted) return no(planted);
   if (pu.disengagedThisRound) return no(`${pu.name} disengaged this round and cannot charge.`);

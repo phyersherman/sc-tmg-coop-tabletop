@@ -34,6 +34,8 @@ const common = {
   name: tabletop ? 'Co-op Command Tabletop' : 'SC TMG Co-op Command',
   appBundleId: tabletop ? 'com.sctmg.coopcommand.tabletop' : 'com.sctmg.coopcommand',
   appCategoryType: 'public.app-category.board-games',
+  // A game to macOS: full screen, it gets Game Mode (the CPU and GPU held at full speed, not throttled as they heat).
+  extendInfo: { LSSupportsGameMode: true },
   prune: true,
   // Only the built site and the Electron entry go in: not the sources, research data or node_modules.
   ignore: [/^\/(?!dist(\/|$)|electron(\/|$)|package\.json$)/],

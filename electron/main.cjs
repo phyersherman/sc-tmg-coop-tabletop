@@ -3,7 +3,14 @@
  * small local web server. A server rather than file:// because the app fetches its manifests and streams video
  * and audio, which need http (and Range requests). The port is fixed so saves (localStorage) survive updates.
  */
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, powerSaveBlocker, shell } = require('electron');
+
+// Draw on the GPU wherever it can, whatever Chromium's list of doubtful graphics chips says, and never slow the
+// page down when the window is behind another one.
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -60,9 +67,13 @@ async function start() {
   try { port = await listen(PORT); } catch { port = await listen(0); }
   const win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 900, minHeight: 600, backgroundColor: '#050a14', title: TITLE,
-    webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.cjs') },
+    // On a Mac it opens full screen: that is when macOS turns Game Mode on for it (see build-desktop.mjs).
+    fullscreen: process.platform === 'darwin',
+    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false, preload: path.join(__dirname, 'preload.cjs') },
   });
   win.setMenuBarVisibility(false);
+  // A battle runs for hours at the table: the screen does not dim or sleep while the app is open.
+  powerSaveBlocker.start('prevent-display-sleep');
   // The game's Menu has Quit and Full screen (the page calls these); F11 toggles full screen, Ctrl/Cmd+Q quits.
   ipcMain.on('desktop:quit', () => app.quit());
   ipcMain.on('desktop:fullscreen', () => win.setFullScreen(!win.isFullScreen()));

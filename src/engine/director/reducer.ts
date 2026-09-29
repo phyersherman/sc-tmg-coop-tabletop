@@ -9,7 +9,7 @@ import { deckFor } from '@data/orderDecks';
 import { initDeck, drawCard, currentCard } from '../ai/orderDeck';
 import { assignObjectives } from '../ai/objectives';
 import { aiDebuff, decideAi, shouldPassEarly, speedModFor, deployable } from '../ai/decide';
-import { BLAST_RADIUS_IN, hiddenFrom, evadeFor, hasAbility, isBurrowed, isHidden, ownerOf, unitAbilities, pendingEndOfRound, CARD_BOOSTS, SAVE_BOOSTS, UNIT_ABILITIES, autoPay, cardDef, chargeMods, defensiveDiceRemoval, effectiveSpeed, passiveTough, payValue, pushHits, refreshPlayerSide, removeToken, SELF_REACTIONS, sparePayCard, spendEffects, weaponWithEffects, type AbilityContext, type AbilitySpec } from '../abilities/index';
+import { BLAST_RADIUS_IN, hiddenFrom, evadeFor, hasAbility, isBurrowed, isHidden, ownerOf, unitAbilities, pendingEndOfRound, CARD_BOOSTS, SAVE_BOOSTS, UNIT_ABILITIES, autoPay, cardDef, chargeMods, defensiveDiceRemoval, effectiveSpeed, passiveTough, payValue, pushHits, refreshPlayerSide, removeToken, SELF_REACTIONS, PROMPTED_REACTIONS, sparePayCard, spendEffects, weaponWithEffects, type AbilityContext, type AbilitySpec } from '../abilities/index';
 import { applyDamage } from '../units/damage';
 import { currentSupply } from '../units/supply';
 import { DIFFICULTIES, supplyFor } from '../difficulty';
@@ -37,6 +37,8 @@ import { visibleEnemies, engagedWith as aiEngagedWith } from '../sense/query';
 import { availableWeapons, weaponModels } from '../units/weapons';
 import { shortestPath, passable } from '../sense/geometry2d';
 import { speedFor } from '../units/speed';
+import { reactionOffers, type ReactionOffer } from '../player/reactions';
+import type { PendingReaction } from '../types/game';
 
 export type Command =
   | { t: 'continue' }
@@ -73,7 +75,7 @@ export type Command =
   | { t: 'playerMove'; unitId: string; point: { x: number; y: number }; kind: 'move' | 'run' | 'disengage'; /** The model you picked to lead this action (0 = the current leader). */ leaderIndex?: number }
   | { t: 'playerHold'; unitId: string }
   | { t: 'playerAttack'; unitId: string; weaponId: string; targetId: string; models?: number; /** Your attack dice, rolled in the app or entered from the table. */ rolls?: number[]; /** Your Surge die, if you rolled it. */ surge?: number; /** The target's Armour and Evade dice, rolled step by step in the Combat Tray. */ saveRolls?: number[]; evadeRolls?: number[] }
-  | { t: 'playerCharge'; unitId: string; targetId: string; /** Your charge die (D6). */ roll?: number; /** Your IMPACT dice for Devastating Charge (rolled once the charge succeeds). */ impactRolls?: number[]; /** The target's Armour and Evade dice against IMPACT, rolled step by step in the Combat Tray. */ impactSaveRolls?: number[]; impactEvadeRolls?: number[]; /** The model you picked to lead this action (0 = the current leader). */ leaderIndex?: number }
+  | { t: 'playerCharge'; unitId: string; targetId: string; /** Your charge die (D6): the higher one when two were rolled. */ roll?: number; /** Every die rolled for the Charge Distance (2D6 keeps the higher). */ rolls?: number[]; /** Your IMPACT dice for Devastating Charge (rolled once the charge succeeds). */ impactRolls?: number[]; /** The target's Armour and Evade dice against IMPACT, rolled step by step in the Combat Tray. */ impactSaveRolls?: number[]; impactEvadeRolls?: number[]; /** The model you picked to lead this action (0 = the current leader). */ leaderIndex?: number }
   | { t: 'enterSaves'; saved: number; /** Boost cards used (TOUGH, damage reduction). */ boostCards?: string[]; /** Reaction abilities used: unit id + ability name. */ reactions?: { unitId: string; name: string; reduce: number }[]; /** Evade Roll successes against the damage pool (when eligible). */ evaded?: number }
   | { t: 'aiResolve' }
   | { t: 'useAbility'; unitId: string; name: string; payWith?: string[]; friendlyId?: string; enemyId?: string; point?: { x: number; y: number }; option?: number }
@@ -134,9 +136,9 @@ export function createGame(config: GameConfig, deployment: DeploymentLayout, ter
     vp: { ai: 0, players: 0 },
     aiSupplyLostThisRound: 0,
     playerSupplyLostThisRound: 0,
-    markers: deployment.markers.map((m) => ({
+    markers: placeMarkers(deployment.markers, terrain.pieces).map(({ m, spot }) => ({
       id: m.id,
-      ...clearMarkerSpot(m, terrain.pieces),
+      ...spot,
       affinity: m.id === 5 ? 'neutral' : m.id === 1 || m.id === 3 ? 'ai' : 'players',
       controlledBy: null,
       active: true,
@@ -293,6 +295,19 @@ function startPhase(state: GameState, mode: MissionMode, phase: Phase): void {
 
 function hasUnusedTenacity(state: GameState): boolean {
   return (state.playerCards ?? []).some((c) => !c.exhausted && !(c.usedGame ?? []).includes('Terran Tenacity') && !!cardDef(c.defId)?.boosts.some((b) => b.name === 'Terran Tenacity'));
+}
+
+/**
+ * The Mission Markers where the deployment card puts them, each one on terrain moved clear of it: never onto
+ * another marker (the ones already placed, and the card spots of the ones still to come).
+ */
+function placeMarkers<M extends { id: number; x: number; y: number }>(markers: M[], pieces: GameState['terrain']['pieces']): { m: M; spot: ReturnType<typeof clearMarkerSpot> }[] {
+  const out: { m: M; spot: ReturnType<typeof clearMarkerSpot> }[] = [];
+  markers.forEach((m, i) => {
+    const others = [...out.map((o) => o.spot), ...markers.slice(i + 1)];
+    out.push({ m, spot: clearMarkerSpot(m, pieces, others) });
+  });
+  return out;
 }
 
 function aiPass(state: GameState): void {
@@ -803,7 +818,8 @@ export function impactParams(state: GameState, pu: PlayerUnit, target: AiUnitIns
 export function chargeImpactSetup(state: GameState, cmd: Extract<Command, { t: 'playerCharge' }>): { params: AttackParams } | null {
   const pu = state.playerUnits.find((x) => x.id === cmd.unitId);
   const target = state.army.units.find((x) => x.id === cmd.targetId);
-  if (!pu || !target) return null;
+  // Lightning Dash's second Charge makes no IMPACT: Devastating Charge does not trigger a second time.
+  if (!pu || !target || pu.dashFrom) return null;
   // Before the move, every model of the unit is assumed to reach the Ranks (the tray shows that many dice).
   const params = impactParams(state, pu, target, chargeMods(pu), cmd, pu.models);
   return params ? { params } : null;
@@ -878,6 +894,13 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
     }
     case 'aiResolve': {
       if (state.step.kind !== 'AI_ORDER') return state;
+      // A Reaction still on offer is declined: the enemy's order goes on (nothing may leave the game stuck).
+      const held = state.pendingReaction;
+      if (held && held.kind && held.kind !== 'damage') {
+        state.pendingReaction = undefined;
+        continueAfterReaction(state, mode, held);
+        return state;
+      }
       aiResolve(state, mode);
       return state;
     }
@@ -894,6 +917,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
         let reduce = 0;
         let dodge = 0;
         let minDamage = 0;
+        let evadeBonus = 0;
         const used: string[] = [];
         // Whose unit is being shot at: only that player's own cards can be played on the roll.
         const defOwner: number = ownerOf(pu);
@@ -907,6 +931,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
           reduce += sb.reduce ?? 0;
           dodge += sb.dodge ?? 0;
           minDamage = Math.max(minDamage, sb.minDamage ?? 0);
+          evadeBonus += sb.evadeBonus ?? 0;
           used.push(b.name);
         }
         let capDmg: number | undefined;
@@ -946,7 +971,9 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
         const done = completeSaves(base, saved, playerUnitDef(pu), { models: pu.models, damageMarker: pu.damageMarker, shieldsLeft: pu.shieldsLeft });
         let { attack, result } = done;
         // Evade Roll: successes discard dice from the damage pool before Damage is applied.
-        const ev = forcedEvade !== undefined ? { value: forcedEvade, reason: 'Prophetic Vision' } : evadeFor(state, pu, base);
+        const found = forcedEvade !== undefined ? { value: forcedEvade, reason: 'Prophetic Vision' } : evadeFor(state, pu, base);
+        // Brood Instinct: +1 to the Evade Roll (the Evade successes come counted from the tray).
+        const ev = found && evadeBonus && forcedEvade === undefined ? { ...found, value: Math.max(2, found.value - evadeBonus) } : found;
         if (ev && cmd.evaded && attack.damage > 0) {
           const pool = base.hits - attack.saved;
           const evaded = Math.min(pool, cmd.evaded);
@@ -976,7 +1003,9 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
         const t = state.playerUnits.find((p) => p.id === ps.targetId);
         if (t && !t.destroyed && fireBatches(state, mode, u, ps.order, t, ps.remaining, ps.report)) return state;
       }
-      finishAiOrder(state, mode, ps.report, ps.enemySupply);
+      // After a Ranged Attack is fully resolved, Lunge may answer it.
+      if (ps.attack.phase === 'Assault') endAiRanged(state, mode, ps.attack.attacker.unitId, ps.attack.defender.unitId, ps.report, ps.enemySupply);
+      else finishAiOrder(state, mode, ps.report, ps.enemySupply);
       return state;
     }
     case 'playerDeploy': {
@@ -1001,6 +1030,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       const ab = def.abilities.find((a) => a.name === cmd.name);
       const spec = UNIT_ABILITIES[cmd.name];
       if (!ab || !spec) return reject(state, `${cmd.name} is not usable from the app.`);
+      if (PROMPTED_REACTIONS.has(ab.name)) return reject(state, `${ab.name} is offered when it triggers.`);
       if (ab.upgradeCost && !pu.upgrades.includes(ab.id)) return reject(state, `${pu.name} does not have ${cmd.name}.`);
       if (pu.location !== 'table') return reject(state, `${pu.name} must be on the battlefield.`);
       if (ab.kind === 'Active') {
@@ -1035,21 +1065,16 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
     case 'damageReaction': {
       const pr = state.pendingReaction;
       if (!pr) return state;
+      if (cmd.key) {
+        const o = reactionOffers(state, pr).find((x) => x.key === cmd.key);
+        if (!o) return reject(state, 'That Reaction is no longer available.');
+        const err = useReaction(state, pr, o);
+        if (err) return reject(state, err);
+        // More than one Reaction may answer the same moment: the rest stay on offer.
+        if (reactionOffers(state, pr).length) { state.pendingReaction = pr; return state; }
+      }
       state.pendingReaction = undefined;
-      const pu = state.playerUnits.find((x) => x.id === pr.unitId);
-      if (!pu || !cmd.key) return state;
-      const h = damageHelpers(state, pu).find((x) => x.key === cmd.key);
-      const ru = h ? state.playerUnits.find((x) => x.id === h.unitId) : undefined;
-      if (!h || !ru) return reject(state, 'That Reaction is no longer available.');
-      const ab = playerUnitDef(ru).abilities.find((a) => a.name === h.name);
-      const pay = payFor(state, ab?.cost ? (ab.cost.amount === 'X' ? 1 : ab.cost.amount) : 0, undefined, ownerOf(ru));
-      if (typeof pay === 'string') return reject(state, pay);
-      for (const c of pay) c.exhausted = true;
-      ru.used = [...(ru.used ?? []), h.name];
-      const back = Math.min(h.reduce, pr.amount, pu.damageMarker);
-      pu.damageMarker -= back;
-      pushLog(state, 'players', `${h.name}: ${ru.name} reduces the ${pr.source} damage on ${pu.name} by ${back}.`);
-      emit(state, { kind: 'effect', side: 'players', unitId: pu.id, label: `${h.name} −${back}`, detail: `${ru.name} reduces the ${pr.source} damage`, tone: 'good' });
+      continueAfterReaction(state, mode, pr);
       return state;
     }
     case 'useBoost': {
@@ -1091,6 +1116,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       pushLog(state, 'players', `${pu.name} is PLACEd ${pr.reach.toFixed(1)}" away.`);
       pu.placeRange = 0;
       if (state.activeUnitId === pu.id) pu.mayAdjust = pu.models > 1;
+      offerReaction(state, { kind: 'afterPlace', unitId: pu.id, amount: 0, source: 'PLACE' });
       return state;
     }
     case 'playerBonusMove': {
@@ -1175,8 +1201,11 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       const speed = effectiveSpeed(pu);
       const cm = chargeMods(pu);
       const opt = chargeOptions(state, pu).find((c) => c.unit.id === target.id)!;
-      const roll = cmd.roll ? { roll: cmd.roll, reach: speed + cmd.roll + cm.bonus, rolls: [cmd.roll] } : rollCharge(ctx.rng, speed, cm.twoDice ? '2d6high' : '1d6', cm.bonus);
+      const roll = cmd.roll ? { roll: cmd.roll, reach: speed + cmd.roll + cm.bonus, rolls: cmd.rolls?.length ? cmd.rolls : [cmd.roll] } : rollCharge(ctx.rng, speed, cm.twoDice ? '2d6high' : '1d6', cm.bonus);
       spendEffects(pu, cm.spent);
+      // Lightning Dash's second Charge: Devastating Charge does not trigger a second time.
+      const dash = !!pu.dashFrom;
+      pu.dashFrom = undefined;
       const needed = opt.needed;
       const success = roll.reach >= needed;
       state.lastCharge = { side: 'players', unitId: pu.id, targetId: target.id, rolls: roll.rolls, reach: roll.reach, needed, success, round: state.round };
@@ -1194,7 +1223,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
         target.engaged = true;
         target.engagedEnemySupply += playerUnitSupply(pu);
         pushLog(state, 'players', `${pu.name} charges ${target.label}: ${speed} + ${roll.roll} = ${roll.reach}" (needed ${needed.toFixed(1)}"). Success!`);
-        if (def.impact) {
+        if (def.impact && !dash) {
           const tdef = unitById(target.defId);
           const before = currentSupply(tdef, target.models);
           // IMPACT dice come from models in the Fighting and Supporting Ranks after the charge.
@@ -1208,6 +1237,8 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
         }
       } else pushLog(state, 'players', `${pu.name} charges ${target.label}: ${speed} + ${roll.roll} = ${roll.reach}" (needed ${needed.toFixed(1)}"). Failed.`);
       commitRng(state, ctx.rng);
+      // Lightning Dash answers a successful Charge (not the second one it grants).
+      if (success && !dash && !pu.destroyed) offerReaction(state, { kind: 'afterCharge', unitId: pu.id, targetId: target.id, amount: 0, source: 'Charge' });
       finishPlayerAction(state, mode, pu, 'assault', 'charge');
       return state;
     }
@@ -1284,7 +1315,8 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       if (state.step.kind !== 'PLAYERS_TURN' || !state.activeUnitId) return state;
       const pu = state.playerUnits.find((x) => x.id === state.activeUnitId);
       state.activeUnitId = null;
-      if (pu) { pu.mayAdjust = false; pu.firedThisActivation = []; }
+      if (pu) { pu.mayAdjust = false; pu.firedThisActivation = []; pu.dashFrom = undefined; }
+      if (state.pendingReaction?.kind === 'afterCharge') state.pendingReaction = undefined;
       pushLog(state, 'players', `${pu?.name ?? 'Your unit'} ends its activation.`);
       state.turn = 'ai';
       advanceTurn(state, mode);
@@ -1293,7 +1325,8 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
     case 'playersPass': {
       if (state.step.kind !== 'PLAYERS_TURN') return state;
       state.activeUnitId = null;
-      for (const p of state.playerUnits) p.mayAdjust = false;
+      for (const p of state.playerUnits) { p.mayAdjust = false; p.dashFrom = undefined; }
+      if (state.pendingReaction?.kind === 'afterCharge') state.pendingReaction = undefined;
       state.passed.players = true;
       if (!state.passed.ai && state.nextFirstPlayer === null) state.nextFirstPlayer = 'players';
       pushLog(state, 'players', 'Players pass.');
@@ -1598,14 +1631,148 @@ function emitFxChanges(state: GameState, before: FxSnap): void {
  */
 function offerDamageReaction(state: GameState, pu: PlayerUnit, amount: number, source: string): void {
   if (amount <= 0 || pu.destroyed) return;
-  const helpers = damageHelpers(state, pu).filter((h) => {
-    const ru = state.playerUnits.find((x) => x.id === h.unitId);
-    const ab = ru ? playerUnitDef(ru).abilities.find((a) => a.name === h.name) : undefined;
-    const cost = ab?.cost ? (ab.cost.amount === 'X' ? 1 : ab.cost.amount) : 0;
-    return !!ru && typeof payFor(state, cost, undefined, ownerOf(ru)) !== 'string';
-  });
-  if (!helpers.length) return;
-  state.pendingReaction = { unitId: pu.id, amount, source };
+  offerReaction(state, { kind: 'damage', unitId: pu.id, amount, source });
+}
+
+/** Hold the game on this moment when one of your Reactions can answer it. Returns whether it is held. */
+function offerReaction(state: GameState, pr: PendingReaction): boolean {
+  if (!reactionOffers(state, pr).length) return false;
+  state.pendingReaction = pr;
+  return true;
+}
+
+/** Use one offered Reaction: pay it, spend it for the round and resolve it. Returns an error, or null. */
+function useReaction(state: GameState, pr: PendingReaction, o: ReactionOffer): string | null {
+  const ru = state.playerUnits.find((x) => x.id === o.unitId);
+  if (!ru) return 'That Reaction is no longer available.';
+  if (o.cardId) {
+    const card = (state.playerCards ?? []).find((c) => c.id === o.cardId);
+    const spec = CARD_BOOSTS[o.name];
+    if (!card || card.exhausted || !spec) return 'That card is no longer Ready.';
+    const line = spec.apply({ state, unit: ru });
+    if (line.startsWith('!')) return line.slice(1);
+    card.exhausted = true;
+    pushLog(state, 'players', `${cardDef(card.defId)?.name ?? o.name}: ${line}`);
+    emit(state, { kind: 'effect', side: 'players', unitId: ru.id, label: o.name.toUpperCase(), detail: line, tone: 'good' });
+    return null;
+  }
+  const pay = payFor(state, o.costAmount, undefined, ownerOf(ru));
+  if (typeof pay === 'string') return pay;
+  for (const c of pay) c.exhausted = true;
+  const spec = UNIT_ABILITIES[o.name];
+  if (!spec?.repeatable) ru.used = [...(ru.used ?? []), o.name];
+  if (spec?.once === 'game') ru.usedGame = [...(ru.usedGame ?? []), o.name];
+  const paid = pay.length ? ` (paid with ${pay.map((c) => cardDef(c.defId)?.name).join(', ')})` : '';
+  const target = state.playerUnits.find((x) => x.id === pr.unitId);
+  const ai = pr.aiUnitId ? state.army.units.find((u) => u.id === pr.aiUnitId) : undefined;
+  const say = (line: string, unitId = ru.id, side: 'players' | 'ai' = 'players', tone: 'good' | 'bad' = 'good') => {
+    pushLog(state, 'players', `${line}${paid}`);
+    emit(state, { kind: 'effect', side, unitId, label: o.name.toUpperCase(), detail: line, tone });
+  };
+  switch (o.name) {
+    case 'Life Support':
+    case 'Transfusion': {
+      if (!target) return null;
+      const back = Math.min(o.reduce ?? 0, pr.amount, target.damageMarker);
+      target.damageMarker -= back;
+      pr.amount -= back;
+      pushLog(state, 'players', `${o.name}: ${ru.name} reduces the ${pr.source} damage on ${target.name} by ${back}.${paid}`);
+      emit(state, { kind: 'effect', side: 'players', unitId: target.id, label: `${o.name} −${back}`, detail: `${ru.name} reduces the ${pr.source} damage`, tone: 'good' });
+      return null;
+    }
+    case 'Hierarch’s Stand': {
+      // The attack is redirected to this unit, which may Evade it until the End of the enemy's Activation.
+      pr.unitId = ru.id;
+      ru.effects = [...(ru.effects ?? []), { id: `hierarch-${state.round}-${state.log.length}`, source: 'Hierarch’s Stand', text: 'May make an Evade Roll against the redirected attack.', mods: { mayEvade: true }, until: 'round' }];
+      say(`Hierarch’s Stand: ${ai?.label ?? 'The attack'} is redirected from ${target?.name ?? 'its target'} to ${ru.name}.`);
+      return null;
+    }
+    case 'Hallucination': {
+      if (!target) return null;
+      target.effects = [...(target.effects ?? []), { id: `halluc-${state.round}-${state.log.length}`, source: 'Hallucination', text: 'May make an Evade Roll against this attack.', mods: { mayEvade: true }, until: 'round' }];
+      say(`Hallucination: ${target.name} may make an Evade Roll against ${ai?.label ?? 'the attack'}.`, target.id);
+      return null;
+    }
+    case 'Debilitating Saliva': {
+      if (!ai) return null;
+      ai.debuffs = [...(ai.debuffs ?? []), { id: `saliva-${state.round}-${state.log.length}`, source: 'Debilitating Saliva', text: 'DEBUFF Hit (1) on its Ranged Weapons' }];
+      // The order's dice are already in hand: its Ranged Weapons hit on one more.
+      if (state.step.kind === 'AI_ORDER' && state.step.order.unitId === ai.id) for (const b of state.step.order.batches) b.hitMod = (b.hitMod ?? 0) - 1;
+      say(`Debilitating Saliva: ${ai.label} gains DEBUFF Hit (1) on its Ranged Weapons.`, ai.id, 'ai', 'bad');
+      return null;
+    }
+    case 'Concussive Shells': {
+      if (!ai) return null;
+      ai.statDebuffs = [...(ai.statDebuffs ?? []).filter((d) => d.stat !== 'speed'), { stat: 'speed', amount: 2 }];
+      say(`Concussive Shells: ${ai.label} gains DEBUFF Speed (2).`, ai.id, 'ai', 'bad');
+      return null;
+    }
+    case 'Lunge': {
+      const moved = lungeToward(state, ru, ai);
+      say(moved > 0 ? `Lunge: ${ru.name} moves ${moved.toFixed(1)}" towards ${ai?.label ?? 'the attacker'}.` : `Lunge: ${ru.name} has no room to move towards ${ai?.label ?? 'the attacker'}.`);
+      return null;
+    }
+    case 'Lightning Dash': {
+      ru.dashFrom = pr.targetId ?? '';
+      say(`Lightning Dash: ${ru.name} may declare a second Charge against a different Enemy Unit.`);
+      return null;
+    }
+    default:
+      say(`${o.name}: ${ru.name}.`);
+      return null;
+  }
+}
+
+/** Lunge: a Move action Directly Towards the attacking Unit, as far as its Speed allows, stopping outside Engagement Range. */
+function lungeToward(state: GameState, ru: PlayerUnit, ai: AiUnitInstance | undefined): number {
+  const from = playerPos(state, ru);
+  const to = ai ? aiPos(state, ai) : null;
+  if (!from || !to) return 0;
+  const d = Math.hypot(to.x - from.x, to.y - from.y);
+  if (d < 0.01) return 0;
+  const lead = unitShapes(state, 'players', ru.id)[0];
+  const foe = ai ? unitShapes(state, 'ai', ai.id) : [];
+  // Stop with the base clear of Engagement Range of the attacker's nearest model.
+  const room = lead && foe.length ? Math.min(...foe.map((f) => edgeDistance(lead, f))) - ENGAGEMENT_IN - 0.1 : d - 2;
+  const step = Math.max(0, Math.min(effectiveSpeed(ru), room));
+  if (step <= 0.05) return 0;
+  const pt = { x: from.x + ((to.x - from.x) / d) * step, y: from.y + ((to.y - from.y) / d) * step };
+  if (!passable(pt, standingPieces(state, 'players', ru.id))) return 0;
+  setPlayerPosition(state, ru, pt, { avoidEngaging: true, facing: Math.atan2(to.y - from.y, to.x - from.x) });
+  const after = playerPos(state, ru);
+  return after ? Math.hypot(after.x - from.x, after.y - from.y) : 0;
+}
+
+/**
+ * Carry on from a held moment once its Reactions are answered: the enemy's attack or charge goes ahead (at the
+ * unit Hierarch's Stand drew it to), the enemy's Activation ends, or your unit's Activation goes on or ends.
+ */
+function continueAfterReaction(state: GameState, mode: MissionMode, pr: PendingReaction): void {
+  const kind = pr.kind ?? 'damage';
+  const order = state.step.kind === 'AI_ORDER' ? state.step.order : null;
+  const u = order && pr.aiUnitId === order.unitId ? state.army.units.find((x) => x.id === order.unitId) : undefined;
+  if (kind === 'aiRanged') {
+    const t = state.playerUnits.find((p) => p.id === pr.unitId);
+    if (!order || !u) return;
+    if (!t || t.destroyed || t.location !== 'table') { finishAiOrder(state, mode, 'noTarget'); return; }
+    if (aiRangedFire(state, mode, u, order, t, !!pr.firstOnly)) return;
+    endAiRanged(state, mode, u.id, t.id, 'attacked');
+    return;
+  }
+  if (kind === 'afterAiRanged') {
+    if (state.step.kind === 'AI_ORDER') finishAiOrder(state, mode, pr.report ?? 'attacked', pr.enemySupply);
+    return;
+  }
+  if (kind === 'aiCharge') {
+    if (!order || !u) return;
+    aiChargeRoll(state, mode, u, order, pr.unitId);
+    return;
+  }
+  if (kind === 'afterCharge') {
+    const pu = state.playerUnits.find((p) => p.id === pr.unitId);
+    // Lightning Dash used: the unit stays active for its second Charge. Declined: its Activation goes on as usual.
+    if (pu && !pu.dashFrom && state.step.kind === 'PLAYERS_TURN') settleActivation(state, mode, pu, 'charge');
+  }
 }
 
 /** Exhaust Ready cards to pay a resource cost. Each player pays from their own cards and no one else's. */
@@ -1650,9 +1817,18 @@ function finishPlayerAction(state: GameState, mode: MissionMode, pu: PlayerUnit,
   // It also stays active while it still has an Active ability to use (move, then Blink), or a weapon it may still
   // fire this activation (a SIDEARM after its main attack, or its main weapon after a SIDEARM).
   if (action !== 'attack') pu.firedThisActivation = [];
+  settleActivation(state, mode, pu, action);
+}
+
+/**
+ * After an action: the unit stays active while it has something left to do (coherency to fix, a weapon to fire,
+ * an Active ability, a Reaction waiting on its Charge, a Lightning Dash to declare); otherwise its Activation ends.
+ */
+function settleActivation(state: GameState, mode: MissionMode, pu: PlayerUnit, action: 'deploy' | 'move' | 'run' | 'disengage' | 'hold' | 'attack' | 'charge'): void {
   state.activeUnitId = pu.id;
   const moreWeapons = action === 'attack' && playerWeapons(state, pu).some((w) => state.army.units.some((u) => u.location === 'table' && checkAttack(state, pu, w, u).ok));
-  if (pu.location === 'table' && !pu.destroyed && (pu.mayAdjust || moreWeapons || unitAbilities(state, pu).some((a) => a.ok && a.ability.kind === 'Active'))) return;
+  const held = state.pendingReaction?.kind === 'afterCharge' && state.pendingReaction.unitId === pu.id;
+  if (pu.location === 'table' && !pu.destroyed && (held || !!pu.dashFrom || pu.mayAdjust || moreWeapons || unitAbilities(state, pu).some((a) => a.ok && a.ability.kind === 'Active'))) return;
   state.activeUnitId = null;
   pu.firedThisActivation = [];
   state.turn = 'ai';
@@ -1660,6 +1836,10 @@ function finishPlayerAction(state: GameState, mode: MissionMode, pu: PlayerUnit,
 }
 
 function finishAiOrder(state: GameState, mode: MissionMode, report: string, enemySupply?: number): void {
+  // Hallucination and Hierarch's Stand last until the End of the enemy's Activation.
+  for (const pu of state.playerUnits) if (pu.effects?.some((e) => e.mods.mayEvade)) pu.effects = pu.effects.filter((e) => !e.mods.mayEvade);
+  const held = state.pendingReaction?.kind;
+  if (held === 'aiRanged' || held === 'afterAiRanged' || held === 'aiCharge') state.pendingReaction = undefined;
   applyOrderReport(state, mode, report, { enemySupply });
   state.turn = 'players';
   advanceTurn(state, mode);
@@ -1845,6 +2025,92 @@ function fireBatches(state: GameState, mode: MissionMode, u: AiUnitInstance, ord
 }
 
 /**
+ * The AI's declared Ranged Attack, fired at `t`: every weapon batch that reaches it, each with the models that can.
+ * Returns true when it stopped for your saves. `firstOnly`: a Charge order falling back on its guns fires its first one.
+ */
+function aiRangedFire(state: GameState, mode: MissionMode, u: AiUnitInstance, order: AiOrder, t: PlayerUnit, firstOnly = false): boolean {
+  const def = unitById(u.defId);
+  const flare = (u.debuffs ?? []).reduce((a, d) => a + (d.rangeMod ?? 0), 0);
+  const noLR = (u.debuffs ?? []).some((d) => d.noLongRange);
+  const notHidden = (list: ReturnType<typeof visibleEnemies>) => list.filter((v) => !hiddenFrom(v.unit, v.nearest));
+  // The target is chosen by the main weapon's reach; each SIDEARM batch then fires at it only if it is within
+  // that sidearm's own range (at long range if it has one), with the models it can reach.
+  const indices: number[] = [];
+  order.batches.forEach((b, i) => {
+    if (firstOnly && i > 0) return;
+    const bRange = Math.max(0, (typeof b.range === 'number' ? b.range : 0) + (b.rangeMod ?? 0) + flare);
+    let bv = notHidden(visibleEnemies(state, u, bRange)).find((v) => v.unit.id === t.id);
+    let blr = false;
+    if (!bv && b.longRange && !noLR) {
+      bv = notHidden(visibleEnemies(state, u, b.longRange + (b.rangeMod ?? 0) + flare)).find((v) => v.unit.id === t.id);
+      blr = !!bv;
+    }
+    if (!bv) {
+      if (i > 0) pushLog(state, 'ai', `${u.label}: ${def.weapons.find((w) => w.id === b.weaponId)?.name ?? 'sidearm'} is out of range of ${t.name}.`);
+      return;
+    }
+    const roa = b.models ? b.dice / b.models : b.dice;
+    b.models = Math.min(b.models, bv.firing);
+    b.dice = Math.round(roa * b.models);
+    if (blr) b.hitMod = (b.hitMod ?? 0) - 1;
+    indices.push(i);
+  });
+  return fireBatches(state, mode, u, order, t, indices, 'attacked');
+}
+
+/** The AI's Ranged Attack is fully resolved: Lunge may answer it, then the AI's order ends. */
+function endAiRanged(state: GameState, mode: MissionMode, aiUnitId: string, targetId: string, report: string, enemySupply?: number): void {
+  if (state.step.kind === 'AI_ORDER' && offerReaction(state, { kind: 'afterAiRanged', unitId: targetId, aiUnitId, amount: 0, source: report, report, enemySupply })) return;
+  finishAiOrder(state, mode, report, enemySupply);
+}
+
+/** How far the AI unit's charge must reach your unit (to Engagement Range between bases, around terrain), and by which path. */
+function aiChargePath(state: GameState, u: AiUnitInstance, pu: PlayerUnit): { d: number; path: { x: number; y: number }[]; tp: Shape } | null {
+  const from = aiPos(state, u);
+  const lead = unitShapes(state, 'ai', u.id)[0];
+  const tModels = unitShapes(state, 'players', pu.id);
+  if (!from || !lead || !tModels.length) return null;
+  // Nearest enemy model by base gap; charge distance counts to Engagement Range between bases.
+  const tp = tModels.reduce((a, b) => (edgeDistance(lead, a) <= edgeDistance(lead, b) ? a : b));
+  const sp = shortestPath(from, tp, state.terrain.pieces, state.terrain.table, pathOptionsFor(state, 'ai', u.id));
+  const d = Math.max(0, edgeDistance(lead, tp) + (sp.length - Math.hypot(tp.x - from.x, tp.y - from.y)) - 1);
+  return { d, path: sp.path.length >= 2 ? sp.path : [from, tp], tp };
+}
+
+/** The AI's declared Charge against your unit: roll it, and on a success move in and resolve its IMPACT. */
+function aiChargeRoll(state: GameState, mode: MissionMode, u: AiUnitInstance, order: AiOrder, targetId: string): void {
+  const ctx = ctxFor(state);
+  const def = unitById(u.defId);
+  const card = currentCard(state.orderDeck);
+  const pu = state.playerUnits.find((p) => p.id === targetId);
+  const from = aiPos(state, u);
+  const cp = pu && from && pu.location === 'table' && !pu.destroyed ? aiChargePath(state, u, pu) : null;
+  if (!pu || !from || !cp) { finishAiOrder(state, mode, 'noTarget'); return; }
+  // A DEBUFF to its Speed (Concussive Shells) shortens the charge.
+  const speed = Math.max(0, speedFor(def, u.models) - aiDebuff(u, 'speed'));
+  const roll = rollCharge(ctx.rng, speed, DIFFICULTIES[state.config.difficulty].chargeDice, card.chargeBonus ?? 0);
+  const needed = cp.d;
+  const success = roll.reach >= needed;
+  state.lastCharge = { side: 'ai', unitId: u.id, targetId: pu.id, rolls: roll.rolls, reach: roll.reach, needed, success, round: state.round };
+  emit(state, { kind: 'charge', ...state.lastCharge });
+  commitRng(state, ctx.rng);
+  if (success) {
+    const end = contactPointAlong(cp.path, unitShapes(state, 'ai', u.id)[0]!, cp.tp);
+    placeUnit(state, 'ai', u.id, end, { contactWith: [pu.id], facing: Math.atan2(cp.tp.y - from.y, cp.tp.x - from.x) });
+    order.placed = true;
+    u.engaged = true;
+    pu.engaged = true;
+    if (!pu.engagedWith.includes(u.id)) pu.engagedWith.push(u.id);
+    pushLog(state, 'ai', `${u.label} charges ${pu.name}: ${speed} + ${roll.roll} = ${roll.reach}" (needed ${needed.toFixed(1)}"). Success!`);
+    if (order.impact && aiAttackPlayer(state, mode, u, order, 0, pu, 'Impact', 'charged', playerUnitSupply(pu))) return;
+    finishAiOrder(state, mode, 'charged', playerUnitSupply(pu));
+  } else {
+    pushLog(state, 'ai', `${u.label} charges ${pu.name}: ${speed} + ${roll.roll} = ${roll.reach}" (needed ${needed.toFixed(1)}"). Failed.`);
+    finishAiOrder(state, mode, 'chargeFailed');
+  }
+}
+
+/**
  * Whether the AI order can attack from the known positions, without rolling anything. `attack` is null when positions
  * are unknown (no camera or map placement for your units), in which case the player is asked on the table.
  */
@@ -1951,30 +2217,11 @@ function aiResolve(state: GameState, mode: MissionMode): void {
       if (vis.length) {
         const target = pickFocus(vis.map((v) => v.unit));
         const t = state.playerUnits.find((p) => p.id === target.id)!;
-        // The target is chosen by the main weapon's reach; each SIDEARM batch then fires at it only if it is within
-        // that sidearm's own range (at long range if it has one), with the models it can reach.
-        const indices: number[] = [];
-        order.batches.forEach((b, i) => {
-          const bRange = Math.max(0, (typeof b.range === 'number' ? b.range : 0) + (b.rangeMod ?? 0) + flare);
-          let bv = notHidden(visibleEnemies(state, u, bRange)).find((v) => v.unit.id === target.id);
-          let blr = false;
-          if (!bv && b.longRange && !noLR) {
-            bv = notHidden(visibleEnemies(state, u, b.longRange + (b.rangeMod ?? 0) + flare)).find((v) => v.unit.id === target.id);
-            blr = !!bv;
-          }
-          if (!bv) {
-            if (i > 0) pushLog(state, 'ai', `${u.label}: ${def.weapons.find((w) => w.id === b.weaponId)?.name ?? 'sidearm'} is out of range of ${t.name}.`);
-            return;
-          }
-          const roa = b.models ? b.dice / b.models : b.dice;
-          b.models = Math.min(b.models, bv.firing);
-          b.dice = Math.round(roa * b.models);
-          if (blr) b.hitMod = (b.hitMod ?? 0) - 1;
-          indices.push(i);
-        });
-        if (fireBatches(state, mode, u, order, t, indices, 'attacked')) return;
         commitRng(state, ctx.rng);
-        finishAiOrder(state, mode, 'attacked');
+        // The attack is declared: your Reactions to it come first (Hierarch's Stand, Hallucination, Debilitating Saliva).
+        if (offerReaction(state, { kind: 'aiRanged', unitId: t.id, aiUnitId: u.id, amount: 0, source: u.label, validTargets: vis.map((v) => v.unit.id) })) return;
+        if (aiRangedFire(state, mode, u, order, t)) return;
+        endAiRanged(state, mode, u.id, t.id, 'attacked');
         return;
       }
     }
@@ -1986,41 +2233,19 @@ function aiResolve(state: GameState, mode: MissionMode): void {
     const from = aiPos(state, u);
     const speed = speedFor(def, u.models);
     const threshold = (card.chargeThreshold === 'likely' ? speed + 3 : speed + 6) + (card.chargeBonus ?? 0);
-    let best: { pu: PlayerUnit; d: number; path: { x: number; y: number }[]; tp: Shape } | null = null;
+    let best: { pu: PlayerUnit; d: number } | null = null;
     if (from) {
       for (const pu of livePlayers) {
         if (playerUnitFlying(pu)) continue;
-        // Nearest enemy model by base gap; charge distance counts to Engagement Range between bases.
-        const lead = unitShapes(state, 'ai', u.id)[0];
-        const tModels = unitShapes(state, 'players', pu.id);
-        if (!lead || !tModels.length) continue;
-        const tp = tModels.reduce((a, b) => (edgeDistance(lead, a) <= edgeDistance(lead, b) ? a : b));
-        const sp = shortestPath(from, tp, state.terrain.pieces, state.terrain.table, pathOptionsFor(state, 'ai', u.id));
-        const need = Math.max(0, edgeDistance(lead, tp) + (sp.length - Math.hypot(tp.x - from.x, tp.y - from.y)) - 1);
-        if (need <= threshold && (!best || need < best.d)) best = { pu, d: need, path: sp.path.length >= 2 ? sp.path : [from, tp], tp };
+        const cp = aiChargePath(state, u, pu);
+        if (cp && cp.d <= threshold && (!best || cp.d < best.d)) best = { pu, d: cp.d };
       }
     }
     if (best) {
-      const roll = rollCharge(ctx.rng, speed, DIFFICULTIES[state.config.difficulty].chargeDice, card.chargeBonus ?? 0);
-      const needed = best.d;
-      const success = roll.reach >= needed;
-      state.lastCharge = { side: 'ai', unitId: u.id, targetId: best.pu.id, rolls: roll.rolls, reach: roll.reach, needed, success, round: state.round };
-      emit(state, { kind: 'charge', ...state.lastCharge });
       commitRng(state, ctx.rng);
-      if (success) {
-        const end = contactPointAlong(best.path, unitShapes(state, 'ai', u.id)[0]!, best.tp);
-        placeUnit(state, 'ai', u.id, end, { contactWith: [best.pu.id], facing: Math.atan2(best.tp.y - from!.y, best.tp.x - from!.x) });
-        order.placed = true;
-        u.engaged = true;
-        best.pu.engaged = true;
-        if (!best.pu.engagedWith.includes(u.id)) best.pu.engagedWith.push(u.id);
-        pushLog(state, 'ai', `${u.label} charges ${best.pu.name}: ${speed} + ${roll.roll} = ${roll.reach}" (needed ${needed.toFixed(1)}"). Success!`);
-        if (order.impact && aiAttackPlayer(state, mode, u, order, 0, best.pu, 'Impact', 'charged', playerUnitSupply(best.pu))) return;
-        finishAiOrder(state, mode, 'charged', playerUnitSupply(best.pu));
-      } else {
-        pushLog(state, 'ai', `${u.label} charges ${best.pu.name}: ${speed} + ${roll.roll} = ${roll.reach}" (needed ${needed.toFixed(1)}"). Failed.`);
-        finishAiOrder(state, mode, 'chargeFailed');
-      }
+      // The Charge is declared: Concussive Shells may answer it before the dice are rolled.
+      if (offerReaction(state, { kind: 'aiCharge', unitId: best.pu.id, aiUnitId: u.id, amount: 0, source: u.label })) return;
+      aiChargeRoll(state, mode, u, order, best.pu.id);
       return;
     }
     // Brawler fallback: shoot if possible.
@@ -2030,12 +2255,10 @@ function aiResolve(state: GameState, mode: MissionMode): void {
       const vis = visibleEnemies(state, u, range);
       if (vis.length) {
         const target = pickFocus(vis.map((v) => v.unit));
-        const firing = vis.find((v) => v.unit.id === target.id)!.firing;
-        main.models = Math.min(main.models, firing);
-        main.dice = Math.round((main.dice / Math.max(1, order.batches[0]!.models)) * main.models);
-        if (aiAttackPlayer(state, mode, u, order, 0, target, 'Assault', 'attacked')) return;
         commitRng(state, ctx.rng);
-        finishAiOrder(state, mode, 'attacked');
+        if (offerReaction(state, { kind: 'aiRanged', unitId: target.id, aiUnitId: u.id, amount: 0, source: u.label, validTargets: vis.map((v) => v.unit.id), firstOnly: true })) return;
+        if (aiRangedFire(state, mode, u, order, target, true)) return;
+        endAiRanged(state, mode, u.id, target.id, 'attacked');
         return;
       }
     }

@@ -52,10 +52,12 @@ describe('rulebook map layouts', () => {
             const d = distToPiece(mk, p);
             if (d > 0) expect(d, `${m.id} on ${d}: marker ${mk.id} on the edge of the ramp`).toBeGreaterThanOrEqual(2);
           }
-          // A marker moved because of high ground goes up onto a plateau, never on the ramp or below it.
+          // A marker moved because of high ground goes up onto a plateau, never on the ramp or below it, unless
+          // another marker already holds that plateau: then it keeps its distance below.
           if (mk.movedFrom?.piece === 'Lost Temple Ramp') {
-            const up = g.terrain.pieces.some((p) => p.catalogId === 'lt-ramp' && distToPiece(mk, p) === 0 && rampLevel(mk, p) === 1);
-            expect(up, `${m.id} on ${d.id}: marker ${mk.id} set below the plateau`).toBe(true);
+            const upOn = (q: { x: number; y: number }) => g.terrain.pieces.some((p) => p.catalogId === 'lt-ramp' && distToPiece(q, p) === 0 && rampLevel(q, p) === 1);
+            const taken = g.markers.some((o) => o !== mk && upOn(o));
+            expect(upOn(mk) || taken, `${m.id} on ${d.id}: marker ${mk.id} set below the plateau`).toBe(true);
           }
           if (mk.movedFrom) {
             moved++;
