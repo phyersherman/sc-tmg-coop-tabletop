@@ -5,7 +5,7 @@ import { makePlayerUnit } from '@engine/sense/playerUnits';
 import { playerWeapons, validTargets, checkMove } from '@engine/player/rules';
 import { unitAbilities, weaponWithEffects, blastCover, passiveTough, SELF_REACTIONS } from '@engine/abilities/index';
 import { makeConfig } from '../engine/helpers';
-import { decideAi, planted, usableNow } from '@engine/ai/decide';
+import { decideAi, deployOrder, planted, usableNow } from '@engine/ai/decide';
 import type { MissionCtx } from '@engine/types/mission';
 import { modeById } from '@engine/missions/index';
 import { aiUnitSize } from '@engine/sense/playerUnits';
@@ -203,13 +203,36 @@ describe('the AI with a Siege Tank', () => {
     expect(aiUnitSize(tank)).toBe(3);
     const guns = unitById('siege_tank').weapons.filter((w) => usableNow(tank, w) && w.phase === 'Assault');
     expect(guns.map((w) => w.name)).toEqual(['Shock Cannon']);
-    // With nothing left in range it packs up.
+    // With nothing left in range it packs up, once its dropship pickup has been spent.
     sieged.sense!.players['p1'] = [{ x: 2, y: 2 }];
     sieged.phase = 'movement';
     tank.activated.movement = false;
+    sieged.modeState['pickupUsed'] = ['ai-tank'];
     const back = decideAi(sieged, modeById(sieged.config.modeId)!, ctxOf(sieged), Rng.from(5));
     expect(back?.title).toMatch(/Leave SIEGE MODE/i);
   });
+
+  it('is picked up by dropship once a game, still dug in, to where its big gun has a target', () => {
+    const { s } = aiTank();
+    const tank = findTank(s)!;
+    tank.statuses = ['Siege Mode'];
+    s.phase = 'movement';
+    // Your Marines are out of the Shock Cannon's range (18"), but within reach of a spot 12" nearer.
+    s.sense!.players['p1'] = [{ x: 18, y: 6 }];
+    s.sense!.ai['ai-tank'] = [{ x: 18, y: 32 }];
+    tank.est = { x: 18, y: 32 };
+    const order = decideAi(s, modeById(s.config.modeId)!, ctxOf(s), Rng.from(5));
+    expect(order?.title).toMatch(/Ready for Pickup\?/);
+    const to = order!.pickupTo!;
+    expect(Math.hypot(to.x - 18, to.y - 32)).toBeLessThanOrEqual(12);
+    const after = apply({ ...s, step: { kind: 'AI_ORDER', order: order! } }, { t: 'orderReport', report: 'done' });
+    const moved = findTank(after)!;
+    expect(moved.statuses).toContain('Siege Mode');
+    expect(after.modeState['pickupUsed']).toContain('ai-tank');
+    const lead = after.sense!.ai['ai-tank']![0]!;
+    expect(Math.hypot(lead.x - to.x, lead.y - to.y)).toBeLessThan(1.5);
+  });
+
 
   it('will not walk or charge while it is dug in', () => {
     const { s } = aiTank();
@@ -221,5 +244,42 @@ describe('the AI with a Siege Tank', () => {
     // The only thing it does in the Movement phase is change stance, never a move order.
     const order = decideAi(s, modeById(s.config.modeId)!, ctxOf(s), Rng.from(5));
     expect(order === null || order.type === 'special').toBe(true);
+  });
+});
+
+describe('Terran order cards: Dust-off', () => {
+  it('brings one Terran Ground Unit down by dropship, 10" clear of the players, once a round', () => {
+    const cfg = makeConfig({ aiFaction: 'Terran', playMode: 'video' });
+    cfg.playerUnits = [makePlayerUnit('p1', 'marine', 'small', [], 'Marines', 300)];
+    const s = createGame(cfg, dep, flat);
+    s.playerUnits[0]!.location = 'table';
+    s.sense!.players['p1'] = [{ x: 18, y: 10 }];
+    s.orderDeck.current = 'dustOff';
+    s.phase = 'movement';
+    const unit = s.army.units.find((u) => !unitById(u.defId).tags.includes('Flying'))!;
+    unit.location = 'reserves';
+    const order = deployOrder(s, unit);
+    expect(order.usesRoundDeploy).toBe('dustOff');
+    expect(order.lines.join(' ')).toMatch(/READY FOR DUST-OFF/);
+    expect(Math.hypot(order.dropAt!.x - 18, order.dropAt!.y - 10)).toBeGreaterThan(10);
+    const after = apply({ ...s, step: { kind: 'AI_ORDER', order } }, { t: 'orderReport', report: 'done' });
+    expect(after.modeState['dustOffRound']).toBe(after.round);
+    // The next Unit this round enters from the edge as usual.
+    const next = after.army.units.find((u) => u.location === 'reserves' && !unitById(u.defId).tags.includes('Flying'));
+    if (next) expect(deployOrder(after, next).dropAt).toBeUndefined();
+  });
+
+  it('Warp In lets only one Unit a round come on from a side edge', () => {
+    const cfg = makeConfig({ aiFaction: 'Protoss', playMode: 'video' });
+    const s = createGame(cfg, dep, flat);
+    s.orderDeck.current = 'warpIn';
+    s.phase = 'movement';
+    const [a, b] = s.army.units;
+    a!.location = 'reserves';
+    b!.location = 'reserves';
+    const first = deployOrder(s, a!);
+    expect(first.usesRoundDeploy).toBe('warpIn');
+    const after = apply({ ...s, step: { kind: 'AI_ORDER', order: first } }, { t: 'orderReport', report: 'done' });
+    expect(deployOrder(after, after.army.units.find((u) => u.id === b!.id)!).usesRoundDeploy).toBeUndefined();
   });
 });

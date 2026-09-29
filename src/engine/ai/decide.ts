@@ -15,6 +15,7 @@ import { hasMutator } from '../mutators/index';
 import { onTable, reserves, aiSupplyOnTable, poolNow, heldInPlace, isStructure } from '../director/selectors';
 import { playerModels, visibleEnemies } from '../sense/query';
 import { passable } from '../sense/geometry2d';
+import { playerUnitFlying } from '../sense/playerUnits';
 import { playerSegments } from '../terrain/geometry';
 import { hiddenFrom } from '../abilities/index';
 import type { Rng } from '../rng';
@@ -183,7 +184,7 @@ function inPlayerZoi(state: GameState, p: { x: number; y: number }): boolean {
  * more than 6" from every player model the app knows of, out of the players' Zone of Influence, and clear of the
  * AI's own units. With no player positions known (tabletop without the camera) the 6" is the players' to keep.
  */
-function dropPointFor(state: GameState, unit: AiUnitInstance, toward: { x: number; y: number }): { x: number; y: number } {
+function dropPointFor(state: GameState, unit: AiUnitInstance, toward: { x: number; y: number }, clear = 6): { x: number; y: number } {
   const t = state.deployment.table;
   const yours = state.playerUnits.filter((p) => p.location === 'table' && !p.destroyed).flatMap((p) => playerModels(state, p));
   const own = state.army.units.filter((u) => u.location === 'table' && u.id !== unit.id).flatMap((u) => state.sense?.ai[u.id] ?? (u.est ? [u.est] : []));
@@ -192,7 +193,7 @@ function dropPointFor(state: GameState, unit: AiUnitInstance, toward: { x: numbe
     for (let x = 1.5; x <= t.width - 1.5; x += 1) {
       const p = { x, y };
       if (inPlayerZoi(state, p) || !passable(p, state.terrain.pieces)) continue;
-      if (yours.some((q) => dist(p, q) < 7)) continue;
+      if (yours.some((q) => dist(p, q) < clear + 1)) continue;
       if (own.some((q) => dist(p, q) < 2.5)) continue;
       const d = dist(p, toward);
       if (!best || d < best.d) best = { p, d };
@@ -223,14 +224,22 @@ export function deployOrder(state: GameState, unit: AiUnitInstance): AiOrder {
   }
   const hasAmbush = d.abilities.some((a) => /Burrow Ambush/i.test(a.name) && (!a.upgradeCost || unit.upgrades.includes(a.id)));
   // A collection too small for the players' armies: the AI is not held to its entry edge.
-  const dropAt = state.config.options.aiDropsAnywhere ? dropPointFor(state, unit, tp) : undefined;
-  if (dropAt) {
+  // Dust-off: once a round, one Terran Ground Unit comes down by dropship away from the fight.
+  const dustOff = card.id === 'dustOff' && d.faction === 'Terran' && !d.tags.includes('Flying') && state.modeState['dustOffRound'] !== state.round;
+  const dropAt = state.config.options.aiDropsAnywhere ? dropPointFor(state, unit, tp) : dustOff ? dropPointFor(state, unit, tp, 10) : undefined;
+  const warpIn = card.id === 'warpIn' && state.modeState['warpInRound'] !== state.round;
+  let usesRoundDeploy: 'warpIn' | 'dustOff' | undefined;
+  if (dropAt && !state.config.options.aiDropsAnywhere) {
+    usesRoundDeploy = 'dustOff';
+    lines.push(`READY FOR DUST-OFF: a dropship sets the Unit down anywhere on the table more than 10" from every player model, outside the players' Zone of Influence. Place the Leading Model at about ${fmtIn(dropAt)} and the rest in Coherency within 3".`);
+  } else if (dropAt) {
     lines.push(`Set the whole unit down anywhere on the table, outside the players' Zone of Influence and with every model more than 6" from every player model. Place the Leading Model at about ${fmtIn(dropAt)} and the rest in Coherency within 3".`);
     lines.push('The AI is short of models for this battle. Its Units arrive where they are needed, not at its Entry Edge.');
   } else if (card.deployBias === 'ambush' && hasAmbush) {
     lines.push(`BURROW AMBUSH: set the Unit up anywhere within 18" of the AI's Entry Edge, outside the players' Zone of Influence and with no model within 10" of a player model.`);
     lines.push('It takes no other action this phase.');
-  } else if (hasMutator(state, 'aggressiveDeployment') || (card.id === 'warpIn' && !state.modeState['warpInUsed'])) {
+  } else if (hasMutator(state, 'aggressiveDeployment') || warpIn) {
+    if (warpIn && !hasMutator(state, 'aggressiveDeployment')) usesRoundDeploy = 'warpIn';
     lines.push(`Enter from ${describeSegment(seg, table)}, or from either side edge that is not a player's Entry Edge. End more than 10" from every player model.`);
     lines.push(`Move the Leading Model up to ${speed}" onto the table, then set the rest of the Unit in Coherency within 3".`);
   } else {
@@ -248,6 +257,7 @@ export function deployOrder(state: GameState, unit: AiUnitInstance): AiOrder {
     batches: [],
     reports: [report('done', 'Deployed')],
     dropAt,
+    usesRoundDeploy,
   };
 }
 
@@ -283,6 +293,50 @@ function stanceChange(state: GameState, u: AiUnitInstance): 'siege' | 'unsiege' 
     return inRange.length && !pinned && !u.engaged ? 'siege' : null;
   }
   return !inRange.length || pinned ? 'unsiege' : null;
+}
+
+/**
+ * Ready for Pickup? (Terran, once per Game): a Siege Tank in SIEGE MODE with nothing left in range is set down by a
+ * dropship up to 12" away, still dug in, where its big gun has a target: a PLACE (12) that replaces its action. No
+ * model ends within Engagement Range of an enemy, and it keeps out of Point Blank reach.
+ */
+function pickupOrder(state: GameState, unit: AiUnitInstance): AiOrder | null {
+  const w = statusWeapon(unit);
+  if (!w || !hasStatus(unit, w.requiresStatus!) || unit.engaged) return null;
+  if ((state.modeState['pickupUsed'] as string[] | undefined)?.includes(unit.id)) return null;
+  const from = state.sense?.ai[unit.id]?.[0] ?? unit.est;
+  if (!from) return null;
+  const foes = state.playerUnits.filter((p) => p.location === 'table' && !p.destroyed && !playerUnitFlying(p)).flatMap((p) => playerModels(state, p));
+  if (!foes.length) return null;
+  const range = maxRange(w) + rangeModFor(state);
+  const t = state.deployment.table;
+  let best: { p: { x: number; y: number }; score: number } | null = null;
+  for (let y = 1.5; y <= t.height - 1.5; y += 1) {
+    for (let x = 1.5; x <= t.width - 1.5; x += 1) {
+      const p = { x, y };
+      if (dist(p, from) > 12 || !passable(p, state.terrain.pieces)) continue;
+      const near = Math.min(...foes.map((q) => dist(p, q)));
+      // In the big gun's range, but not so close that the enemy is on top of it.
+      if (near > range - 1 || near < 8) continue;
+      const score = Math.abs(near - (range - 4));
+      if (!best || score < best.score) best = { p, score };
+    }
+  }
+  if (!best) return null;
+  const status = w.requiresStatus!;
+  return {
+    type: 'special',
+    unitId: unit.id,
+    title: `${unit.label}: Ready for Pickup?`,
+    lines: [
+      `A dropship lifts ${unit.label} and sets it down up to 12" away. It stays in ${status}. This is its action.`,
+      `Place the Leading Model at about ${fmtIn(best.p)}. No model may end within 1" of an enemy model.`,
+    ],
+    batches: [],
+    reports: [report('done', 'Placed')],
+    pickupTo: best.p,
+    preview: best.p,
+  };
 }
 
 function stanceOrder(state: GameState, unit: AiUnitInstance, to: 'siege' | 'unsiege'): AiOrder {
@@ -484,9 +538,12 @@ export function decideAi(state: GameState, mode: MissionMode, ctx: MissionCtx, r
       const p = classify(def(u));
       if ((p === 'rangedLine' || p === 'support') && currentSupply(def(u), u.models) > u.engagedEnemySupply) return disengageOrder(state, u);
     }
-    // Stance first: a gun that has to be set up is set up before the rest of the force walks on.
+    // Stance first: a gun that has to be set up is set up before the rest of the force walks on. A dug-in gun with
+    // nothing left to shell is picked up by dropship to where it has, once a game, instead of packing up.
     for (const u of table) {
       const to = stanceChange(state, u);
+      const pickup = to === 'unsiege' ? pickupOrder(state, u) : null;
+      if (pickup) return pickup;
       if (to) return stanceOrder(state, u, to);
     }
     // Units that still want to move.

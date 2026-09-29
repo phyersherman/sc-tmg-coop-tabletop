@@ -502,8 +502,10 @@ function advanceEstimate(state: GameState, u: AiUnitInstance, order: AiOrder, re
   const def = unitById(u.defId);
   const speed = speedFor(def, u.models) + speedModFor(state, u);
   const t = state.terrain.table;
+  // Set down where a dropship put it (Ready for Pickup?): it stands there, whatever it was doing.
+  if (order.pickupTo) { u.est = { ...order.pickupTo }; return; }
   if (order.type === 'deploy') {
-    // Set down away from the edge (a collection too small for the players' armies): it stands where it was dropped.
+    // Set down away from the edge (a collection too small for the players' armies, or Dust-off): it stands where it was dropped.
     if (order.dropAt) { u.est = { ...order.dropAt }; return; }
     const target = headingPointFor(state, u, { x: t.width / 2, y: t.height / 2 });
     const segs = aiSegments(state.deployment);
@@ -572,6 +574,12 @@ function applyOrderReport(state: GameState, mode: MissionMode, report: string, e
     u.deployedRound = state.round;
     u.atObjective = false;
     pushLog(state, 'ai', `${u.label} deployed.`);
+    // Warp In and Dust-off let one Unit a round come on another way: this one used it.
+    if (order.usesRoundDeploy) state.modeState[`${order.usesRoundDeploy}Round`] = state.round;
+  }
+  if (order.pickupTo) {
+    state.modeState['pickupUsed'] = [...((state.modeState['pickupUsed'] as string[] | undefined) ?? []), u.id];
+    pushLog(state, 'ai', `${u.label} is picked up by dropship and set down again, still dug in.`);
   }
   if (order.type === 'special' && /siege mode/i.test(order.title)) {
     // The tank digs in or packs up: the Status is what its weapons, its Size and its movement all read from.

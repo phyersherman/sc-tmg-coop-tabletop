@@ -29,6 +29,7 @@ export const ORDER_CARDS: Record<string, OrderCard> = {
   swarmSurge: { id: 'swarmSurge', name: 'Swarm Surge', flavor: 'The ground itself erupts.', deployMax: 'all', deployBias: 'ambush', advance: 'aggressive', chargeThreshold: 'possible', chargeBonus: 1, special: 'Units with Burrow Ambush may deploy anywhere within 18" of the AI\'s Entry Edge, with no model within 10" of a player model.' },
   stim: { id: 'stim', name: 'Stim', flavor: 'Pop it and push.', deployMax: 2, deployBias: 'nearest', advance: 'aggressive', chargeThreshold: 'likely', hitMod: 1, special: 'Stimpack: every Biological AI Unit that attacks this round takes 1 damage first.' },
   digIn: { id: 'digIn', name: 'Dig In', flavor: 'Hold the line.', deployMax: 1, deployBias: 'nearest', advance: 'hold', chargeThreshold: 'likely', passEarly: true, focus: 'onMarker', special: 'Combat Shield: AI Units that did not move re-roll their first failed Armour save.' },
+  dustOff: { id: 'dustOff', name: 'Dust-off', flavor: 'Dropships inbound.', deployMax: 2, deployBias: 'nearest', advance: 'normal', chargeThreshold: 'possible', special: 'Ready For Dust-off: one Terran Ground Unit may deploy from Reserves by dropship, anywhere more than 10" from every player model.' },
   warpIn: { id: 'warpIn', name: 'Warp In', flavor: 'The Khala opens.', deployMax: 2, deployBias: 'flank', advance: 'normal', chargeThreshold: 'possible', special: 'One AI Unit may deploy from either side edge that is not a player\'s Entry Edge, more than 10" from every player model.' },
   khalaLink: { id: 'khalaLink', name: 'Khala Link', flavor: 'One mind, many blades.', deployMax: 2, deployBias: 'nearest', advance: 'normal', chargeThreshold: 'likely', hitMod: 1, special: 'AI attacks get +1 to hit this round.' },
 };
@@ -36,7 +37,7 @@ export const ORDER_CARDS: Record<string, OrderCard> = {
 const BASE = ['advance', 'advance', 'advance', 'hold', 'hold', 'focusFire', 'focusFire', 'flank', 'reinforce', 'allIn'];
 const FACTION_EXTRA: Record<Faction, string[]> = {
   Zerg: ['swarmSurge', 'allIn'],
-  Terran: ['stim', 'digIn'],
+  Terran: ['stim', 'digIn', 'dustOff'],
   Protoss: ['warpIn', 'khalaLink'],
 };
 

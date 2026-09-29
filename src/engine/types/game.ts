@@ -156,6 +156,10 @@ export interface AiOrder {
   preview?: { x: number; y: number };
   /** A deploy set down away from the entry edge (see GameOptions.aiDropsAnywhere): where the leading model goes. */
   dropAt?: { x: number; y: number };
+  /** The once-a-round deploy an order card allows (Warp In, Dust-off): used up when this order is carried out. */
+  usesRoundDeploy?: 'warpIn' | 'dustOff';
+  /** Ready for Pickup?: where a dropship sets the Unit down (a Siege Tank keeps its SIEGE MODE). */
+  pickupTo?: { x: number; y: number };
   /** Checked when the order was issued: the attack has no legal target, so the unit runs instead. */
   noTarget?: boolean;
   /** Its unit is holding its ground (a garrison before it may move): it fires or does nothing, never runs. */
