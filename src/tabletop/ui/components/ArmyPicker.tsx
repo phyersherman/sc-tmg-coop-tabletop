@@ -13,6 +13,9 @@ import { UnitSheet } from './UnitCard';
 import { configCost, configLabel, type UnitConfig } from './UnitBuilder';
 import { cardArt, modelPhoto } from '@data/modelPhotos';
 
+/** A Creep card (printed "CREEP CARD"): the one kind of Tactical card an army takes only once. */
+const isCreepCard = (c: CardDef) => / Creep$/.test(c.name);
+
 /** The buildings each faction trains its units from, as the game's command card lays them out. */
 /** A unit, card or building shown by its initials ("SIE" for a Siege Tank, "RF" for a two-word card). */
 function Icon({ name, size = 40 }: { name: string; size?: number }) {
@@ -187,11 +190,11 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
     onChange({ ...value, units: next });
   };
   const setFactionCard = (id: string) => onChange({ ...value, cards: [id, ...value.cards.filter((c) => !CARDS.find((d) => d.id === c)?.isFactionCard)] });
-  // A click takes another copy of a card (a Unique one only once: a second click puts it back); a right-click
-  // puts one copy back.
+  // A click takes another copy of a card; a right-click puts one copy back. A Creep card is taken once: a second
+  // click puts it back. (Only one Faction card is ever in the army.)
   const addTactical = (c: CardDef) => {
     const i = value.cards.indexOf(c.id);
-    if (i >= 0 && c.unique) return removeTactical(c);
+    if (i >= 0 && isCreepCard(c)) return removeTactical(c);
     if (gasSpent + c.cost > gas) return;
     onChange({ ...value, cards: [...value.cards, c.id] });
   };
@@ -312,10 +315,10 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
               const off = !n && (gasSpent + c.cost > gas);
               return (
                 <button key={c.id} type="button" className={`cmd-btn card-btn ${n ? 'on' : ''}`} disabled={off} onClick={() => addTactical(c)} onContextMenu={(e) => { e.preventDefault(); removeTactical(c); }}
-                  {...hover({ title: c.name, meta: `Tactical card · ${c.cost} gas · ${c.resource} ${resource} · slots ${SLOTS.filter((s) => c.slots[s]).map((s) => `${c.slots[s]} ${s}`).join(', ') || 'none'}${c.unique ? ' · unique' : ''}`, body: <>{cardBody(c)}{n ? <><br />{c.unique ? 'In your army. Click to remove.' : `${n} in your army. Click to add another, right-click to remove one.`}</> : off ? <><br />Not enough Vespene Gas.</> : null}</> })}>
+                  {...hover({ title: c.name, meta: `Tactical card · ${c.cost} gas · ${c.resource} ${resource} · slots ${SLOTS.filter((s) => c.slots[s]).map((s) => `${c.slots[s]} ${s}`).join(', ') || 'none'}${c.unique ? ' · unique' : ''}`, body: <>{cardBody(c)}{n ? <><br />{isCreepCard(c) ? 'In your army. Click to remove.' : `${n} in your army. Click to add another, right-click to remove one.`}</> : off ? <><br />Not enough Vespene Gas.</> : null}</> })}>
                   <Icon name={`c_${c.id}`} size={52} />
                   <span className="cmd-cost">{c.cost}</span>
-                  {n > 0 && <span className="cmd-count">{c.unique || n === 1 ? '✓' : `×${n}`}</span>}
+                  {n > 0 && <span className="cmd-count">{n === 1 ? '✓' : `×${n}`}</span>}
                 </button>
               );
             })}
