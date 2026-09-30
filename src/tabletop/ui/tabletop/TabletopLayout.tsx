@@ -170,7 +170,7 @@ function useStageKeys(undoLast: () => void): void {
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoLast(); return; }
       if (e.key !== ' ' || document.querySelector('.combat-tray')) return;
-      const primary = document.querySelector<HTMLButtonElement>('.eb-deal .tt-primary:not(:disabled), .tt-now .tt-primary:not(:disabled)');
+      const primary = document.querySelector<HTMLButtonElement>('.tt-rolls .tt-primary:not(:disabled), .eb-deal .tt-primary:not(:disabled), .tt-now .tt-primary:not(:disabled)');
       if (!primary) return;
       e.preventDefault();
       primary.click();

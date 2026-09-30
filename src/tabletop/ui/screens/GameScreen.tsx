@@ -121,15 +121,17 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
           <p className="ask">{camLine ? 'Roll the AI\'s charge distance on the table.' : `Charge ${targetText(order.focus, true)} within ${order.charge?.max ?? '?'}" of the Leading Model. Otherwise, do not charge.`}</p>
           {/* The charge die goes the way the attack dice go: rolled by the app when it rolls the AI's dice, by the table
               otherwise. */}
-          {!camLine && order.charge && (showRolls
-            ? <InTray><ChargeRoll faction={def.faction} dice={order.charge.dice} speed={order.charge.speed} bonus={order.charge.min - 1 - order.charge.speed} seed={`${g.config.seed}:${g.round}:${g.phase}:${order.unitId}:charge`} /></InTray>
-            : <p className="ask">Roll the AI's charge on the table. {chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>)}
+          {!camLine && order.charge && !showRolls && <p className="ask">Roll the AI's charge on the table. {chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>}
+          {/* The charge roll and what the table makes of it, together in the tray. */}
+          <InTray key="charge">
+          {!camLine && order.charge && showRolls && <ChargeRoll faction={def.faction} dice={order.charge.dice} speed={order.charge.speed} bonus={order.charge.min - 1 - order.charge.speed} seed={`${g.config.seed}:${g.round}:${g.phase}:${order.unitId}:charge`} />}
           <div className="row">
             {order.impact ? <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge made, roll IMPACT</Btn> : <Btn variant="primary" size="lg" className="tt-primary" onClick={() => report('charged')}>Charge made</Btn>}
             {hasReport('chargeFailed') && <Btn size="lg" onClick={() => report('chargeFailed')}>Charge failed</Btn>}
             {hasReport('attacked') && order.batches.length > 0 && <Btn size="lg" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>No charge, fire instead</Btn>}
             {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>No target, it ran</Btn>}
           </div>
+          </InTray>
         </div>
       )}
       {needsAsk && askFighters && (
@@ -149,7 +151,14 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
       {stage === 'roll' && rollWhat === 'impact' && order.impact && <InTray key="impact"><DiceBlock batch={order.impact} showRolls={showRolls} title="IMPACT" faction={def.faction} models={fighters ?? undefined} /></InTray>}
 
 
-      {(!hasDice || stage === 'roll') && (
+      {!hasDice && (
+        <div className="row">
+          {order.reports.map((r) => <Btn key={r.id} size="lg" variant={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'primary' : ''} className={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'tt-primary' : ''} onClick={() => report(r.id)}>{r.label}</Btn>)}
+        </div>
+      )}
+      {/* The dice and the button that finishes them sit together in the tray above the cards. */}
+      {stage === 'roll' && (
+        <InTray key="resolve">
         <div className="row">
           {stage === 'roll' && rollWhat === 'impact' && (
             <>
@@ -160,9 +169,9 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
           {stage === 'roll' && rollWhat === 'batches' && order.type === 'ranged' && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('attacked')}>Attack resolved</Btn>}
           {stage === 'roll' && rollWhat === 'batches' && order.type === 'charge' && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('attacked')}>Attack resolved</Btn>}
           {stage === 'roll' && rollWhat === 'batches' && order.type === 'closeCombat' && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('done')}>Combat resolved</Btn>}
-          {!hasDice && order.reports.map((r) => <Btn key={r.id} size="lg" variant={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'primary' : ''} className={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'tt-primary' : ''} onClick={() => report(r.id)}>{r.label}</Btn>)}
           {stage === 'roll' && <Btn size="sm" variant="ghost" onClick={() => setStage('ask')}>Back</Btn>}
         </div>
+        </InTray>
       )}
       {/* The rules behind the order, for the operator: after the one action, never between the steps and it. */}
       <div className="row cmd-more">
