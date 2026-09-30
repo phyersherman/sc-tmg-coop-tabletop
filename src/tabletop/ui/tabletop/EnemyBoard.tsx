@@ -10,7 +10,7 @@ import { REWARDS, sideState } from '@engine/missions/sideMarkers';
 import { StepIcon } from './StepIcon';
 import { DieFace } from '../components/DiceRoll';
 import { modelPhoto } from '@data/modelPhotos';
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 const STAT_DEBUFFS = ['speed', 'hit', 'armour', 'evade'] as const;
 
@@ -24,6 +24,22 @@ export function EnemyBoard({ g, selected, lastId = null, onPick, onEngaged, extr
   const onTable = g.army.units.filter((u) => u.models > 0 && (u.location === 'table' || u.id === dealt?.unitId));
   const reserves = g.army.units.filter((u) => u.location === 'reserves' && u.models > 0 && u.id !== dealt?.unitId);
   const activeId = g.step.kind === 'AI_ORDER' ? g.step.order.unitId : null;
+  // Every card as tall as the tallest one not opened for damage, kept so as photos load and orders come and go.
+  const grid = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = grid.current;
+    if (!el) return;
+    const fit = () => {
+      el.style.setProperty('--eb-h', '0px');
+      const tiles = [...el.querySelectorAll<HTMLElement>('.eb-tile:not(.selected)')];
+      const h = Math.max(0, ...tiles.map((t) => t.offsetHeight));
+      el.style.setProperty('--eb-h', `${h}px`);
+    };
+    fit();
+    const ro = new ResizeObserver(() => fit());
+    for (const t of el.querySelectorAll('.eb-tile')) for (const c of t.children) ro.observe(c);
+    return () => ro.disconnect();
+  });
   return (
     <section className="eb" aria-label="Enemy units">
       <div className="eb-head">
@@ -32,7 +48,7 @@ export function EnemyBoard({ g, selected, lastId = null, onPick, onEngaged, extr
         {onTable.length > 0 && <span className="eb-hint">Pick a Unit to enter damage, models lost and DEBUFFs.</span>}
       </div>
       {onTable.length === 0 && <p className="eb-empty">No enemy Units on the table yet. They arrive in the Movement phase.</p>}
-      <div className="eb-grid">
+      <div className="eb-grid" ref={grid}>
         {onTable.map((u) => <EnemyTile key={u.id} g={g} u={u} active={u.id === activeId} last={u.id === lastId} selected={u.id === selected} onPick={() => onPick(u.id)} onEngaged={onEngaged ? (on) => onEngaged(u.id, on) : undefined} extra={extra?.(u.id)} dealt={dealt?.unitId === u.id ? dealt.node : null} />)}
       </div>
     </section>

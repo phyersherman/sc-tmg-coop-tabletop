@@ -587,7 +587,7 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 
 /* The deal: the AI's order lands on the acting Unit's card, which spans two slots while it carries it. The order is
    the Unit's own card grown: its name, the action card, the roll, the one light button. */
-.eb-tile.dealing { grid-column: span 2; order: -1; opacity: 1; transform: translateY(-6px); border-color: rgba(226, 59, 59, 0.75); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); }
+.eb-tile.dealing { order: -1; opacity: 1; transform: translateY(-6px); border-color: rgba(226, 59, 59, 0.75); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); }
 .eb-tile.dealing .eb-tile-top { border-bottom: 1px solid rgba(226, 59, 59, 0.35); }
 .eb-deal > * { animation: deal-land 0.32s cubic-bezier(0.2, 0.9, 0.2, 1) both; }
 @keyframes deal-land { from { opacity: 0; transform: translateY(-18px) rotate(-1.2deg) scale(1.02); } to { opacity: 1; transform: none; } }
@@ -605,7 +605,6 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .eb-deal .cmd .ac-full { margin: 8px 16px 12px; padding: 14px 16px 16px; border: 1px solid rgba(226, 59, 59, 0.45); background: linear-gradient(180deg, rgba(226, 59, 59, 0.08), rgba(226, 59, 59, 0.02)), rgba(9, 9, 24, 0.6); }
 .eb-deal .btn-lg, .tt-now .btn-lg { min-height: 58px; font-size: 15px; padding: 12px 26px; }
 .eb-deal .tt-takeback { margin: 0 16px 14px; }
-@media (max-width: 720px) { .eb-tile.dealing { grid-column: auto; } }
 
 /* ---------------------------------------------------------------- Action cards: numbered steps, one mark */
 .ac { border-top: 1px solid var(--line); background: linear-gradient(180deg, rgba(226, 59, 59, 0.07), rgba(226, 59, 59, 0.02)); padding: 10px 14px 12px; }
@@ -643,7 +642,12 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .eb-reserves, .eb-hint { color: var(--muted); font-size: 14px; }
 .eb-empty { color: var(--muted); font-size: 17px; }
 /* The acting card leads the row, and the rest pack in behind it with no hole. */
-.eb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); grid-auto-flow: row dense; gap: 16px; align-items: start; }
+.eb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); grid-auto-flow: row dense; gap: 16px; align-items: start; }
+/* Every card one size, as tall as the tallest (EnemyBoard measures it); only a card opened to enter damage grows. */
+.eb-tile:not(.selected) { min-height: var(--eb-h, 0px); }
+/* A card with nothing dealt yet shows its empty slot to the bottom, so the space reads as the card's, not a gap. */
+.eb-tile > .eb-nocard, .eb-tile > .ac { flex: 1 1 auto; }
+.eb-tile > .eb-nocard { display: flex; align-items: center; justify-content: center; }
 /* Every card stands at full strength, ready to be picked; the acting card is lifted and takes the red edge. */
 .eb-tile { display: flex; flex-direction: column; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }
 /* Under the pointer a card comes up to full strength and takes the cyan edge: this is the one a click opens. */
@@ -695,7 +699,7 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .eb-extra .tt-card::before, .eb-extra .tt-card::after { display: none; }
 .eb-extra .tt-card h2 { font-size: 13px; letter-spacing: 0.12em; color: var(--cyan); }
 .eb-extra .tt-card > p.small { font-size: 13px; }
-@media (min-width: 1800px) { .eb-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); } }
+@media (min-width: 1800px) { .eb-grid { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); } }
 
 @media (max-width: 1280px) and (min-width: 801px) { .tt-map { top: 132px; } }
 @media (max-width: 800px) {
