@@ -259,7 +259,7 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
                     const left = leftFor(d);
                     const canBuild = left === Infinity || left >= Math.min(...d.compositions.map((c) => c.models));
                     return (
-                      <button key={d.id} type="button" className={`cmd-btn ${sel === d.id ? 'on' : ''}`} disabled={!canBuild} onClick={() => pick(d)}
+                      <button key={d.id} type="button" className={`cmd-btn ${sel === d.id ? 'on' : ''}`} aria-disabled={!canBuild} onClick={() => canBuild && pick(d)}
                         {...hover({ title: d.name, meta: `${d.role}${d.unique ? ' · unique' : ''} · ${d.compositions.map((c) => `${c.models} for ${c.cost}`).join(' / ')}`, body: <>Speed {d.stats.speed ? d.stats.speed.join('/') : '–'}" · Armour {d.stats.armour}+{d.stats.evade ? ` · Evade ${d.stats.evade}+` : ''} · HP {d.stats.hp}{d.stats.shields ? ` +${d.stats.shields} shields` : ''}<br />{d.tags.join(', ')}{!canBuild ? <><br />You do not own enough {d.name} models.</> : left !== Infinity ? <><br />{left} model{left === 1 ? '' : 's'} left in your Collection.</> : null}<UnitTipKit def={d} /></> })}>
                         <Icon name={`u_${d.id}`} size={44} />
                         <span className="cmd-cost">{Math.min(...d.compositions.map((c) => c.cost))}</span>
@@ -314,8 +314,8 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
               const n = value.cards.filter((id) => id === c.id).length;
               const off = !n && (gasSpent + c.cost > gas);
               return (
-                <button key={c.id} type="button" className={`cmd-btn card-btn ${n ? 'on' : ''}`} disabled={off} onClick={() => addTactical(c)} onContextMenu={(e) => { e.preventDefault(); removeTactical(c); }}
-                  {...hover({ title: c.name, meta: `Tactical card · ${c.cost} gas · ${c.resource} ${resource} · slots ${SLOTS.filter((s) => c.slots[s]).map((s) => `${c.slots[s]} ${s}`).join(', ') || 'none'}${c.unique ? ' · unique' : ''}`, body: <>{cardBody(c)}{n ? <><br />{isCreepCard(c) ? 'In your army. Click to remove.' : `${n} in your army. Click to add another, right-click to remove one.`}</> : off ? <><br />Not enough Vespene Gas.</> : null}</> })}>
+                <button key={c.id} type="button" className={`cmd-btn card-btn ${n ? 'on' : ''}`} aria-disabled={off} onClick={() => !off && addTactical(c)} onContextMenu={(e) => { e.preventDefault(); removeTactical(c); }}
+                  {...hover({ title: c.name, meta: `Tactical card · ${c.cost} gas · ${c.resource} ${resource} · slots ${SLOTS.filter((s) => c.slots[s]).map((s) => `${c.slots[s]} ${s}`).join(', ') || 'none'}${isCreepCard(c) ? ' · one per army' : ''}`, body: <>{cardBody(c)}{n ? <><br />{isCreepCard(c) ? 'In your army. Click to remove.' : `${n} in your army. Click to add another, right-click to remove one.`}</> : off ? <><br />Not enough Vespene Gas.</> : null}</> })}>
                   <Icon name={`c_${c.id}`} size={52} />
                   <span className="cmd-cost">{c.cost}</span>
                   {n > 0 && <span className="cmd-count">{n === 1 ? '✓' : `×${n}`}</span>}

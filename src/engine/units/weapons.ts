@@ -98,7 +98,9 @@ export function expectedDamage(w: WeaponProfile): number {
  * unit may fire as it stands, so a dug-in Siege Tank picks among the guns SIEGE MODE actually leaves it.
  */
 export function bestWeapon(def: UnitDef, upgrades: string[], phase: 'Assault' | 'Combat', usable: (w: WeaponProfile) => boolean = (w) => !w.requiresStatus): WeaponProfile | undefined {
-  const ws = availableWeapons(def, upgrades, phase).filter((w) => w.target !== 'Flying' && usable(w));
+  const all = availableWeapons(def, upgrades, phase).filter((w) => w.target !== 'Flying' && usable(w));
+  // A squad leads with the gun most of it carries: a SPECIALIST's weapon is one model's, never the unit's lead.
+  const ws = all.some((w) => !isSpecialist(w)) ? all.filter((w) => !isSpecialist(w)) : all;
   let best: WeaponProfile | undefined;
   let bestEv = -1;
   for (const w of ws) {

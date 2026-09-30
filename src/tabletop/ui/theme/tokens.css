@@ -268,7 +268,8 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .cmd-btn { position: relative; width: 56px; height: 56px; padding: 0; border: 1px solid var(--line-2); background: rgba(20, 26, 39, 0.9); cursor: pointer; display: grid; place-items: center; }
 .cmd-btn:hover:not(:disabled) { border-color: var(--cyan); }
 .cmd-btn.on { border-color: var(--cyan); box-shadow: inset 0 0 0 1px var(--cyan); }
-.cmd-btn:disabled { opacity: 0.35; cursor: default; }
+/* Unavailable, but still pointed at: its tip says why (a disabled button would take no pointer events at all). */
+.cmd-btn:disabled, .cmd-btn[aria-disabled='true'] { opacity: 0.35; cursor: default; }
 .cmd-btn .cmd-cost { position: absolute; right: 2px; bottom: 1px; font-size: 10px; color: var(--warn); font-family: var(--font-mono); text-shadow: 0 0 3px #000; }
 .cmd-btn .cmd-count { position: absolute; left: 2px; top: 1px; font-size: 10px; color: var(--text); font-family: var(--font-mono); text-shadow: 0 0 3px #000; }
 .cmd-btn.card-btn { width: 64px; height: 64px; }

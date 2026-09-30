@@ -5,7 +5,7 @@ import type { UnitDef } from '../types/units';
 import { unitById } from '@data/index';
 import { currentCard } from './orderDeck';
 import { classify, preferredRange, type Profile } from './profiles';
-import { availableWeapons, bestWeapon, diceInstruction, maxRange, rollInstruction, type DiceInstruction } from '../units/weapons';
+import { availableWeapons, bestWeapon, diceInstruction, isSpecialist, maxRange, rollInstruction, weaponModels, type DiceInstruction } from '../units/weapons';
 import { currentSupply } from '../units/supply';
 import { speedFor } from '../units/speed';
 import { impactText } from '../units/keywords';
@@ -79,7 +79,9 @@ function cardMods(state: GameState, unit?: AiUnitInstance): AiUnitInstance['card
 
 function hitModFor(state: GameState, unit?: AiUnitInstance): number {
   const card = currentCard(state.orderDeck);
-  let mod = (card.hitMod ?? 0) + (cardMods(state, unit)?.hit ?? 0) - aiDebuff(unit, 'hit');
+  // The Stim card is a Stimpack: it drives only the Biological Units, whose attacks pay for it in damage.
+  const stimmed = card.id !== 'stim' || !unit || def(unit).tags.includes('Biological');
+  let mod = (stimmed ? card.hitMod ?? 0 : 0) + (cardMods(state, unit)?.hit ?? 0) - aiDebuff(unit, 'hit');
   if (state.modeState['avengerActive']) mod += 1;
   return mod;
 }
@@ -114,11 +116,14 @@ function batchesFor(state: GameState, unit: AiUnitInstance, rng: Rng, phase: 'As
   const out: DiceInstruction[] = [];
   const mod = hitModFor(state, unit);
   const rmod = rangeModFor(state);
-  const pick = phase === 'Combat' ? (best ? [best] : []) : ws.filter((w) => w === best || w.keywords.some((k) => k.k === 'SIDEARM'));
+  // The main weapon, then SIDEARMs and the SPECIALISTs' own guns: each fired by the models that carry it (a
+  // Marine squad with a Rocket Launcher is eight rifles and one launcher, never nine launchers).
+  const pick = phase === 'Combat' ? (best ? [best] : []) : ws.filter((w) => w === best || isSpecialist(w) || w.keywords.some((k) => k.k === 'SIDEARM'));
   for (const w of pick) {
     // An action card's extra attacks add to the main weapon only (a BUFF RoA on the weapon the ability names).
     const roa = w === best && phase === 'Assault' ? cardMods(state, unit)?.roa ?? 0 : 0;
-    let instr = diceInstruction(roa ? { ...w, roa: w.roa + roa } : w, unit.models);
+    const models = Math.min(unit.models, weaponModels(d, unit.upgrades, phase, w, unit.models));
+    let instr = diceInstruction(roa ? { ...w, roa: w.roa + roa } : w, models);
     if (mod) instr.hitMod = mod;
     if (rmod && w.range !== 'E') instr.rangeMod = rmod;
     instr = rollInstruction(rng, instr);

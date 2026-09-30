@@ -1832,11 +1832,14 @@ function finishPlayerAction(state: GameState, mode: MissionMode, pu: PlayerUnit,
  * After an action: the unit stays active while it has something left to do (coherency to fix, a weapon to fire,
  * an Active ability, a Reaction waiting on its Charge, a Lightning Dash to declare); otherwise its Activation ends.
  */
-function settleActivation(state: GameState, mode: MissionMode, pu: PlayerUnit, action: 'deploy' | 'move' | 'run' | 'disengage' | 'hold' | 'attack' | 'charge'): void {
+/**
+ * After its action a unit stays active until the player ends its activation: a SIDEARM still to fire, an ability,
+ * its models to tidy, or nothing at all, the choice to move on is theirs. Only a unit no longer on the table (it
+ * went back to Reserves, or was destroyed) ends it at once.
+ */
+function settleActivation(state: GameState, mode: MissionMode, pu: PlayerUnit, _action: 'deploy' | 'move' | 'run' | 'disengage' | 'hold' | 'attack' | 'charge'): void {
   state.activeUnitId = pu.id;
-  const moreWeapons = action === 'attack' && playerWeapons(state, pu).some((w) => state.army.units.some((u) => u.location === 'table' && checkAttack(state, pu, w, u).ok));
-  const held = state.pendingReaction?.kind === 'afterCharge' && state.pendingReaction.unitId === pu.id;
-  if (pu.location === 'table' && !pu.destroyed && (held || !!pu.dashFrom || pu.mayAdjust || moreWeapons || unitAbilities(state, pu).some((a) => a.ok && a.ability.kind === 'Active'))) return;
+  if (pu.location === 'table' && !pu.destroyed) return;
   state.activeUnitId = null;
   pu.firedThisActivation = [];
   state.turn = 'ai';
