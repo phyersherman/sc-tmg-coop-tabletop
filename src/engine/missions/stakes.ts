@@ -3,6 +3,7 @@
  * Read-only: it looks at the counters the missions already keep (modeState) and the score, never changes them.
  */
 import type { GameState } from '../types/game';
+import { modeById } from './index';
 
 export type StakesTone = 'ok' | 'warn' | 'danger';
 export interface Stakes { text: string; tone: StakesTone }
@@ -23,6 +24,9 @@ function vpLine(g: GameState): Stakes {
 export function missionStakes(g: GameState): Stakes {
   const s = (g.modeState ?? {}) as Record<string, number>;
   const players = g.config.players ?? 1;
+  // A mission that says what it needs (the campaign's) says it itself.
+  const own = modeById(g.config.modeId)?.stakes?.(g);
+  if (own) return own;
   switch (g.config.modeId) {
     case 'temple-of-the-past': {
       const held = s.holds ?? 0;
@@ -73,6 +77,9 @@ export function missionOutcome(g: GameState, result: 'won' | 'lost' | 'draw'): s
   const s = (g.modeState ?? {}) as Record<string, number>;
   const { players: p, ai: a } = g.vp;
   const score = `Final score: you ${p}, AI ${a}.`;
+  // A campaign mission is won on its objectives, not on VP.
+  const own = modeById(g.config.modeId)?.stakes?.(g);
+  if (own) return result === 'won' ? 'Every objective met.' : `Objective not met. ${own.text}`;
   switch (g.config.modeId) {
     case 'temple-of-the-past':
       if (result === 'lost' && (s.aiStreak ?? 0) >= 2) return 'The AI held the Temple at two Scoring phases in a row.';

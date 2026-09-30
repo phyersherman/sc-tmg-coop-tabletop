@@ -11,6 +11,8 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
+// Music and sound start with the app, not after the first click: the browser's autoplay rule is for web pages.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');

@@ -35,6 +35,8 @@ export interface MissionMode {
   winCheck(ctx: MissionCtx, final: boolean): 'won' | 'lost' | 'draw' | null;
   onAiUnitDestroyed?(ctx: MissionCtx, unit: AiUnitInstance): void;
   onOrderReport?(ctx: MissionCtx, unit: AiUnitInstance, report: string): void;
+  /** What the mission needs from the players right now, for the top strip (missions that don't say get a VP line). */
+  stakes?(state: GameState): { text: string; tone: 'ok' | 'warn' | 'danger' };
 }
 
 export interface MutatorDef {
