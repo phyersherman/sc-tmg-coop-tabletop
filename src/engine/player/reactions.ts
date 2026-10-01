@@ -11,7 +11,7 @@
  */
 import type { GameState, PendingReaction } from '../types/game';
 import type { PlayerUnit } from '../sense/types';
-import { UNIT_ABILITIES, activeEffects, autoPay, cardDef, evadeFor, hasAbility, isHidden, ownerOf } from '../abilities/index';
+import { UNIT_ABILITIES, abilityCost, activeEffects, autoPay, cardDef, evadeFor, hasAbility, isHidden, ownerOf } from '../abilities/index';
 import { playerUnitDef } from '../sense/playerUnits';
 import { abilityGap, chargeOptions, damageHelpers } from './rules';
 
@@ -39,13 +39,18 @@ const costOf = (pu: PlayerUnit, name: string): number => {
   return ab?.cost ? (ab.cost.amount === 'X' ? 1 : ab.cost.amount) : 0;
 };
 const affordable = (state: GameState, pu: PlayerUnit, cost: number) => cost <= 0 || !!autoPay(state, cost, [], ownerOf(pu));
-/** Whether a unit may still use this Reaction: it has it, has not used it this round (or game), and can pay. */
+/**
+ * Whether a unit may still use this Reaction: it has it, has not used it this round (or game), its player has not
+ * already resolved a Reaction in this Activation (Part 10.4), and it can pay.
+ */
 function ready(state: GameState, pu: PlayerUnit, name: string): boolean {
   if (!live(pu) || pu.summoned || !hasAbility(pu, name)) return false;
+  if ((state.reacted ?? []).includes(ownerOf(pu))) return false;
   const spec = UNIT_ABILITIES[name];
   if (!spec?.repeatable && (pu.used ?? []).includes(name)) return false;
   if (spec?.once === 'game' && (pu.usedGame ?? []).includes(name)) return false;
-  return affordable(state, pu, costOf(pu, name));
+  const ab = playerUnitDef(pu).abilities.find((a) => a.name === name);
+  return affordable(state, pu, ab ? abilityCost(state, pu, ab).cost : costOf(pu, name));
 }
 function offer(pu: PlayerUnit, name: string): ReactionOffer {
   const ab = playerUnitDef(pu).abilities.find((a) => a.name === name)!;
@@ -70,6 +75,8 @@ export function reactionOffers(state: GameState, pr: PendingReaction): ReactionO
     });
   }
   const ai = pr.aiUnitId ? state.army.units.find((u) => u.id === pr.aiUnitId) : undefined;
+  // INSTANT: your Units cannot declare or resolve Reactions in response to the attack.
+  if (pr.instant && (kind === 'aiRanged' || kind === 'afterAiRanged')) return [];
   if (kind === 'aiRanged') {
     if (!ai || ai.location !== 'table' || !live(pu)) return [];
     const out: ReactionOffer[] = [];
@@ -117,7 +124,7 @@ export function reactionOffers(state: GameState, pr: PendingReaction): ReactionO
     // Veil of Shadows: the unit that was PLACEd resolves HEAL (2). Offered while it has Damage to heal.
     if (!live(pu) || pu.damageMarker <= 0) return [];
     return (state.playerCards ?? []).flatMap((c) => {
-      if (c.exhausted || ownerOf(c) !== ownerOf(pu)) return [];
+      if (c.exhausted || ownerOf(c) !== ownerOf(pu) || (state.reacted ?? []).includes(ownerOf(c))) return [];
       const b = cardDef(c.defId)?.boosts.find((x) => x.name === 'Veil of Shadows');
       return b ? [{ key: `card:${c.id}:${b.name}`, unitId: pu.id, unit: pu.name, name: b.name, text: b.text, cost: '', costAmount: 0, cardId: c.id }] : [];
     });

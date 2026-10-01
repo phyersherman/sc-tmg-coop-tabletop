@@ -46,12 +46,17 @@ describe('Large (Siege Tank)', () => {
     s = apply(s, { t: 'playerMove', unitId: 'u1', kind: 'move', point: { x: 18, y: 9 } });
     expect(s.terrain.pieces.map((t) => t.n)).toEqual([2]);
   });
-  it('ends its 150mm base in a 3" gap between walls, as the rules let it through one', () => {
+  it('passes through a 3" gap between walls, but cannot end in it: its 150mm base does not fit there (4.6)', () => {
     let s = game('siege_tank', [{ ...wall(2, 12.8, 8), w: 3.2 }, { ...wall(3, 19.2, 8), w: 3.2 }]);
     const pu = s.playerUnits.find((p) => p.id === 'u1')!;
-    expect(checkMove(s, pu, { x: 17.6, y: 8.5 }, 'move').ok).toBe(true);
-    s = apply(s, { t: 'playerMove', unitId: 'u1', kind: 'move', point: { x: 17.6, y: 8.5 } });
-    expect(s.sense!.players.u1![0]!.x).toBeCloseTo(17.6, 0);
+    // Clearance governs movement through a space, not stopping inside one.
+    expect(checkMove(s, pu, { x: 17.6, y: 8.5 }, 'move').ok).toBe(false);
+    // From just short of the gap to just past it: the whole base ends clear of both walls.
+    s.sense!.players.u1 = [{ x: 17.6, y: 5 }];
+    expect(checkMove(s, pu, { x: 17.6, y: 11.97 }, 'move').ok).toBe(true);
+    s = apply(s, { t: 'playerMove', unitId: 'u1', kind: 'move', point: { x: 17.6, y: 11.97 } });
+    expect(s.sense!.players.u1![0]!.x).toBeCloseTo(17.6, 1);
+    expect(s.sense!.players.u1![0]!.y).toBeCloseTo(11.97, 1);
   });
   it('other Units still cannot end on Size 1 terrain', () => {
     const s = game('marine', [shrub(1, 17, 7)]);

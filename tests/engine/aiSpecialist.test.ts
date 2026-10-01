@@ -21,20 +21,21 @@ function nineMarines(upgrades: string[]) {
 }
 
 describe('AI SPECIALIST weapons', () => {
-  it('a Rocket Launcher is fired by one Marine, the rifles by the other eight', () => {
+  it('a Rocket Launcher is fired by one Marine, who fires its rifle as well (a SIDEARM carried alongside it)', () => {
     const { s, u } = nineMarines([rocket]);
     const o = rangedOrder(s, u, Rng.from(1), 'rangedLine', false)!;
     const byName = Object.fromEntries(o.batches.map((b) => [b.weapon, b]));
     expect(byName['Rocket Launcher']!.models).toBe(1);
     expect(byName['Rocket Launcher']!.dice).toBe(4);
-    expect(byName['C-14 rifle']!.models).toBe(8);
+    expect(byName['C-14 rifle']!.models).toBe(9);
   });
 
   it('an AGG-12 fires alongside the rifles from its one model', () => {
     const { s, u } = nineMarines([agg, rocket]);
     const o = rangedOrder(s, u, Rng.from(1), 'rangedLine', false)!;
     const models = Object.fromEntries(o.batches.map((b) => [b.weapon, b.models]));
-    expect(models).toEqual({ 'C-14 rifle': 7, 'AGG-12': 1, 'Rocket Launcher': 1 });
+    // The AGG-12 replaces one Marine's rifle; the Rocket Launcher does not (Part 9.1.7).
+    expect(models).toEqual({ 'C-14 rifle': 8, 'AGG-12': 1, 'Rocket Launcher': 1 });
   });
 
   it('without upgrades all nine fire the rifle', () => {

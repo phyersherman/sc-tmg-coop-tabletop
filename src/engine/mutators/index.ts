@@ -12,12 +12,20 @@ export const MUTATORS: MutatorDef[] = [
   { id: 'aggressiveDeployment', name: 'Aggressive Deployment', cost: 2, text: 'AI units may deploy from either side edge, more than 10" from player models.' },
   { id: 'hardenedWill', name: 'Hardened Will', cost: 1, text: 'The first time each round the AI hero would be destroyed, it survives with 1 HP instead.' },
   { id: 'diffusion', name: 'Diffusion', cost: 1, text: 'Any single hit of more than 5 damage on an AI unit is halved (rounded up).' },
-  { id: 'slimPickings', name: 'Slim Pickings', cost: 2, text: 'The players\' Supply Pool is 1 lower each round (apply it yourself).' },
+  { id: 'slimPickings', name: 'Slim Pickings', cost: 2, text: 'Each player\'s Supply Pool is 1 lower in every round. In the final round it is unlimited as normal.' },
   { id: 'outbreak', name: 'Outbreak', cost: 2, text: 'The AI Supply Pool escalates 1 faster each round.' },
 ];
 
 export function hasMutator(state: GameState, id: string): boolean {
   return state.config.mutators.includes(id);
+}
+
+/** Slim Pickings: how much each player's Supply Pool is reduced by this round. The final round's pool is unlimited, so nothing is taken from it. */
+export const SLIM_PICKINGS_PENALTY = 1;
+
+export function playerPoolPenalty(state: GameState): number {
+  if (!hasMutator(state, 'slimPickings') || state.round >= state.finalRound) return 0;
+  return SLIM_PICKINGS_PENALTY;
 }
 
 /** Pick a random mutator set whose costs sum to exactly `points` (2–3 mutators). */

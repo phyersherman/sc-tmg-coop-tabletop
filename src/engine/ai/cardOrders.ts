@@ -2,7 +2,7 @@ import type { AiOrder, GameState } from '../types/game';
 import type { AiObjective, AiUnitInstance } from '../types/army';
 import { unitById } from '@data/index';
 import { classify } from './profiles';
-import { chargeOrder, deployOrder, headingText, moveOrder, rangedOrder, report, speedModFor } from './decide';
+import { cardBonuses, chargeOrder, deployOrder, headingText, moveOrder, rangedOrder, report, speedModFor } from './decide';
 import { drawFor, markOnceUsed, modsOf, noMap, primaryStep, usesDecks, type ActionCard, type CardStep, type MoveTo } from './actionDecks';
 import { findUnit, onTable } from '../director/selectors';
 import { aiBurrowed, aiHas, setAiBurrowed } from './burrow';
@@ -49,6 +49,7 @@ function holdOrder(u: AiUnitInstance): AiOrder {
 function holdInstead(order: AiOrder): AiOrder {
   return {
     ...order,
+    noRun: true,
     lines: order.lines.map((l) => (/^Otherwise: RUN/.test(l) ? 'Otherwise: it holds where it is.' : l)),
     reports: order.reports.map((r) => (r.id === 'noTarget' ? { ...r, label: 'No target, held' } : r)),
   };
@@ -102,15 +103,43 @@ export function cardOrder(state: GameState, base: AiOrder, rng: Rng): AiOrder {
     return { ...holdOrder(u), lines: ['BURROWED: it cannot attack or charge. It holds where it is and counts as activated.'] };
   }
   if (!card) return base;
-  u.cardMods = modsOf(card, state.round);
+  // A card's own bonuses apply only with no map in play; an ability's numbers always do.
+  u.cardMods = modsOf(card, state.round, cardBonuses(state));
   markOnceUsed(state, card);
+  const paid = abilityEffects(state, u, card);
   // The card's buffs (the unit's reactions, as the AI never reacts) last until the End of the Round.
   for (const b of card.buffs) if (!(u.buffs ?? []).some((x) => x.name === b.name)) u.buffs = [...(u.buffs ?? []), b];
-  const order = burrowing(u, card, orderFor(state, u, base, card, primaryStep(card), rng));
+  const built = burrowing(u, card, orderFor(state, u, base, card, primaryStep(card), rng));
+  const order = paid.length ? { ...built, lines: [...built.lines, ...paid] } : built;
   // With a map, the order reads as it always has; the card's own text follows it once the camera has had its say.
   if (!noMap(state)) return { ...order, card };
   const [abilities, extras] = cardText(card);
   return { ...order, card, lines: [...abilities, ...order.lines, ...extras], title: `${u.label}: ${card.name}` };
+}
+
+/**
+ * What the abilities on a card do to the unit beyond its order: Stimpack's NON-LETHAL DAMAGE (2) and its PRECISION
+ * on the rifles and close combat weapons, Adrenal Overload's +1 to IMPACT Hit Rolls. The AI pays no Command Points,
+ * Biomass or Psionic Energy, but an ability's price in its own Hit Points is part of the ability.
+ */
+function abilityEffects(state: GameState, u: AiUnitInstance, card: ActionCard): string[] {
+  const lines: string[] = [];
+  for (const st of card.steps) {
+    if (st.k !== 'ability') continue;
+    if ((u.fx ?? []).some((f) => f.source === st.name)) continue;
+    const nonLethal = Number(/this Unit suffers NON-LETHAL DAMAGE \((\d+)\)/i.exec(st.text)?.[1] ?? 0);
+    if (nonLethal && u.location === 'table') {
+      u.damageMarker += nonLethal;
+      lines.push(`${st.name}: it suffers NON-LETHAL DAMAGE (${nonLethal}). No model is removed for it.`);
+    }
+    const precision = Number(/gain PRECISION \((\d+)\)/i.exec(st.text)?.[1] ?? 0);
+    if (st.name === 'Stimpack' && precision) {
+      u.fx = [...(u.fx ?? []), { source: st.name, precision, weapons: ['c-14', 'quad k12'], weaponPhase: 'Assault' }, { source: st.name, precision, weaponPhase: 'Combat' }];
+    }
+    if (/\+1 Modifier to all IMPACT Hit Rolls/i.test(st.text)) u.fx = [...(u.fx ?? []), { source: st.name, impactHit: 1 }];
+  }
+  void state;
+  return lines;
 }
 
 /**

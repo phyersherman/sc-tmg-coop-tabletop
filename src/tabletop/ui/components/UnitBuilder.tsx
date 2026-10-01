@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { configCostOf } from '@engine/army/force';
 import { unitsForFaction, unitById } from '@data/index';
 import type { Faction, UnitDef } from '@engine/types/units';
+import { toggleUpgrade } from '@engine/units/weapons';
 import { Btn, Stepper, Toggle } from './Basics';
 
 export interface UnitConfig {
@@ -50,7 +51,7 @@ export function UnitBuilder({ faction, onAdd, lockFaction, owned, used, allowSum
   const [upgrades, setUpgrades] = useState<string[]>([]);
   const [name, setName] = useState('');
   const [count, setCount] = useState(1);
-  if (!def) return <p className="small muted">No {fac} models in your Collection yet — add them on the Collection screen.</p>;
+  if (!def) return <p className="small muted">No {fac} models in your Collection yet. Add them on the Collection screen.</p>;
   const comp = def.compositions.find((c) => c.label === composition) ?? def.compositions[0];
   // How many more copies of this unit your models can field.
   const left = owned ? Math.max(0, (owned[def.id] ?? 0) - (used?.[def.id] ?? 0)) : Infinity;
@@ -73,7 +74,7 @@ export function UnitBuilder({ faction, onAdd, lockFaction, owned, used, allowSum
       </div>
       <div className="row" style={{ gap: 6 }}>
         {upgradeOptions(def).map((o) => (
-          <Toggle key={o.id} on={upgrades.includes(o.id)} onChange={(v) => setUpgrades(v ? [...upgrades, o.id] : upgrades.filter((x) => x !== o.id))}>
+          <Toggle key={o.id} on={upgrades.includes(o.id)} onChange={() => setUpgrades(toggleUpgrade(def, upgrades, o.id))}>
             {o.name} +{composition === 'large' ? o.cost.large : o.cost.small}{o.note ? <span className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}> · {o.note}</span> : null}
           </Toggle>
         ))}

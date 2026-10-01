@@ -254,7 +254,14 @@ describe('Terran order cards: Dust-off', () => {
     const s = createGame(cfg, dep, flat);
     s.playerUnits[0]!.location = 'table';
     s.sense!.players['p1'] = [{ x: 18, y: 10 }];
+    // With a map in play the order card needs the ability it names: without a Dropship the Unit enters at its edge.
     s.orderDeck.current = 'dustOff';
+    s.phase = 'movement';
+    const grounded = s.army.units.find((u) => !unitById(u.defId).tags.includes('Flying'))!;
+    grounded.location = 'reserves';
+    s.army.tacticalCards = [];
+    expect(deployOrder(s, grounded).dropAt).toBeUndefined();
+    s.army.tacticalCards = ['dropship'];
     s.phase = 'movement';
     const unit = s.army.units.find((u) => !unitById(u.defId).tags.includes('Flying'))!;
     unit.location = 'reserves';
@@ -272,6 +279,7 @@ describe('Terran order cards: Dust-off', () => {
   it('Warp In lets only one Unit a round come on from a side edge', () => {
     const cfg = makeConfig({ aiFaction: 'Protoss', playMode: 'video' });
     const s = createGame(cfg, dep, flat);
+    s.army.tacticalCards = ['warp_gate'];
     s.orderDeck.current = 'warpIn';
     s.phase = 'movement';
     const [a, b] = s.army.units;

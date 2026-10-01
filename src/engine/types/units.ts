@@ -113,6 +113,10 @@ export interface UnitDef {
 export interface CardBoost {
   name: string;
   text: string;
+  /** The ability's type as the card prints it. */
+  kind?: 'Passive' | 'Active' | 'Reaction';
+  /** Its Phase Limitation. */
+  phase?: PhaseName;
 }
 
 export interface CardDef {

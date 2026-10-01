@@ -21,6 +21,10 @@ export interface DiceInstruction {
   hitMod?: number;
   /** Extra range from effects (e.g. mutators). */
   rangeMod?: number;
+  /** The -1 of LONG RANGE is already in `hitMod` for the whole batch (an order read off the map for the table to roll). */
+  longShot?: boolean;
+  /** LONG RANGE, resolved model by model: how many of `models` are beyond the weapon's Range and roll at -1 to Hit. */
+  farModels?: number;
 }
 
 /** SPECIALIST: one model of the unit carries this weapon, and the rest keep their own. */
@@ -74,8 +78,10 @@ export function availableWeapons(def: UnitDef, upgrades: string[], phase: 'Assau
  */
 export function weaponModels(def: UnitDef, upgrades: string[], phase: 'Assault' | 'Combat', weapon: WeaponProfile, models: number): number {
   if (isSpecialist(weapon)) return 1;
-  const specialists = availableWeapons(def, upgrades, phase).filter(isSpecialist).length;
-  return Math.max(1, models - specialists);
+  // Only a SPECIALIST that replaces this weapon takes it out of a model's hands (the AGG-12 for the C-14 Rifle).
+  // One carried alongside it (the Rocket Launcher, a SIDEARM) leaves that model its own weapon too (Part 9.1.7).
+  const replaced = availableWeapons(def, upgrades, phase).filter((w) => isSpecialist(w) && (w.replaces ?? '').toLowerCase() === weapon.name.toLowerCase()).length;
+  return Math.max(0, models - replaced);
 }
 
 export function surgeExpected(die: SurgeDie | undefined): number {
@@ -157,7 +163,8 @@ export function hitsFor(instr: DiceInstruction, models: number, hitMod = instr.h
   const roa = instr.models > 0 ? instr.dice / instr.models : instr.dice;
   const dice = Math.round(roa * Math.max(0, Math.min(models, instr.models)));
   const rolls = (instr.rolls ?? []).slice(0, dice);
-  const need = instr.hit - hitMod;
+  // Modifiers move the Target Number within 2+..6+: a 6 always hits and a 1 never does (Part 3.4, 3.6).
+  const need = Math.max(2, Math.min(6, instr.hit - hitMod));
   const hits = rolls.filter((r) => r >= need).length;
   return { dice, hits };
 }

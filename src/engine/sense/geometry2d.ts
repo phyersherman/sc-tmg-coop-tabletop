@@ -1,6 +1,6 @@
 import type { Pt } from './types';
 import type { Rect, TerrainPiece } from '../types/terrain';
-import { dist, distToPiece, distToRect, pieceLocal, rampBlocks, rampLevel, pieceParts } from '../terrain/geometry';
+import { dist, distToPiece, nearPiece, pieceLocal, rampBlocks, rampLane, rampParts, rampZone, pieceParts, type RampZone } from '../terrain/geometry';
 
 /**
  * A binary min-heap of lattice keys by priority. The path searches used to scan their whole open list for the
@@ -106,44 +106,27 @@ export function segmentHitsRect(a: Pt, b: Pt, r: Rect): boolean {
   return true;
 }
 
-/**
- * Official 2D top-down line of sight between two models on ground level.
- * Full Cover: a blocking piece (size >= 1) on the line with size >= both models' sizes.
- * Direct Cover: a piece on the line with size >= the size of a model within 1" of it.
- */
-export function losBlocked(a: Pt, sizeA: number, b: Pt, sizeB: number, pieces: TerrainPiece[]): boolean {
-  // Effective Size: a model on high ground adds the Size of what it stands on (7.1.2), and the piece under it is
-  // never between it and its target: a Marine on the plateau shoots down over its edge.
-  const high = pieces.filter(isHighGround);
-  const onA = high.find((p) => rampLevel(a, p) > 0), onB = high.find((p) => rampLevel(b, p) > 0);
-  if (onA && rampLevel(a, onA) > 0.5) sizeA += onA.size;
-  if (onB && rampLevel(b, onB) > 0.5) sizeB += onB.size;
-  for (const p of pieces) {
-    if (p.size < 1 || p.catalogId.startsWith('token:')) continue;
-    if (p === onA || p === onB) continue;
-    // Measure in each part's own frame, so a wall set at an angle blocks exactly what it covers, and an L wall
-    // only where its arms stand.
-    let nearA = Infinity, nearB = Infinity, hit = false;
-    for (const r of pieceParts(p)) {
-      const la = pieceLocal(a, r);
-      const lb = pieceLocal(b, r);
-      if (!segmentHitsRect(la, lb, r)) continue;
-      hit = true;
-      nearA = Math.min(nearA, distToRect(la, r));
-      nearB = Math.min(nearB, distToRect(lb, r));
-    }
-    if (!hit) continue;
-    if (p.size >= sizeA && p.size >= sizeB) return true;
-    const closeQuarters = nearA <= 1 && nearB <= 1 && dist(a, b) <= 3;
-    if (closeQuarters) continue;
-    if (nearA <= 1 && p.size >= sizeA) return true;
-    if (nearB <= 1 && p.size >= sizeB) return true;
-  }
-  return false;
-}
-
 /** A model's base for Line of Sight: a circle, or an oval (a capsule `half` long each way along its facing `a`). */
 export interface LosBase { x: number; y: number; r: number; half?: number; a?: number }
+
+/** What Line of Sight needs to know about the two models beyond their Size. */
+export interface LosOptions {
+  /** The first model is Flying (7.1.4): no Full Cover, never the model Within 1" for Direct Cover, no Size from terrain. */
+  flyingA?: boolean;
+  /** The second model is Flying. */
+  flyingB?: boolean;
+}
+
+/** A traced point that may carry its model's base, so "Within 1" of the terrain" is measured from the base. */
+type LosPoint = Pt & { r?: number; half?: number };
+
+/** The two ends of an oval's straight part (one point for a round base). */
+function baseSpine(b: LosPoint): Pt[] {
+  const half = b.half ?? 0, a = b.a ?? 0;
+  if (!(half > 0)) return [{ x: b.x, y: b.y }];
+  const dx = Math.cos(a) * half, dy = Math.sin(a) * half;
+  return [{ x: b.x - dx, y: b.y - dy }, { x: b.x, y: b.y }, { x: b.x + dx, y: b.y + dy }];
+}
 
 /** Points around the edge of a base: both caps of an oval, eight each; the centre too, for a thin base. */
 function baseEdge(b: LosBase): Pt[] {
@@ -154,15 +137,139 @@ function baseEdge(b: LosBase): Pt[] {
   return out;
 }
 
+/** From the edge of a base to a terrain piece (4.1): 0 when the base touches or overlaps it. */
+export function baseToPiece(b: LosPoint, t: TerrainPiece): number {
+  let best = Infinity;
+  const spine = baseSpine(b);
+  // Along an oval's length the nearest point may lie between its ends.
+  for (let i = 0; i < spine.length; i++) {
+    best = Math.min(best, distToPiece(spine[i]!, t));
+    if (i + 1 < spine.length) for (let k = 1; k < 4; k++) best = Math.min(best, distToPiece({ x: spine[i]!.x + ((spine[i + 1]!.x - spine[i]!.x) * k) / 4, y: spine[i]!.y + ((spine[i + 1]!.y - spine[i]!.y) * k) / 4 }, t));
+  }
+  return Math.max(0, best - (b.r ?? 0));
+}
+
+function ptSeg(p: Pt, a: Pt, b: Pt): number {
+  const vx = b.x - a.x, vy = b.y - a.y, len = vx * vx + vy * vy;
+  const t = len > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / len)) : 0;
+  return Math.hypot(p.x - (a.x + vx * t), p.y - (a.y + vy * t));
+}
+
+/** Edge to edge between two bases (4.1), 0 when they touch. */
+function baseGap(a: LosPoint, b: LosPoint): number {
+  const sa = baseSpine(a), sb = baseSpine(b);
+  const a1 = sa[0]!, a2 = sa[sa.length - 1]!, b1 = sb[0]!, b2 = sb[sb.length - 1]!;
+  const d = Math.min(ptSeg(a1, b1, b2), ptSeg(a2, b1, b2), ptSeg(b1, a1, a2), ptSeg(b2, a1, a2));
+  return Math.max(0, d - (a.r ?? 0) - (b.r ?? 0));
+}
+
+/** Where a model stands (8.5.3): GROUND LEVEL, MID GROUND on a ramp, or HIGH GROUND on a plateau, and on which piece. */
+export interface Elevation { zone: RampZone; piece: TerrainPiece | null }
+
+const ZONE_RANK: Record<RampZone, number> = { ground: 0, ramp: 1, plateau: 2 };
+
 /**
- * Line of Sight between two models as the rules draw it (7.1): from any point of the firing model's base to any
- * point of the target's, seen from above, with only terrain of their Size or more in the way blocking it.
+ * The elevation of a model by its base: a base on more than one level stands on the highest of them. A base is
+ * on a level it reaches along the ramp (its foot, its top); what hangs over the side of a ramp is not counted.
  */
-export function losBetweenBases(a: LosBase, sizeA: number, b: LosBase, sizeB: number, pieces: TerrainPiece[]): boolean {
+export function baseElevation(b: LosPoint, pieces: TerrainPiece[]): Elevation {
+  let out: Elevation = { zone: 'ground', piece: null };
+  const reach = (b.r ?? 0) + (b.half ?? 0);
+  for (const t of pieces) {
+    if (!isHighGround(t)) continue;
+    let zone = rampZone(b, t);
+    if (zone !== 'plateau' && reach > 0) {
+      const lane = rampLane(t);
+      const { u, v } = lane.toLocal(b);
+      for (const du of [-reach, reach]) {
+        const z = rampZone(lane.toTable(u + du, v), t, 0.05);
+        if (ZONE_RANK[z] > ZONE_RANK[zone]) zone = z;
+      }
+    }
+    if (ZONE_RANK[zone] > ZONE_RANK[out.zone]) out = { zone, piece: t };
+  }
+  return out;
+}
+
+/** What one Line of Sight check is traced against: the rectangles that block it, each in its own frame. */
+interface LosScene {
+  /** A rule that needs no trace already blocks it (the Elevation Dead Zone). */
+  blocked: boolean;
+  blockers: { local: (p: Pt) => Pt; rect: Rect }[];
+}
+
+/**
+ * Cover between two models (7.1.1), one terrain piece at a time: which pieces block a trace that passes through
+ * them, by Full Cover or by Direct Cover, and whether the Elevation Dead Zone hides the two from each other.
+ */
+function losScene(a: LosPoint, sizeA: number, b: LosPoint, sizeB: number, pieces: TerrainPiece[], o: LosOptions = {}): LosScene {
+  const high = pieces.filter(isHighGround);
+  const elevA = high.length ? baseElevation(a, high) : { zone: 'ground' as RampZone, piece: null };
+  const elevB = high.length ? baseElevation(b, high) : { zone: 'ground' as RampZone, piece: null };
+  // Effective Size (7.1.2): a model on HIGH GROUND adds the Size of what it stands on, one on a ramp (Size 1) adds
+  // 1. A Flying model's is higher than any terrain on the table, and terrain never adds to it (7.1.4).
+  const raised = (e: Elevation) => (e.zone === 'plateau' ? e.piece!.size : e.zone === 'ramp' ? 1 : 0);
+  const effA = o.flyingA ? Infinity : sizeA + raised(elevA);
+  const effB = o.flyingB ? Infinity : sizeB + raised(elevB);
+  const gap = baseGap(a, b);
+  const scene: LosScene = { blocked: false, blockers: [] };
+  for (const p of pieces) {
+    if (p.size < 1 || p.catalogId.startsWith('token:')) continue;
+    const nearA = baseToPiece(a, p), nearB = baseToPiece(b, p);
+    // Close Quarters: both Within 1" of this piece and Within 3" of each other.
+    const closeQuarters = nearA <= 1 && nearB <= 1 && gap <= 3;
+    const covers = (size: number) => (size >= effA && size >= effB) || (!closeQuarters && ((nearA <= 1 && size >= effA) || (nearB <= 1 && size >= effB)));
+    if (isHighGround(p)) {
+      const onA = elevA.piece === p ? elevA.zone : 'ground', onB = elevB.piece === p ? elevB.zone : 'ground';
+      if (onA === 'plateau' || onB === 'plateau') {
+        // The surface a model stands on is never between it and its target. Elevation Dead Zone: from HIGH GROUND
+        // (Size 3+), a model at GROUND LEVEL Within 1" of the base of the same piece cannot be seen, nor see back.
+        const low = onA === 'plateau' ? (onB === 'plateau' ? null : { elev: elevB, near: nearB }) : { elev: elevA, near: nearA };
+        if (low && p.size >= 3 && low.elev.zone === 'ground' && low.near <= 1 && !(gap <= 3)) scene.blocked = true;
+        continue;
+      }
+      const parts = rampParts(p);
+      // The plateau rises between two models that are not on it; its ramp (Size 1) only between models off the piece.
+      if (covers(p.size)) for (const rect of parts.plateau) scene.blockers.push({ local: parts.toLocal, rect });
+      if (onA === 'ground' && onB === 'ground' && covers(1)) scene.blockers.push({ local: parts.toLocal, rect: parts.lane });
+      continue;
+    }
+    // Stacking Terrain (7.1.2): a piece set on HIGH GROUND or on a ramp gains the Size of what it stands on.
+    const under = high.length ? baseElevation({ x: p.x + p.w / 2, y: p.y + p.h / 2 }, high) : null;
+    if (!covers(p.size + (under ? raised(under) : 0))) continue;
+    // Each part in its own frame, so a wall set at an angle blocks exactly what it covers, and an L wall only
+    // where its arms stand.
+    for (const rect of pieceParts(p)) scene.blockers.push({ local: (q) => pieceLocal(q, rect), rect });
+  }
+  return scene;
+}
+
+const traceBlocked = (scene: LosScene, a: Pt, b: Pt): boolean => scene.blocked || scene.blockers.some((k) => segmentHitsRect(k.local(a), k.local(b), k.rect));
+
+/**
+ * Official 2D top-down Line of Sight along one trace, from `a` to `b` (7.1). A point that carries its model's base
+ * (`r`, and `half` and `a` for an oval) is measured from the base for "Within 1" of the terrain"; a bare point from itself.
+ * Full Cover: a piece on the trace with Effective Size >= both models'.
+ * Direct Cover: a piece on the trace with Effective Size >= that of a model Within 1" of it (not in Close Quarters).
+ * Elevation Dead Zone: HIGH GROUND and the foot of the same piece never see each other (but for Close Quarters).
+ */
+export function losBlocked(a: Pt, sizeA: number, b: Pt, sizeB: number, pieces: TerrainPiece[], opts?: LosOptions): boolean {
+  return traceBlocked(losScene(a, sizeA, b, sizeB, pieces, opts), a, b);
+}
+
+/**
+ * Line of Sight between two models as the rules draw it (7.1): from any part of one base to any part of the other,
+ * seen from above. Each terrain piece a trace passes through is judged on its own for Full Cover and Direct Cover,
+ * the 1" of Direct Cover measured from the model's base. True when the two models see each other.
+ */
+export function losBetweenBases(a: LosBase, sizeA: number, b: LosBase, sizeB: number, pieces: TerrainPiece[], opts?: LosOptions): boolean {
+  const scene = losScene(a, sizeA, b, sizeB, pieces, opts);
+  if (scene.blocked) return false;
+  if (!scene.blockers.length) return true;
   const from = baseEdge(a), to = baseEdge(b);
   // Centre to centre first: the common case, and the cheapest.
-  if (!losBlocked(from[0]!, sizeA, to[0]!, sizeB, pieces)) return true;
-  for (const p of from) for (const q of to) if (!losBlocked(p, sizeA, q, sizeB, pieces)) return true;
+  if (!traceBlocked(scene, from[0]!, to[0]!)) return true;
+  for (const p of from) for (const q of to) if (!traceBlocked(scene, p, q)) return true;
   return false;
 }
 
@@ -202,13 +309,18 @@ export interface PathOptions {
   circles?: { x: number; y: number; r: number }[];
   /** Raptor Strain: moves through impassable terrain (Size 4 or less) and changes height without the ramp. */
   climber?: boolean;
+  /** A mover of Size 3 or more: it moves over Force Fields (which are then removed). */
+  crossesForceFields?: boolean;
 }
+
+/** A Force Field token, kept among the terrain as the Size 2 obstacle it is to Units of Size 2 or lower. */
+export const isForceField = (t: TerrainPiece) => t.catalogId.startsWith('token:');
 
 /** A point test for where the centre of a moving base may be. Obstacles it already touches at either end do not trap it. */
 function freeCheck(pieces: TerrainPiece[], from: Pt, to: Pt, o?: PathOptions): (p: Pt) => boolean {
   const cl = o?.clearance ?? 0.3;
   const walls = pieces
-    .filter((t) => blocksMovement(t) && !(o?.climber && t.size <= 4))
+    .filter((t) => blocksMovement(t) && !(o?.climber && t.size <= 4) && !(o?.crossesForceFields && isForceField(t)))
     .map((t) => {
       const rect = t;
       const near = Math.min(distToPiece(from, rect), distToPiece(to, rect));
@@ -218,7 +330,7 @@ function freeCheck(pieces: TerrainPiece[], from: Pt, to: Pt, o?: PathOptions): (
   const circles = (o?.circles ?? []).filter((c) => dist(c, from) >= c.r - 0.02 && dist(c, to) >= c.r - 0.02);
   const highs = o?.climber ? [] : pieces.filter(isHighGround);
   return (p: Pt) => {
-    for (const w of walls) if (distToPiece(p, w.rect) < w.allow) return false;
+    for (const w of walls) if (nearPiece(p, w.rect, w.allow)) return false;
     for (const t of highs) if (rampBlocks(p, t, Math.min(cl, 0.6))) return false;
     for (const c of circles) if (dist(p, c) < c.r - 0.02) return false;
     return true;

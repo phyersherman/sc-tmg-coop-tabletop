@@ -132,11 +132,37 @@ export function pieceParts(t: Turnable & { catalogId?: string }): Turnable[] {
   });
 }
 
+/** A piece's parts and the circle round its whole footprint, kept until the piece is moved or turned. */
+interface PieceInfo { x: number; y: number; w: number; h: number; rot: number; parts: Turnable[]; cx: number; cy: number; r: number }
+const pieceInfo = new WeakMap<object, PieceInfo>();
+function infoOf(t: Turnable & { catalogId?: string }): PieceInfo {
+  const rot = t.rot ?? 0;
+  const had = pieceInfo.get(t);
+  if (had && had.x === t.x && had.y === t.y && had.w === t.w && had.h === t.h && had.rot === rot) return had;
+  // Every part lies inside the piece's own box, which turns about its centre: this circle holds them all.
+  const info = { x: t.x, y: t.y, w: t.w, h: t.h, rot, parts: pieceParts(t), cx: t.x + t.w / 2, cy: t.y + t.h / 2, r: Math.hypot(t.w, t.h) / 2 };
+  pieceInfo.set(t, info);
+  return info;
+}
+
 /** Distance from a point to a (possibly turned) piece's footprint; 0 inside. An L wall: to the nearer arm. */
 export function distToPiece(p: Pt, t: Turnable & { catalogId?: string }): number {
   let best = Infinity;
-  for (const part of pieceParts(t)) best = Math.min(best, distToRect(pieceLocal(p, part), part));
+  for (const part of infoOf(t).parts) best = Math.min(best, distToRect(pieceLocal(p, part), part));
   return best;
+}
+
+/** A distance no greater than `distToPiece(p, t)`, found without measuring the piece's parts. */
+export function pieceLowerBound(p: Pt, t: Turnable & { catalogId?: string }): number {
+  const info = infoOf(t);
+  return Math.max(0, Math.hypot(p.x - info.cx, p.y - info.cy) - info.r);
+}
+
+/** Whether a point is closer than `d` to a piece's footprint: `distToPiece(p, t) < d`, skipping pieces far away. */
+export function nearPiece(p: Pt, t: Turnable & { catalogId?: string }, d: number): boolean {
+  const info = infoOf(t);
+  if (Math.hypot(p.x - info.cx, p.y - info.cy) - info.r >= d) return false;
+  return distToPiece(p, t) < d;
 }
 
 /** The four corners of a piece's footprint on the table. */
@@ -227,6 +253,53 @@ export function rampLevel(p: Pt, t: Turnable & { accessPoints?: Pt[]; rampSide?:
   return 1;
 }
 
+/** Where a point stands on a Lost Temple Ramp piece: off it (GROUND LEVEL), on its ramp (MID GROUND) or on its plateau (HIGH GROUND). */
+export type RampZone = 'ground' | 'ramp' | 'plateau';
+
+/**
+ * The elevation of a table point on a Lost Temple Ramp piece (8.5.3): a ramp is Size 1 MID GROUND along its whole
+ * surface, the rest of the footprint is the plateau, HIGH GROUND. `inset` is how far inside the footprint a point
+ * must be to count as on the piece, so a base touching the cliff from the ground is still on the ground.
+ */
+export function rampZone(p: Pt, t: Turnable & { accessPoints?: Pt[]; rampSide?: 1 | -1 }, inset = 0): RampZone {
+  const r = rampLane(t);
+  const { u, v } = r.toLocal(p);
+  if (Math.abs(u) > r.hl - inset || Math.abs(v) > r.ht - inset) return 'ground';
+  return v * r.side >= r.ht - r.w && u >= r.hl - r.len ? 'ramp' : 'plateau';
+}
+
+/**
+ * A Lost Temple Ramp piece in its own frame (`u` along the long side, `v` across): the rectangles its plateau
+ * covers and the one its ramp covers, for a Line of Sight trace that a plateau blocks and a ramp does not.
+ */
+export function rampParts(t: Turnable & { accessPoints?: Pt[]; rampSide?: 1 | -1 }): { plateau: Rect[]; lane: Rect; toLocal(p: Pt): Pt } {
+  const r = rampLane(t);
+  const inner = r.hl - r.len;
+  // Across the piece, the ramp takes `w` on its side and the plateau beside it the rest.
+  const laneV = r.side === 1 ? r.ht - r.w : -r.ht;
+  const besideV = r.side === 1 ? -r.ht : -r.ht + r.w;
+  return {
+    plateau: [
+      { x: -r.hl, y: -r.ht, w: r.hl + inner, h: r.ht * 2 },
+      { x: inner, y: besideV, w: r.len, h: r.ht * 2 - r.w },
+    ],
+    lane: { x: inner, y: laneV, w: r.len, h: r.w },
+    toLocal: (p) => { const q = r.toLocal(p); return { x: q.u, y: q.v }; },
+  };
+}
+
+/**
+ * How far a table point is from one of the ramp's two ACCESS POINTS: its foot, where it meets the ground, or its
+ * top, where it meets the plateau. Each is the full width of the ramp.
+ */
+export function rampEndDistance(p: Pt, t: Turnable & { accessPoints?: Pt[]; rampSide?: 1 | -1 }, end: 'foot' | 'top'): number {
+  const r = rampLane(t);
+  const { u, v } = r.toLocal(p);
+  const at = end === 'foot' ? r.hl : r.hl - r.len;
+  const vs = v * r.side;
+  return Math.hypot(u - at, Math.max(r.ht - r.w - vs, 0, vs - r.ht));
+}
+
 /**
  * Whether a base centre at `p`, `cl` inches across, is blocked by a Lost Temple Ramp piece for a unit that has to use
  * its access point: the piece's edges are a cliff except where the ramp meets the ground, and the plateau's edge
@@ -252,6 +325,22 @@ export function rampBlocks(p: Pt, t: Turnable & { accessPoints?: Pt[]; rampSide?
   const inner = r.hl - r.len;
   if (Math.abs(vs - (r.ht - r.w)) < cl && u > inner + 1 && u < r.hl + cl) return true;
   return false;
+}
+
+/**
+ * Whether a base of radius `r` centred at `p` cannot be set here because of a Lost Temple Ramp piece (4.6: a model
+ * is never set where its base does not fit). Off the piece and up on its plateau the whole base keeps clear of the
+ * cliffs; on the ramp, and at its foot, a base wider than the ramp is measured by `onRamp`, the half-gap its Unit
+ * passes, so the ramp stays open to it.
+ */
+export function rampBlocksBase(p: Pt, t: Turnable & { accessPoints?: Pt[]; rampSide?: 1 | -1 }, r: number, onRamp: number): boolean {
+  if (!rampBlocks(p, t, r)) return false;
+  if (onRamp >= r) return true;
+  const lane = rampLane(t);
+  const { u, v } = lane.toLocal(p);
+  const vs = v * lane.side;
+  const alongRamp = u >= lane.hl - lane.len && vs >= lane.ht - lane.w && vs <= lane.ht;
+  return !alongRamp || rampBlocks(p, t, onRamp);
 }
 
 /**

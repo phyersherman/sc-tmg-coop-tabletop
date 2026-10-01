@@ -12,7 +12,7 @@ const flat = { seed: 1, table: dep.table, pieces: [], fireLanes: [], violations:
 describe('the AI\'s sidearms', () => {
   it('fire only at a target within their own range, whatever the main weapon reaches', () => {
     // A lone AI Goliath: Autocannon 12" (long 18"), Underbelly Machine Gun 8", Hellfire 16", Haywire 12".
-    const army = buildAiArmy({ faction: 'Terran', budget: 250, ownership: { goliath: 1 }, heroAllowed: false, seed: 1, units: UNITS, cards: CARDS });
+    const army = buildAiArmy({ faction: 'Terran', budget: 250, storyForce: true, ownership: { goliath: 1 }, heroAllowed: false, seed: 1, units: UNITS, cards: CARDS });
     expect(army.units.map((u) => u.defId)).toEqual(['goliath']);
     const cfg = makeConfig({ modeId: 'frontlines', playMode: 'video', aiFaction: 'Terran', army });
     cfg.playerUnits = [makePlayerUnit('m1', 'marine', 'large', [], 'Marines', 100)];

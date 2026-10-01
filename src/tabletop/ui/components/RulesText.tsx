@@ -6,6 +6,34 @@ const G = GLOSSARY as Record<string, string>;
 const KEYS = Object.keys(G).filter((k) => k.length >= 4).sort((a, b) => b.length - a.length);
 const RE = new RegExp(`\\b(${KEYS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'g');
 
+/**
+ * The tip itself. Glossary entries are the rulebook's full wording, so some are long: the tip opens on the side of
+ * the pointer with more room, never taller than that room, and a long entry gets a wider box set in two columns.
+ */
+function Tip({ word, at }: { word: string; at: { x: number; y: number } }) {
+  const text = G[word]!.replace(new RegExp(`^${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^:]*:\\s*`), '');
+  const long = text.length > 700;
+  const width = Math.min(long ? 640 : 360, window.innerWidth - 24);
+  const below = window.innerHeight - at.y - 26;
+  const above = at.y - 16;
+  const down = below >= above || below >= 260;
+  const room = Math.max(120, down ? below : above);
+  return (
+    <span
+      className="kw-tip"
+      style={{
+        width, left: Math.max(8, Math.min(at.x + 14, window.innerWidth - width - 12)),
+        top: down ? at.y + 18 : undefined, bottom: down ? undefined : window.innerHeight - at.y + 8,
+        maxHeight: room, overflow: 'hidden', columnCount: long ? 2 : undefined, columnGap: long ? 16 : undefined,
+        fontSize: text.length > 1500 ? 11.5 : undefined,
+      }}
+    >
+      <b>{word}</b>
+      {text}
+    </span>
+  );
+}
+
 /** A rules keyword: its official wording opens beside it on hover or tap (the app's own tip, so it works everywhere). */
 function Keyword({ word }: { word: string }) {
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
@@ -13,12 +41,7 @@ function Keyword({ word }: { word: string }) {
   return (
     <span className="kw" onMouseEnter={show} onMouseMove={show} onMouseLeave={() => setAt(null)} onClick={(e) => { e.stopPropagation(); setAt(at ? null : { x: e.clientX, y: e.clientY }); }}>
       {word}
-      {at && (
-        <span className="kw-tip" style={{ left: Math.min(at.x + 14, window.innerWidth - 380), top: at.y + 18 > window.innerHeight - 200 ? undefined : at.y + 18, bottom: at.y + 18 > window.innerHeight - 200 ? window.innerHeight - at.y + 8 : undefined }}>
-          <b>{word}</b>
-          {G[word]!.replace(new RegExp(`^${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^:]*:\\s*`), '')}
-        </span>
-      )}
+      {at && <Tip word={word} at={at} />}
     </span>
   );
 }

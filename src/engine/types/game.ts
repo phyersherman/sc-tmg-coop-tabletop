@@ -97,6 +97,8 @@ export interface PlayerCard {
   owner?: number;
   /** Boost names used this game (for Once per Game boosts). */
   usedGame?: string[];
+  /** Round in which a Once per Round ability that does not Exhaust the card was used (Advanced Training). */
+  usedRound?: number;
 }
 
 /** Something set on the battlefield by an ability (Creep Tumor, Force Field, Shade, Faction Indicator). */
@@ -164,6 +166,8 @@ export interface AiOrder {
   noTarget?: boolean;
   /** Its unit is holding its ground (a garrison before it may move): it fires or does nothing, never runs. */
   held?: boolean;
+  /** Its card says to hold when the attack or charge finds no target: the unit stays where it is instead of running. */
+  noRun?: boolean;
   /** Checked when the order was issued: who the AI will attack. */
   intentTarget?: string;
   /** The action card this order comes from (tabletop decks). */
@@ -271,7 +275,7 @@ export interface GameState {
   removedBefore?: { ai: number; players: number };
   eventSeq?: number;
   /** An AI attack waiting for the defender's hand-entered saves. */
-  pendingSaves?: { attack: AttackResult; order: AiOrder; report: string; enemySupply?: number; /** Batch indices still to fire after the saves, at targetId. */ remaining: number[]; targetId?: string };
+  pendingSaves?: { attack: AttackResult; order: AiOrder; report: string; enemySupply?: number; /** Batch indices still to fire after the saves, at targetId. */ remaining: number[]; targetId?: string; /** A Blast Template's Spillover, resolved once the main target's saves are in. */ spill?: { weaponId: string; hits: { side: 'ai' | 'players'; id: string; models: number }[] } };
   /** Your Faction and Tactical cards. */
   playerCards?: PlayerCard[];
   /** Tokens set by abilities. */
@@ -284,8 +288,12 @@ export interface GameState {
    * enemy's declared attack or charge, after an attack, after your own charge or after a PLACE effect.
    */
   pendingReaction?: PendingReaction;
-  /** Round in which a Pylon's Warp Conduit / Omega Network was used for a deploy. */
+  /** Round in which a Pylon's Warp Conduit was used for a deploy. */
   conduitUsedRound?: number;
+  /** Omega Network: the Supply deployed through the Omega Worm this Round (2 at most). */
+  omegaUsed?: { round: number; supply: number };
+  /** Players who have resolved a Reaction in the current Activation: each may resolve only one (Part 10.4). */
+  reacted?: number[];
   /** Your unit that has taken its action but is still active: it can use abilities until you end its activation. */
   activeUnitId?: string | null;
   /** Last charge attempt, for display. */
@@ -313,6 +321,8 @@ export interface PendingReaction {
   validTargets?: string[];
   /** A Charge-order unit falling back on its guns fires only its first weapon. */
   firstOnly?: boolean;
+  /** The attack is made with an INSTANT weapon: your Units cannot declare Reactions to it. */
+  instant?: boolean;
   /** How the AI's order ends once the Reaction is answered ('afterAiRanged'). */
   report?: string;
   enemySupply?: number;

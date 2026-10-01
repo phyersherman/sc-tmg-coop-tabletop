@@ -55,6 +55,22 @@ export interface PlayerUnit {
   deployAnyEdge?: boolean;
   /** Lightning Dash: the Enemy Unit its first Charge hit. It may declare a second Charge against a different one. */
   dashFrom?: string;
+  /** The Round in which a model of this unit last moved, was moved or was PLACED: it has no Stationary Status that Round. */
+  movedRound?: number;
+  /** Out of Coherency (4.4): at the end of its last repositioning a model was not Wholly Within Coherency of the Leading Model. Casualties never change it. */
+  outOfCoherency?: boolean;
+  /** An ability resolved in several steps (Corrosive Bile: one token for each model): the uses still to make, at no further cost. */
+  pendingUses?: { name: string; left: number };
+  /** HIDDEN that lasts until the End of this Round whatever the unit does (Darkness Descends). */
+  hiddenThroughRound?: number;
+  /** The PLACE effect waiting to be resolved takes the place of the unit's action (Ready for Pickup?). */
+  placeAsAction?: boolean;
+  /** The PLACE effect waiting may not set a model Within Engagement Range, whatever the Phase. */
+  placeNoEngage?: boolean;
+  /** Round in which Lurking answered its one Ranged Attack. */
+  lurkedRound?: number;
+  /** The enemy Activation in which a once-per-Activation TOUGH (Ancillary Carapace) was last used. */
+  toughKey?: string;
 }
 
 export type UnitStatus = 'Burrowed' | 'Hidden' | 'Siege Mode';
@@ -92,6 +108,12 @@ export interface EffectMods {
   spotter?: string;
   /** Hallucination / Hierarch's Stand: the unit may make an Evade Roll against the current enemy attack. */
   mayEvade?: boolean;
+  /** Combat Shield: an Evade Roll against Close Combat Attacks. */
+  evadeMelee?: boolean;
+  /** Mutating Carapace: an Evade Roll against every attack made by this enemy Unit... */
+  evadeVs?: string;
+  /** ...with this Modifier to the roll (+2 makes it two easier). */
+  evadeBonus?: number;
 }
 
 export interface UnitEffect {

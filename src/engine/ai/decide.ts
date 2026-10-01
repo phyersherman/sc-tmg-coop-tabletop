@@ -13,11 +13,17 @@ import { aiSegments, closestOnSegment, describeSegment, dist, segmentMidpoint } 
 import { DIFFICULTIES } from '../difficulty';
 import { hasMutator } from '../mutators/index';
 import { onTable, reserves, aiSupplyOnTable, poolNow, heldInPlace, isStructure } from '../director/selectors';
-import { playerModels, visibleEnemies } from '../sense/query';
+import { engagedWith, playerModels, visibleEnemies } from '../sense/query';
+import { CARDS } from '@data/index';
+import { noMap } from './actionDecks';
+import { aiBurrowed, aiHas } from './burrow';
+import { firedWeapon, impactDice } from '../units/firing';
+import type { PlayerUnit } from '../sense/types';
+import type { WeaponProfile } from '../types/units';
 import { passable } from '../sense/geometry2d';
 import { playerUnitFlying } from '../sense/playerUnits';
 import { playerSegments } from '../terrain/geometry';
-import { hiddenFrom } from '../abilities/index';
+import { hasAbility, hiddenFrom } from '../abilities/index';
 import type { Rng } from '../rng';
 
 const def = (u: AiUnitInstance): UnitDef => unitById(u.defId);
@@ -77,11 +83,58 @@ function cardMods(state: GameState, unit?: AiUnitInstance): AiUnitInstance['card
   return m && m.round === state.round && m.phase === state.phase ? m : undefined;
 }
 
+/**
+ * What the AI's cards give it beyond the rulebook (a better Hit roll, extra inches of Speed or Charge Distance, a
+ * re-roll) is a help for an AI that plays blind: it applies only in Tabletop, AI only. With a map in play (the
+ * simulation, the camera, or units set on the map) the AI uses the rulebook's numbers.
+ */
+export const cardBonuses = (state: GameState): boolean => noMap(state);
+
+/** The round's order card as it stands in this game: its bonuses only where they apply (see `cardBonuses`). */
+export function orderHitMod(state: GameState): number {
+  return cardBonuses(state) ? currentCard(state.orderDeck).hitMod ?? 0 : 0;
+}
+export function orderChargeBonus(state: GameState): number {
+  return cardBonuses(state) ? currentCard(state.orderDeck).chargeBonus ?? 0 : 0;
+}
+
+/** Whether the AI army holds a card with this ability: its Faction cards and the Tactical cards it bought. */
+export function aiHasBoost(state: GameState, name: string): boolean {
+  const ids = [state.army.factionCardId, ...Object.values(state.army.factionCards ?? {}), ...(state.army.tacticalCards ?? [])];
+  return ids.some((id) => !!CARDS.find((c) => c.id === id)?.boosts.some((b) => b.name === name));
+}
+
+/**
+ * Whether an AI unit may make a Ranged Attack against one of your units with this weapon (Part 8.7.3): the target's
+ * Combat Tag matches the weapon's Target; an Engaged unit fires only at what it is Engaged with, and never a BULKY
+ * weapon; an Unengaged unit fires at an Engaged one only with PINPOINT. Indomitable lets an Engaged unit fire out
+ * of its fight, and be fired at by Unengaged units.
+ */
+export function aiMayTarget(state: GameState, u: AiUnitInstance, pu: PlayerUnit, w?: WeaponProfile): boolean {
+  const flying = playerUnitFlying(pu);
+  if (w && ((w.target === 'Ground' && flying) || (w.target === 'Flying' && !flying))) return false;
+  const fighting = pu.engagedWith.includes(u.id) || engagedWith(state, u).some((e) => e.id === pu.id);
+  if (u.engaged) {
+    if (w?.keywords.some((k) => k.k === 'BULKY')) return false;
+    if (fighting) return true;
+    return aiHas(u, 'Indomitable') && !pu.engaged;
+  }
+  if (pu.engaged) return !!w?.keywords.some((k) => k.k === 'PINPOINT') || hasAbility(pu, 'Indomitable');
+  return true;
+}
+
+/** The weapon of a dice batch as the unit fires it: the profile on its card with its own upgrades and Passives. */
+export function aiWeapon(u: AiUnitInstance, weaponId: string): WeaponProfile | undefined {
+  const d = def(u);
+  const w = d.weapons.find((x) => x.id === weaponId);
+  return w ? firedWeapon(w, { def: d, upgrades: u.upgrades, statuses: u.statuses, targetDist: null }).weapon : undefined;
+}
+
 function hitModFor(state: GameState, unit?: AiUnitInstance): number {
   const card = currentCard(state.orderDeck);
   // The Stim card is a Stimpack: it drives only the Biological Units, whose attacks pay for it in damage.
   const stimmed = card.id !== 'stim' || !unit || def(unit).tags.includes('Biological');
-  let mod = (stimmed ? card.hitMod ?? 0 : 0) + (cardMods(state, unit)?.hit ?? 0) - aiDebuff(unit, 'hit');
+  let mod = (stimmed ? orderHitMod(state) : 0) + (cardMods(state, unit)?.hit ?? 0) - aiDebuff(unit, 'hit');
   if (state.modeState['avengerActive']) mod += 1;
   return mod;
 }
@@ -119,10 +172,15 @@ function batchesFor(state: GameState, unit: AiUnitInstance, rng: Rng, phase: 'As
   // The main weapon, then SIDEARMs and the SPECIALISTs' own guns: each fired by the models that carry it (a
   // Marine squad with a Rocket Launcher is eight rifles and one launcher, never nine launchers).
   const pick = phase === 'Combat' ? (best ? [best] : []) : ws.filter((w) => w === best || isSpecialist(w) || w.keywords.some((k) => k.k === 'SIDEARM'));
-  for (const w of pick) {
+  for (const base of pick) {
+    // BULKY: no Ranged Attack while the unit is Engaged.
+    if (phase === 'Assault' && unit.engaged && base.keywords.some((k) => k.k === 'BULKY')) continue;
     // An action card's extra attacks add to the main weapon only (a BUFF RoA on the weapon the ability names).
-    const roa = w === best && phase === 'Assault' ? cardMods(state, unit)?.roa ?? 0 : 0;
-    const models = Math.min(unit.models, weaponModels(d, unit.upgrades, phase, w, unit.models));
+    const roa = base === best && phase === 'Assault' ? cardMods(state, unit)?.roa ?? 0 : 0;
+    const models = Math.min(unit.models, weaponModels(d, unit.upgrades, phase, base, unit.models));
+    if (models <= 0) continue;
+    // The weapon as the unit carries it: its upgrades (Grooved Spines, Hydriodic Bile, Ares-Class...) are on the dice.
+    const w = firedWeapon(base, { def: d, upgrades: unit.upgrades, statuses: unit.statuses, targetDist: null }).weapon;
     let instr = diceInstruction(roa ? { ...w, roa: w.roa + roa } : w, models);
     if (mod) instr.hitMod = mod;
     if (rmod && w.range !== 'E') instr.rangeMod = rmod;
@@ -175,7 +233,7 @@ function pickDeploy(state: GameState, cands: AiUnitInstance[]): AiUnitInstance {
 }
 
 /** Inside the 6" strip along a player entry edge (their Zone of Influence). */
-function inPlayerZoi(state: GameState, p: { x: number; y: number }): boolean {
+export function inPlayerZoi(state: GameState, p: { x: number; y: number }): boolean {
   const t = state.deployment.table;
   return playerSegments(state.deployment).some((sg) => {
     const along = sg.edge === 'N' || sg.edge === 'S' ? p.x : p.y;
@@ -230,15 +288,15 @@ export function deployOrder(state: GameState, unit: AiUnitInstance): AiOrder {
   const hasAmbush = d.abilities.some((a) => /Burrow Ambush/i.test(a.name) && (!a.upgradeCost || unit.upgrades.includes(a.id)));
   // A collection too small for the players' armies: the AI is not held to its entry edge.
   // Dust-off: once a round, one Terran Ground Unit comes down by dropship away from the fight.
-  const dustOff = card.id === 'dustOff' && d.faction === 'Terran' && !d.tags.includes('Flying') && state.modeState['dustOffRound'] !== state.round;
+  const dustOff = card.id === 'dustOff' && (cardBonuses(state) || aiHasBoost(state, 'Ready For Dust-off')) && d.faction === 'Terran' && !d.tags.includes('Flying') && state.modeState['dustOffRound'] !== state.round;
   const dropAt = state.config.options.aiDropsAnywhere ? dropPointFor(state, unit, tp) : dustOff ? dropPointFor(state, unit, tp, 10) : undefined;
-  const warpIn = card.id === 'warpIn' && state.modeState['warpInRound'] !== state.round;
+  const warpIn = card.id === 'warpIn' && (cardBonuses(state) || aiHasBoost(state, 'Warp In')) && !d.tags.includes('Flying') && state.modeState['warpInRound'] !== state.round;
   let usesRoundDeploy: 'warpIn' | 'dustOff' | undefined;
   if (dropAt && !state.config.options.aiDropsAnywhere) {
     usesRoundDeploy = 'dustOff';
-    lines.push(`READY FOR DUST-OFF: a dropship sets the Unit down anywhere on the table more than 10" from every player model, outside the players' Zone of Influence. Place the Leading Model at about ${fmtIn(dropAt)} and the rest in Coherency within 3".`);
+    lines.push(`READY FOR DUST-OFF: a dropship sets the Unit down anywhere on the table more than 10" from every player model, outside the players' Zone of Influence. Place the Leading Model at about ${fmtIn(dropAt)} and the rest in Coherency, Wholly Within 3" of it.`);
   } else if (dropAt) {
-    lines.push(`Set the whole unit down anywhere on the table, outside the players' Zone of Influence and with every model more than 6" from every player model. Place the Leading Model at about ${fmtIn(dropAt)} and the rest in Coherency within 3".`);
+    lines.push(`Set the whole unit down anywhere on the table, outside the players' Zone of Influence and with every model more than 6" from every player model. Place the Leading Model at about ${fmtIn(dropAt)} and the rest in Coherency, Wholly Within 3" of it.`);
     lines.push('The AI is short of models for this battle. Its Units arrive where they are needed, not at its Entry Edge.');
   } else if (card.deployBias === 'ambush' && hasAmbush) {
     lines.push(`BURROW AMBUSH: set the Unit up anywhere within 18" of the AI's Entry Edge, outside the players' Zone of Influence and with no model within 10" of a player model.`);
@@ -246,9 +304,9 @@ export function deployOrder(state: GameState, unit: AiUnitInstance): AiOrder {
   } else if (hasMutator(state, 'aggressiveDeployment') || warpIn) {
     if (warpIn && !hasMutator(state, 'aggressiveDeployment')) usesRoundDeploy = 'warpIn';
     lines.push(`Enter from ${describeSegment(seg, table)}, or from either side edge that is not a player's Entry Edge. End more than 10" from every player model.`);
-    lines.push(`Move the Leading Model up to ${speed}" onto the table, then set the rest of the Unit in Coherency within 3".`);
+    lines.push(`Move the Leading Model up to ${speed}" onto the table, then set the rest of the Unit in Coherency, Wholly Within 3" of it.`);
   } else {
-    lines.push(`Enter from ${describeSegment(seg, table)}. Move the Leading Model up to ${speed}" onto the table, then set the rest of the Unit in Coherency within 3".`);
+    lines.push(`Enter from ${describeSegment(seg, table)}. Move the Leading Model up to ${speed}" onto the table, then set the rest of the Unit in Coherency, Wholly Within 3" of it.`);
   }
   lines.push(`Head toward ${headingText(state, unit.objective)}. The Unit may not end in the players' Zone of Influence, the 6" strip along their Entry Edge.`);
   lines.push(`Supply: ${supply}. Models: ${unit.models}${unit.damageMarker ? `. Damage marker: ${unit.damageMarker}` : ''}.`);
@@ -288,7 +346,8 @@ export function planted(u: AiUnitInstance): boolean {
  */
 function stanceChange(state: GameState, u: AiUnitInstance): 'siege' | 'unsiege' | null {
   const w = statusWeapon(u);
-  if (!w || u.activated.movement) return null;
+  // Mode Transformation is an upgrade: a Siege Tank that did not buy it never enters SIEGE MODE.
+  if (!w || u.activated.movement || !aiHas(u, 'Mode Transformation')) return null;
   const range = maxRange(w) + rangeModFor(state);
   const inRange = visibleEnemies(state, u, range).filter((v) => !hiddenFrom(v.unit, v.nearest));
   const sieged = hasStatus(u, w.requiresStatus!);
@@ -308,7 +367,8 @@ function stanceChange(state: GameState, u: AiUnitInstance): 'siege' | 'unsiege' 
 function pickupOrder(state: GameState, unit: AiUnitInstance): AiOrder | null {
   const w = statusWeapon(unit);
   if (!w || !hasStatus(unit, w.requiresStatus!) || unit.engaged) return null;
-  if ((state.modeState['pickupUsed'] as string[] | undefined)?.includes(unit.id)) return null;
+  // Ready for Pickup? is on the Raynor's Raiders Faction card, Once per Game for the whole army.
+  if (!aiHasBoost(state, 'Ready for Pickup?') || ((state.modeState['pickupUsed'] as string[] | undefined) ?? []).length) return null;
   const from = state.sense?.ai[unit.id]?.[0] ?? unit.est;
   if (!from) return null;
   const foes = state.playerUnits.filter((p) => p.location === 'table' && !p.destroyed && !playerUnitFlying(p)).flatMap((p) => playerModels(state, p));
@@ -427,11 +487,14 @@ export function rangedOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
   if (engagedOnly) {
     lines.push('The Unit is Engaged. It fires at the Unit it is Engaged with, which may make Evade rolls.');
   } else {
-    lines.push(`RANGED ATTACK an enemy Unit in Line of Sight within ${r}" of at least one model${lr ? `, or within ${lr}" with LONG RANGE at -1 to hit` : ''}. Target ${focusText(focus)}`);
+    lines.push(`RANGED ATTACK an enemy Unit in Line of Sight within ${r}" of at least one model${lr ? `, or Within ${lr}" with LONG RANGE. Each model beyond ${r}" rolls at -1 to Hit` : ''}. Target ${focusText(focus)}`);
+    lines.push('An Unengaged Unit cannot target an Engaged Unit unless its weapon has PINPOINT.');
+    const indirect = batches.filter((b) => b.keywordsText.some((t) => t.startsWith('INDIRECT FIRE')));
+    if (indirect.length) lines.push(`${indirect.map((b) => b.weapon).join(' and ')}: INDIRECT FIRE needs no Line of Sight. A target it cannot see may make an Evade Roll.`);
     lines.push('Only models with range and Line of Sight fire. Lower the model count below if fewer can.');
     if (batches.length > 1) lines.push(`SIDEARM weapons (${batches.slice(1).map((b) => `${b.weapon} ${typeof b.range === 'number' ? `${b.range}"` : 'engaged'}`).join(', ')}) fire at the same target if it is within their own range.`);
   }
-  if (currentCard(state.orderDeck).id === 'stim' && def(unit).tags.includes('Biological')) lines.push('STIM: the Unit takes 1 damage before it fires. Enter it in the roster.');
+  if (cardBonuses(state) && currentCard(state.orderDeck).id === 'stim' && def(unit).tags.includes('Biological')) lines.push('STIM: the Unit takes 1 damage before it fires. Enter it in the roster.');
   if (!engagedOnly) lines.push(runLines(state, unit, profile));
   const reports: OrderReportOption[] = [report('attacked', 'Attacked'), report('noTarget', engagedOnly ? 'Could not fire' : 'No target, ran')];
   return { type: 'ranged', unitId: unit.id, title: `${unit.label}: Ranged Attack`, lines, focus, heading: unit.objective, headingText: headingText(state, unit.objective), batches, reports };
@@ -468,7 +531,7 @@ export function chargeOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
   const speed = speedFor(d, unit.models) + speedModFor(state, unit);
   const diff = DIFFICULTIES[state.config.difficulty];
   const cm = cardMods(state, unit);
-  const bonus = (card.chargeBonus ?? 0) + (cm?.chargeBonus ?? 0);
+  const bonus = orderChargeBonus(state) + (cm?.chargeBonus ?? 0);
   const dice = cm?.twoDiceCharge ? '2d6high' : diff.chargeDice;
   const threshold = card.chargeThreshold === 'likely' ? speed + 3 + bonus : speed + 6 + bonus;
   const focus = focusFor(state, unit);
@@ -478,10 +541,11 @@ export function chargeOrder(state: GameState, unit: AiUnitInstance, rng: Rng, pr
   const batches: DiceInstruction[] = [];
   let impact: DiceInstruction | undefined;
   if (d.impact) {
-    lines.push(impactText(d.impact.dice, d.impact.hit, unit.models));
-    const w = { id: 'impact', name: 'IMPACT', phase: 'Combat' as const, range: 'E' as const, target: 'Ground' as const, roa: d.impact.dice, hit: d.impact.hit, dmg: 1, surgeTypes: [], keywords: [], text: '' };
+    lines.push(impactText(impactDice(d, unit.upgrades), d.impact.hit, unit.models));
+    // My Life for Aiur: one more IMPACT die for each model. Adrenal Overload and the like: +1 to IMPACT Hit Rolls.
+    const w = { id: 'impact', name: 'IMPACT', phase: 'Combat' as const, range: 'E' as const, target: 'Ground' as const, roa: impactDice(d, unit.upgrades), hit: d.impact.hit, dmg: 1, surgeTypes: [], keywords: [], text: '' };
     let instr = diceInstruction(w, unit.models);
-    const mod = hitModFor(state, unit) + (state.modeState['impactBonus'] ? 1 : 0);
+    const mod = hitModFor(state, unit) + (state.modeState['impactBonus'] ? 1 : 0) + (unit.fx ?? []).reduce((a, f) => a + (f.impactHit ?? 0), 0);
     if (mod) instr.hitMod = mod;
     instr = rollInstruction(rng, instr);
     impact = instr;
@@ -526,6 +590,7 @@ function combatOrder(state: GameState, unit: AiUnitInstance, rng: Rng): AiOrder 
     'If Engaged with more than one enemy Unit, all dice go to ' + focusText({ ...focus, primary: focus.primary === 'onMarker' ? 'nearest' : focus.primary }),
     'If either Unit is wiped out, update the Engaged toggle.',
   ];
+  if (aiBurrowed(unit)) lines.unshift('BURROWED: it performs Close Ranks first, which ends the Status. It then attacks as normal.');
   return { type: 'closeCombat', unitId: unit.id, title: `${unit.label}: Close Combat`, lines, focus, batches, reports: [report('done', 'Resolved')] };
 }
 
@@ -581,9 +646,11 @@ export function decideAi(state: GameState, mode: MissionMode, ctx: MissionCtx, r
           return { type: 'run', unitId: u.id, title: `${u.label}: Run`, lines: [`RUN up to ${speed}" straight toward ${headingText(state, u.objective)}. If any model reaches the edge, the Unit leaves the table. Tap "Exited the table".`], heading: u.objective, batches: [], reports: [report('exited', 'Exited the table'), report('done', 'Ran')] };
         }
         if (u.engaged) {
+          // An Engaged unit fires only at what it is Engaged with, and never runs: with no shot it Holds. A tank
+          // in SIEGE MODE cannot bring its gun down on what it is fighting (Point Blank).
           if (p === 'rangedLine' && !u.disengagedThisRound) {
             const o = rangedOrder(state, u, rng, p, true);
-            if (o) return o;
+            if (o) return { ...o, held: true };
           }
           continue;
         }

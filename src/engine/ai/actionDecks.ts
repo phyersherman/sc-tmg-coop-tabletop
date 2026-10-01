@@ -72,8 +72,8 @@ export interface CardMods {
 /** One line each, printed on the cards and in the AI Rulebook: how the table runs an AI action. */
 export const REMINDERS = {
   focus: 'Focus: the nearest enemy unit by the shortest path. Ties: fewest models, then lowest HP, then the players choose.',
-  move: 'Move: the Leading Model takes the shortest path, around Size 2+ terrain and through grass and scatter. The rest follow in Coherency. Never end within 1" of an enemy or in the players\' Zone of Influence.',
-  run: 'Run: a move at full Speed in the Assault phase instead of attacking.',
+  move: 'Move: the Leading Model takes the shortest path, around Size 2+ terrain and through grass and scatter. The rest follow in Coherency. Never end within 1" of an enemy. A Unit arriving from Reserves never ends in the players\' Zone of Influence.',
+  run: 'Run: a move up to its Speed in the Assault phase instead of attacking.',
   attack: 'Attack: only models with the target in range and Line of Sight fire. The app rolls the AI\'s attack dice.',
   charge: 'Charge: the target must be a Ground Unit within the AI\'s Speed + 6" of the Leading Model. Otherwise, do not charge. Charge distance: a D6 plus its Speed.',
   hold: 'Hold: the Unit stays where it is. It still counts as activated.',
@@ -362,12 +362,18 @@ export function faceCard(state: GameState, unit: AiUnitInstance): ActionCard | n
 }
 
 /** What a card does to the unit's numbers for this phase. */
-export function modsOf(card: ActionCard, round: number): CardMods {
+/**
+ * `bonuses`: whether the card's own extras count (the inches a plain card like Rush adds, Focus Fire's +1 to Hit).
+ * They are a help for an AI playing blind, so they apply only in Tabletop, AI only; what an ability of the unit
+ * gives (Stimpack's Speed, Resonating Glaives' RoA) and a card's slower pace always do.
+ */
+export function modsOf(card: ActionCard, round: number, bonuses = true): CardMods {
   const mods: CardMods = { cardId: card.id, round, phase: card.phase, speed: 0, hit: 0, roa: 0 };
+  const fromAbility = card.steps.some((s) => s.k === 'ability');
   for (const s of card.steps) {
-    if (s.k === 'move' || s.k === 'run') mods.speed += s.mod;
+    if (s.k === 'move' || s.k === 'run') mods.speed += s.mod > 0 && !fromAbility && !bonuses ? 0 : s.mod;
     if (s.k === 'attack') {
-      mods.hit += s.hit ?? 0;
+      mods.hit += bonuses ? s.hit ?? 0 : 0;
       mods.roa += s.roa ?? 0;
       if (s.focus) mods.focus = s.focus;
     }

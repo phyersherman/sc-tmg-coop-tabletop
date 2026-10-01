@@ -50,6 +50,24 @@ export interface AiUnitInstance {
   cardMods?: import('../ai/actionDecks').CardMods;
   /** Buffs from its action cards (its reactions, as the AI never reacts), until the End of the Round. */
   buffs?: import('../ai/actionDecks').CardBuff[];
+  /** The Round in which a model of this unit last moved, was moved or was PLACED: it has no Stationary Status that Round. */
+  movedRound?: number;
+  /** Out of Coherency (4.4): at the end of its last repositioning a model was not Wholly Within Coherency of the Leading Model. Casualties never change it. */
+  outOfCoherency?: boolean;
+  /** What its abilities gave its weapons until the End of the Round (Stimpack's PRECISION). */
+  fx?: AiFx[];
+}
+
+/** An ability's effect on an AI unit's numbers, until the End of the Round. */
+export interface AiFx {
+  source: string;
+  precision?: number;
+  /** Only weapons whose name contains one of these (lower case). */
+  weapons?: string[];
+  /** Only weapons of this Phase. */
+  weaponPhase?: 'Assault' | 'Combat';
+  /** +X to IMPACT Hit Rolls (Adrenal Overload). */
+  impactHit?: number;
 }
 
 export interface AiDebuff {
@@ -71,6 +89,14 @@ export interface AiArmy {
   factionCardId: string;
   /** A mixed army: the Faction card of each race it fields (the lead race's is `factionCardId`). */
   factionCards?: Partial<Record<Faction, string>>;
+  /**
+   * The Tactical cards it bought with its Vespene Gas (10% of its budget), card ids, one entry per copy (a Zerg
+   * army's Creep card among them): with the Faction cards they give the Army Slots its Units occupy, and they are
+   * the card abilities it owns. Absent on an army built before cards were recorded.
+   */
+  tacticalCards?: string[];
+  /** A campaign's story force: it fields what the story fielded, and is not held to Army Slots or Faction Tags. */
+  storyForce?: boolean;
   budget: number;
   spent: number;
   units: AiUnitInstance[];

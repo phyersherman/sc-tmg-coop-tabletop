@@ -7,10 +7,11 @@ import { dist } from '../terrain/geometry';
 import { alongPath, bestEffortToward, losBetweenBases, losBlocked, shortestPath, type PathOptions } from './geometry2d';
 import { centroid } from './homography';
 import { aiUnitSize, playerUnitFlying, playerUnitSize, playerUnitSupply } from './playerUnits';
-import { pathOptionsFor, closestBases, edgeDistance, edgeToPoint, ENGAGEMENT_IN, moveReach, shapeAt, unitGap, unitShapes } from './placement';
+import { pathOptionsFor, closestBases, edgeDistance, edgeToPoint, ENGAGEMENT_IN, moveReach, sameElevationAsMarker, shapeAt, unitGap, unitsEngaged, unitShapes } from './placement';
 import { MARKER_RADIUS_IN } from '@data/bases';
 import { isStructure } from '../director/selectors';
 import { aiBurrowed } from '../ai/burrow';
+import { contestSupply } from '../abilities/index';
 
 export function hasSense(state: GameState): boolean {
   return !!state.sense && state.sense.calibrated;
@@ -63,7 +64,11 @@ export interface EnemyView {
 }
 
 /** Player units the given AI unit could shoot: any AI model within `range` of a visible player model. */
-export function visibleEnemies(state: GameState, unit: AiUnitInstance, range: number, groundOnly = false): EnemyView[] {
+/**
+ * Your units an AI unit can fire at within `range`: each with how many of the AI's models reach it with Line of
+ * Sight. `indirect`: the weapon has INDIRECT FIRE and needs no Line of Sight.
+ */
+export function visibleEnemies(state: GameState, unit: AiUnitInstance, range: number, groundOnly = false, indirect = false): EnemyView[] {
   const mine = aiModels(state, unit);
   if (!mine) return [];
   const def = unitById(unit.defId);
@@ -78,7 +83,8 @@ export function visibleEnemies(state: GameState, unit: AiUnitInstance, range: nu
     const myBases = unitShapes(state, 'ai', unit.id);
     const theirBases = unitShapes(state, 'players', pu.id);
     for (const m of myBases) {
-      const ok = theirBases.some((t) => edgeDistance(m, t) <= range && (flying || losBetweenBases(m, aiUnitSize(unit), t, playerUnitSize(pu), state.terrain.pieces)));
+      // A Flying target ignores Full Cover, but the shooter's own Direct Cover still hides it (Part 7.1.4).
+      const ok = theirBases.some((t) => edgeDistance(m, t) <= range && (indirect || losBetweenBases(m, aiUnitSize(unit), t, playerUnitSize(pu), state.terrain.pieces, { flyingA: def.tags.includes('Flying'), flyingB: flying })));
       if (ok) firing++;
     }
     if (firing === 0) continue;
@@ -113,7 +119,7 @@ export function nearestEnemyByPath(state: GameState, unit: AiUnitInstance, groun
 export function engagedWith(state: GameState, unit: AiUnitInstance): PlayerUnit[] {
   const mine = aiModels(state, unit);
   if (!mine) return [];
-  return state.playerUnits.filter((pu) => !pu.destroyed && pu.location === 'table' && !playerUnitFlying(pu) && unitGap(state, 'ai', unit.id, 'players', pu.id) <= ENGAGEMENT_IN + 0.01);
+  return state.playerUnits.filter((pu) => !pu.destroyed && pu.location === 'table' && unitsEngaged(state, 'ai', unit.id, 'players', pu.id));
 }
 
 /** Marker control suggestion: supply within 3" with line of sight to the marker. */
@@ -124,8 +130,7 @@ export function engagedWith(state: GameState, unit: AiUnitInstance): PlayerUnit[
 export function aiHolding(state: GameState, m: Pt & { contestIn?: number }): AiUnitInstance[] {
   return state.army.units.filter((u) => {
     if (u.location !== 'table' || !aiModels(state, u)) return false;
-    const def = unitById(u.defId);
-    return unitShapes(state, 'ai', u.id).some((s) => edgeToPoint(s, m) - MARKER_RADIUS_IN <= (m.contestIn ?? 3) && !losBlocked(s, def.stats.size, m, 0, state.terrain.pieces));
+    return unitShapes(state, 'ai', u.id).some((s) => reaches(state, s, aiUnitSize(u), m));
   });
 }
 
@@ -140,48 +145,79 @@ export function markerHolder(ai: number, players: number, guard = false): Marker
   return ai > players ? 'ai' : players > ai ? 'players' : 'contested';
 }
 
+/** Whether a model contests a Mission Marker from where it stands: Within reach of it, with Line of Sight to it. */
+function reaches(state: GameState, s: Parameters<typeof edgeToPoint>[0], size: number, m: Pt & { contestIn?: number }): boolean {
+  // Within reach (3", or a campaign objective point's own wider reach), on the marker's own elevation, with Line of
+  // Sight to it (the marker has Size 0).
+  return edgeToPoint(s, m) - MARKER_RADIUS_IN <= (m.contestIn ?? 3) && sameElevationAsMarker(state, s, m) && !losBlocked(s, size, m, 0, state.terrain.pieces);
+}
+
+/**
+ * Whether a unit stands within a marker's reach on its elevation (no Line of Sight needed): a campaign objective's
+ * "within 8"" for an escort reaching it or the enemies wearing a position down.
+ */
+export function unitWithinMarker(state: GameState, side: 'ai' | 'players', id: string, m: Pt & { contestIn?: number }): boolean {
+  return unitShapes(state, side, id).some((s) => edgeToPoint(s, m) - MARKER_RADIUS_IN <= (m.contestIn ?? 3) && sameElevationAsMarker(state, s, m));
+}
+
+/**
+ * The AI units that can Contest a marker (Part 8.9.1): on the table, In Coherency, not Flying, not BURROWED, not a
+ * Structure, with a model Within 3" of it and Line of Sight to it.
+ */
+function aiContesting(state: GameState, m: Pt & { contestIn?: number }): AiUnitInstance[] {
+  return state.army.units.filter((u) => {
+    if (u.location !== 'table' || isStructure(u) || aiBurrowed(u) || u.outOfCoherency || !aiModels(state, u)) return false;
+    const def = unitById(u.defId);
+    if (def.tags.includes('Flying')) return false;
+    return unitShapes(state, 'ai', u.id).some((s) => reaches(state, s, aiUnitSize(u), m));
+  });
+}
+
+/** Your units that can Contest a marker, by the same conditions. */
+function playersContesting(state: GameState, m: Pt & { contestIn?: number }): PlayerUnit[] {
+  return state.playerUnits.filter((pu) => {
+    // On the battlefield: set there, or seen there by the camera wherever the app thinks it is.
+    const present = pu.location === 'table' || !!state.sense?.players[pu.id]?.length;
+    if (!present || pu.destroyed || playerUnitFlying(pu) || (pu.statuses ?? []).includes('Burrowed') || pu.outOfCoherency) return false;
+    if (contestSupply(state, pu) === null) return false;
+    return unitShapes(state, 'players', pu.id).some((s) => reaches(state, s, playerUnitSize(pu), m));
+  });
+}
+
 export function suggestedMarkerControl(state: GameState): Record<number, MarkerControl> {
   const out: Record<number, MarkerControl> = {};
   for (const m of state.markers) {
     let ai = 0;
-    let pl = 0;
     /** A side-marker guard within reach: it adds no Supply, but the players cannot take the marker from it alone. */
     let guard = false;
-    for (const u of state.army.units) {
-      // A Structure never controls or contests a marker, not even unopposed.
-      // Burrowed units cannot control or contest markers either.
-      if (u.location !== 'table' || isStructure(u) || aiBurrowed(u)) continue;
-      const pts = aiModels(state, u);
-      if (!pts) continue;
+    let aiThere = false;
+    for (const u of aiContesting(state, m)) {
+      if (typeof u.special?.sideMarker === 'number') { guard = true; continue; }
       const def = unitById(u.defId);
-      // Within 3" of the marker, measured from the base edge to the marker's edge.
-      if (unitShapes(state, 'ai', u.id).some((s) => edgeToPoint(s, m) - MARKER_RADIUS_IN <= (m.contestIn ?? 3) && !losBlocked(s, def.stats.size, m, 0, state.terrain.pieces))) {
-        if (typeof u.special?.sideMarker === 'number') { guard = true; continue; }
-        ai += currentSupply(def, u.models) + (def.abilities.some((a) => a.name === 'Commander') ? 1 : 0);
-        if (currentSupply(def, u.models) === 0) ai += 0.01; // supply 0 still counts when unopposed
-      }
+      aiThere = true;
+      // Commander: 1 more Supply for Controlling and Contesting Mission Markers.
+      ai += currentSupply(def, u.models) + (def.abilities.some((a) => a.name === 'Commander') ? 1 : 0);
     }
-    for (const pu of state.playerUnits) {
-      // Flying and Burrowed units cannot control or contest markers.
-      if (pu.destroyed || playerUnitFlying(pu) || (pu.statuses ?? []).includes('Burrowed')) continue;
-      if (unitShapes(state, 'players', pu.id).some((s) => edgeToPoint(s, m) - MARKER_RADIUS_IN <= (m.contestIn ?? 3) && !losBlocked(s, playerUnitSize(pu), m, 0, state.terrain.pieces))) pl += playerUnitSupply(pu) + 0.01;
-    }
-    out[m.id] = markerHolder(ai, pl, guard);
+    const yours = playersContesting(state, m);
+    const pl = yours.reduce((a, pu) => a + (contestSupply(state, pu) ?? 0), 0);
+    // The higher total Controls; a tie is Contested and changes nothing. A side alone at the marker Controls it
+    // even at Supply 0, but Supply 0 never wins a contest (Part 8.9.1).
+    if (!aiThere && !yours.length) out[m.id] = 'none';
+    else if (!yours.length) out[m.id] = 'ai';
+    else if (!aiThere) out[m.id] = guard ? 'contested' : 'players';
+    else out[m.id] = ai > pl ? 'ai' : pl > ai ? 'players' : 'contested';
   }
   return out;
 }
 
 /**
  * Your units holding a marker, one entry per unit within its contest range (the same reckoning as the marker's
- * control): who owns it and its Supply. Flying and Burrowed units hold nothing.
+ * control): who owns it and its Supply. Flying, Burrowed and Structure units hold nothing.
  */
 export function playerUnitsHolding(state: GameState, markerId: number): { unitId: string; owner: number; supply: number }[] {
   const m = state.markers.find((x) => x.id === markerId);
   if (!m) return [];
-  return state.playerUnits
-    .filter((pu) => pu.location === 'table' && !pu.destroyed && !playerUnitFlying(pu) && !(pu.statuses ?? []).includes('Burrowed'))
-    .filter((pu) => unitShapes(state, 'players', pu.id).some((s) => edgeToPoint(s, m) - MARKER_RADIUS_IN <= (m.contestIn ?? 3) && !losBlocked(s, playerUnitSize(pu), m, 0, state.terrain.pieces)))
-    .map((pu) => ({ unitId: pu.id, owner: pu.owner ?? 0, supply: playerUnitSupply(pu) }));
+  return playersContesting(state, m).map((pu) => ({ unitId: pu.id, owner: pu.owner ?? 0, supply: contestSupply(state, pu) ?? 0 }));
 }
 
 /** Destination after moving `speed` inches along the shortest path toward `to`. */

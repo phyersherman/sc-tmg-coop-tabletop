@@ -26,7 +26,9 @@ export function playerUnitSize(pu: PlayerUnit): number {
 
 
 /** An AI unit's Size as it stands: a Siege Tank that has dug in counts as Size 3, as the player's does. */
-export function aiUnitSize(u: { defId: string; statuses?: readonly string[] }): number {
+export function aiUnitSize(u: { defId: string; statuses?: readonly string[]; special?: Record<string, unknown> }): number {
+  // BURROWED: Size 0 for all purposes.
+  if ((u.statuses ?? []).includes('Burrowed') || u.special?.burrowed) return 0;
   const size = unitById(u.defId).stats.size;
   return (u.statuses ?? []).includes('Siege Mode') ? Math.max(3, size) : size;
 }

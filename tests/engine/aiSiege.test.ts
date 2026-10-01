@@ -9,7 +9,8 @@ describe('an AI Siege Tank in a whole battle', () => {
     const dep = deploymentById('abandoned-camp');
     const flat = { seed: 3, table: dep.table, pieces: [], fireLanes: [], violations: [] };
     const cfg = makeConfig({ aiFaction: 'Terran', playMode: 'video', playerMinerals: 1200, difficulty: 'hard' });
-    cfg.playerUnits = [makePlayerUnit('p1', 'marine', 'large', [], 'Marines', 300), makePlayerUnit('p2', 'marauder', 'small', [], 'Marauders', 301)];
+    // A third unit waits in Reserves all game: a side with nothing left on the table or in Reserves ends the battle.
+    cfg.playerUnits = [makePlayerUnit('p1', 'marine', 'large', [], 'Marines', 300), makePlayerUnit('p2', 'marauder', 'small', [], 'Marauders', 301), makePlayerUnit('p3', 'medic', 'small', [], 'Medics', 302)];
     const mode = unitById('siege_tank').abilities.find((a) => a.name === 'Mode Transformation')!;
     cfg.army = { ...cfg.army, units: [
       { id: 'tank', defId: 'siege_tank', label: 'Siege Tank A', composition: 'small', upgrades: [mode.id], maxModels: 1, models: 1, damageMarker: 0, shieldsLeft: 0, location: 'reserves', activated: { movement: false, assault: false, combat: false }, engaged: false, engagedEnemySupply: 0, disengagedThisRound: false, objective: { kind: 'enemy' }, atObjective: false, respawns: 0 },

@@ -11,7 +11,7 @@ import { aiSegments, closestOnSegment, dist, segmentMidpoint } from '../terrain/
 import { speedFor } from '../units/speed';
 import { hasSense } from '../sense/query';
 import { currentCard } from './orderDeck';
-import { chargeRollText, speedModFor } from './decide';
+import { aiMayTarget, aiWeapon, chargeRollText, orderChargeBonus, speedModFor } from './decide';
 import { playerUnitSupply } from '../sense/playerUnits';
 
 function headingPoint(state: GameState, order: AiOrder, from: Pt): Pt | null {
@@ -43,8 +43,10 @@ function headingPoint(state: GameState, order: AiOrder, from: Pt): Pt | null {
 function withDice(order: AiOrder, models: number): AiOrder {
   const batches = order.batches.map((b) => {
     const roa = b.models ? b.dice / b.models : b.dice;
-    const dice = Math.round(roa * models);
-    return { ...b, models, dice, rolls: b.rolls?.slice(0, dice) };
+    // Never more models than carry the weapon: a SPECIALIST's weapon stays with its one model.
+    const n = Math.min(b.models, models);
+    const dice = Math.round(roa * n);
+    return { ...b, models: n, dice, rolls: b.rolls?.slice(0, dice) };
   });
   return { ...order, batches };
 }
@@ -108,7 +110,8 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
       vis = visibleEnemies(state, unit, lr);
       usingLong = vis.length > 0;
     }
-    if (unit.engaged) vis = vis.filter((v) => engagedWith(state, unit).some((e) => e.id === v.unit.id));
+    const mainW = aiWeapon(unit, main.weaponId);
+    vis = vis.filter((v) => aiMayTarget(state, unit, v.unit, mainW));
     if (vis.length) {
       const focus = order.focus?.primary ?? 'nearest';
       const sorted = vis.slice().sort((a, b) => {
@@ -122,7 +125,7 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
       });
       const t = sorted[0]!;
       const o = withDice(order, t.firing);
-      if (usingLong) for (const b of o.batches) b.hitMod = (b.hitMod ?? 0) - 1;
+      if (usingLong) for (const b of o.batches) { b.hitMod = (b.hitMod ?? 0) - 1; b.longShot = true; }
       const lines = [
         `Camera: RANGED ATTACK ${t.unit.name}, nearest model ${Math.round(t.nearest)}" away${usingLong ? ', with LONG RANGE at -1 to hit' : ''}. ${t.firing} of ${unit.models} models have range and Line of Sight.`,
         ...(order.lines.filter((l) => l.startsWith('STIM'))),
@@ -138,7 +141,7 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
 
   if (order.type === 'charge') {
     // The charge's own reach: Speed with every bonus the order and its action card give it.
-    const reach = order.charge ? order.charge.min - 1 : speed + (card.chargeBonus ?? 0);
+    const reach = order.charge ? order.charge.min - 1 : speed + orderChargeBonus(state);
     const threshold = card.chargeThreshold === 'likely' ? reach + 3 : reach + 6;
     const e = nearestEnemyByPath(state, unit, true);
     if (e && e.pathDist <= threshold) {
@@ -152,7 +155,7 @@ export function applySense(state: GameState, order: AiOrder, _rng: Rng): AiOrder
     if (order.batches.length) {
       const main = order.batches[0]!;
       const range = (typeof main.range === 'number' ? main.range : 0) + (main.rangeMod ?? 0);
-      const vis = visibleEnemies(state, unit, range).sort((a, b) => a.nearest - b.nearest);
+      const vis = visibleEnemies(state, unit, range).filter((v) => aiMayTarget(state, unit, v.unit, aiWeapon(unit, main.weaponId))).sort((a, b) => a.nearest - b.nearest);
       if (vis.length) {
         const t = vis[0]!;
         return { ...withDice(order, t.firing), lines: [`Camera: no enemy in charge reach (nearest ${e ? Math.round(e.pathDist) : '?'}" by path). RANGED ATTACK ${t.unit.name} with ${t.firing} of ${unit.models} models.`], reports: [{ id: 'attacked', label: 'Attacked' }, { id: 'noTarget', label: 'Could not fire' }] };

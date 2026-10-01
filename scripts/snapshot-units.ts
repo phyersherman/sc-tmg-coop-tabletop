@@ -204,7 +204,9 @@ for (const x of raw) {
       weapons,
       abilities,
     };
-    if (x.keywords) u.subFaction = x.keywords;
+    // Sub-Faction tags only: a race named among them ("Protoss, Nerazim") is the unit's Race Tag, already its faction.
+    const subs = String(x.keywords ?? '').split(',').map((k: string) => k.trim()).filter((k: string) => k && !['Terran', 'Zerg', 'Protoss'].includes(k));
+    if (subs.length) u.subFaction = subs.join(', ');
     if (impact) u.impact = impact;
     units.push(u);
   } else {
@@ -220,10 +222,14 @@ for (const x of raw) {
       resource: Number(x.resource ?? 0),
       slots,
       factionTags: Array.isArray(x.factionTags) ? x.factionTags : [],
-      boosts: (x.boosts ?? []).map((b: Raw) => ({
-        name: b.name,
-        text: String(b.description).replace(/^.*?:\s*/, ''),
-      })),
+      boosts: (x.boosts ?? []).map((b: Raw) => {
+        // "Name <Reaction> <Any Phase>: text" — the ability's type and Phase Limitation come before its text.
+        const head = /^.*?<(Active|Passive|Reaction)>\s*(?:<(Movement|Assault|Combat|Any) Phase>)?\s*:/.exec(String(b.description));
+        const out: any = { name: b.name, text: String(b.description).replace(/^.*?:\s*/, '') };
+        if (head?.[1]) out.kind = head[1];
+        if (head?.[2]) out.phase = head[2];
+        return out;
+      }),
     });
   }
 }

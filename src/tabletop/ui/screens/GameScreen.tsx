@@ -109,7 +109,7 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
       {needsAsk && order.type === 'ranged' && (
         <div className="stack">
           <p className="ask">{camLine ? 'Roll the attack.' : `Fire at ${targetText(order.focus)} in Line of Sight within ${range}" of any of its models. Otherwise, do not fire.`}</p>
-          {!camLine && main?.longRange ? <p className="ask">{`LONG RANGE: if no enemy Unit is that close, fire at one within ${main.longRange + (main.rangeMod ?? 0)}" instead, at -1 to hit.`}</p> : null}
+          {!camLine && main?.longRange ? <p className="ask">{`LONG RANGE (${main.longRange + (main.rangeMod ?? 0)}"): each model beyond the weapon's Range but Within ${main.longRange + (main.rangeMod ?? 0)}" of the target rolls at -1 to Hit.`}</p> : null}
           <div className="row">
             <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>{camLine ? 'Roll' : 'Open fire'}</Btn>
             {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>{order.reports.find((r) => r.id === 'noTarget')?.label ?? 'No target'}</Btn>}

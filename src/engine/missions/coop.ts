@@ -3,7 +3,7 @@ import type { GameState, ScoringPrompt } from '../types/game';
 import type { AiUnitInstance } from '../types/army';
 import { unitById } from '@data/index';
 import { missionTrainFor } from '@data/missionObjects';
-import { applyMarkerControl, baseBriefing, controlled, markerPrompts, vpResult } from './framework';
+import { applyMarkerControl, baseBriefing, controlled, countAnswer, markerPrompts, vpResult } from './framework';
 import { processReturns } from '../respawn';
 import { makeInstance, instanceCost } from '../army/builder';
 import { dist } from '../terrain/geometry';
@@ -95,7 +95,7 @@ export const oblivionExpress = withSideMarkers(coopMode({
   briefing: (s) => [
     ...baseBriefing(s),
     'Each train enters from the left edge at the table\'s vertical centre. In the Movement and Assault phases it moves straight for the right edge, unless it is Engaged. A train has no weapons and never attacks.',
-    'Scoring: the players score 3 VP for each train destroyed. A train that leaves by the right edge scores the AI 3 VP and adds 1 to its Supply escalation.',
+    'Scoring: the players score 3 VP for each train destroyed. A train that leaves by the right edge scores the AI 3 VP and adds 1 to its Supply escalation from the next round.',
   ],
   onSetup: (c) => {
     const s = c.state;
@@ -109,7 +109,8 @@ export const oblivionExpress = withSideMarkers(coopMode({
     ms(c).escaped = 0;
   },
   onRoundStart: (c) => {
-    for (const u of c.state.army.units) if (u.special?.train && u.location === 'reserves') u.special.forceDeploy = u.special.trainRound === c.state.round;
+    // A train runs in its round whatever the AI has on the table: it is no part of the Supply Pool.
+    for (const u of c.state.army.units) if (u.special?.train && u.location === 'reserves') u.special.forceDeploy = u.special.freeSupply = u.special.trainRound === c.state.round;
     // Stall: the train on the line (the one furthest along), or else the one arriving now, does not run this round.
     for (let k = 0; k < 2 && takeCounter(c, 'stall'); k++) {
       const trains = c.state.army.units.filter((u) => u.special?.train && !(Number(u.special.holdUntil ?? 0) > c.state.round));
@@ -127,7 +128,9 @@ export const oblivionExpress = withSideMarkers(coopMode({
     if (u.special?.train && report === 'exited') {
       ms(c).escaped++;
       c.state.vp.ai += 3;
+      // The pool grows by one more each round from the next: the rounds already played are not counted again.
       c.state.supply.escalation += 1;
+      c.state.supply.bonus -= Math.max(0, c.state.round - 1);
       c.log(`${u.label} escaped: AI +3 VP and +1 Supply escalation.`);
     }
   },
@@ -227,7 +230,7 @@ export const voidThrashing = withSideMarkers(coopMode({
   briefing: (s) => [
     ...baseBriefing(s),
     'Marker 2 is the players\' base, with 3 HP. At each Scoring phase it loses 1 HP for every Thrasher within 3" of it.',
-    'The Thrashers are the AI\'s three most expensive units, Heroes excepted. They arrive in rounds 1, 2 and 4 and never return once destroyed. Other AI units fight as normal.',
+    'The Thrashers are the AI\'s three most expensive units, Heroes excepted. They arrive in rounds 1, 2 and 4, free of the Supply Pool, and never return once destroyed. Other AI units fight as normal.',
   ],
   onSetup: (c) => {
     const s = c.state;
@@ -258,7 +261,8 @@ export const voidThrashing = withSideMarkers(coopMode({
       ms(c).baseHp = Math.min(3, ms(c).baseHp + 1);
       c.log(`The base is at ${ms(c).baseHp} of 3 HP.`);
     }
-    for (const u of s.army.units) if (u.special?.thrasher && u.location === 'reserves') u.special.forceDeploy = u.special.thrasherRound === s.round;
+    // A Thrasher comes on in its round whatever the AI has on the table: it deploys free of the Supply Pool.
+    for (const u of s.army.units) if (u.special?.thrasher && u.location === 'reserves') u.special.forceDeploy = u.special.freeSupply = Number(u.special.thrasherRound) <= s.round;
   },
   roundNotes: (c) => [`Base HP: ${ms(c).baseHp}/3. Thrashers destroyed: ${ms(c).killed}/${ms(c).thrashers}.`],
   deployFilter: (c, cands) => cands.filter((u) => !u.special?.thrasher || Number(u.special.thrasherRound) <= c.state.round),
@@ -271,7 +275,8 @@ export const voidThrashing = withSideMarkers(coopMode({
   scoringPrompts: (c) => [...markerPrompts(c.state), { id: 'thrashersAtBase', kind: 'number', text: 'Thrashers within 3" of Mission Marker 2 (the base) right now?', min: 0, max: 3, defaultValue: 0 }],
   onScoring: (c, a) => {
     applyMarkerControl(c.state, a);
-    const n = Number(a.extra['thrashersAtBase'] ?? 0);
+    // Only a Thrasher on the table can be at the base.
+    const n = countAnswer(a, 'thrashersAtBase', 0, c.state.army.units.filter((u) => u.special?.thrasher && u.location === 'table').length);
     if (n > 0) {
       ms(c).baseHp -= n;
       c.log(`The base takes ${n} damage (HP ${Math.max(0, ms(c).baseHp)}/3).`);
@@ -362,7 +367,7 @@ export const riftsToKorhal = withSideMarkers(coopMode({
   onScoring: (c, a) => {
     applyMarkerControl(c.state, a);
     const rifts = ms(c).rifts as { x: number; y: number; round: number; open: boolean }[];
-    let n = Number(a.extra['riftsClosed'] ?? 0);
+    let n = countAnswer(a, 'riftsClosed', 0, 5);
     for (const r of rifts) {
       if (n <= 0) break;
       if (r.open) {
@@ -404,17 +409,20 @@ export const lockAndLoad = withSideMarkers(coopMode({
   roundNotes: (c) => [`Locked markers: ${c.state.markers.filter((m) => m.locked).map((m) => m.id).join(', ') || 'none'}.`],
   scoringPrompts: (c) => [
     ...markerPrompts(c.state),
-    { id: 'lockA', kind: 'number', text: 'Marker locked this round, or 0 for none. A lock needs units from two different players on the marker, or two units playing solo.', min: 0, max: 5, defaultValue: 0 },
+    { id: 'lockA', kind: 'number', text: 'Marker locked this round, or 0 for none. Lock a marker you control with units from two different players on it, or two units playing solo.', min: 0, max: 5, defaultValue: 0 },
     { id: 'lockB', kind: 'number', text: 'Second marker locked this round, or 0 for none.', min: 0, max: 5, defaultValue: 0 },
   ],
   onScoring: (c, a) => {
     applyMarkerControl(c.state, a);
-    for (const k of ['lockA', 'lockB']) {
-      const id = Number(a.extra[k] ?? 0);
+    // A lock needs control: only a marker the players hold once this round's control is settled can be locked.
+    const asked = [...new Set(['lockA', 'lockB'].map((k) => countAnswer(a, k, 0, 5)).filter((id) => id > 0))];
+    for (const id of asked) {
       const m = c.state.markers.find((x) => x.id === id);
-      if (m && !m.locked) {
+      if (!m) c.log(`There is no Marker ${id} to lock.`);
+      else if (m.locked) c.log(`Marker ${id} is already locked.`);
+      else if (!m.active || m.controlledBy !== 'players') c.log(`Marker ${id} is not locked: the players do not control it.`);
+      else {
         m.locked = true;
-        m.controlledBy = 'players';
         c.state.vp.players += 2;
         c.log(`Marker ${id} locked (+2 VP).`);
         grantReward(c, id === 5 ? 'requisition' : id === 2 || id === 4 ? 'reinforce' : 'firepower', id, null);
@@ -439,7 +447,8 @@ export const mistOpportunities = withSideMarkers(coopMode({
     ...baseBriefing(s),
     `Gather ${6 + 2 * (s.config.players - 1)} terrazine to win.`,
     'Each round two markers are active vents, and the vents change every round. A unit that holds within 3" of an active vent for the whole Movement phase gathers 1 terrazine.',
-    'Scoring: the AI scores 1 VP for each marker it controls.',
+    'A closed vent cannot be controlled or contested. It stays with the side that last controlled it.',
+    'Scoring: the AI scores 1 VP for each active vent it controls.',
   ],
   onSetup: (c) => {
     ms(c).terrazine = 0;
@@ -460,7 +469,7 @@ export const mistOpportunities = withSideMarkers(coopMode({
   scoringPrompts: (c) => [...markerPrompts(c.state), { id: 'terrazine', kind: 'number', text: 'Terrazine gathered this round: 1 for each unit that held within 3" of an active vent through the Movement phase.', min: 0, max: 6, defaultValue: 0 }],
   onScoring: (c, a) => {
     applyMarkerControl(c.state, a);
-    ms(c).terrazine += Number(a.extra['terrazine'] ?? 0);
+    ms(c).terrazine += countAnswer(a, 'terrazine', 0, 6);
     c.state.vp.ai += controlled(c.state, 'ai').length;
   },
   winCheck: (c, final) => (ms(c).terrazine >= 6 + 2 * (c.state.config.players - 1) ? 'won' : final ? 'lost' : null),

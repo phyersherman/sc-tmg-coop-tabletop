@@ -5,6 +5,7 @@ import { unitById } from '@data/index';
 import { playerUnitSupply } from '@engine/sense/playerUnits';
 import { configCostOf } from '@engine/army/force';
 import { ownedModels, physicalModelId } from '@engine/army/collection';
+import { validatePlayerArmy } from '@engine/army/rules';
 import { useCollection } from '@tt/store/collectionStore';
 import { useSettings, type RecentArmy } from '@tt/store/settingsStore';
 import { useUi } from '@tt/store/uiStore';
@@ -66,6 +67,8 @@ export function ArmiesScreen() {
 
   const save = () => {
     if (!editing || !editing.value.units.length) return;
+    // Only an army that may be fielded is saved (Part 9.1): within its Mineral and Vespene limits, its Army Slots and its Faction card's tags.
+    if (validatePlayerArmy({ cards: editing.value.cards, units: editing.value.units, minerals: editing.budget }).length) return;
     // Saving under a new name leaves the old army alone; saving the one you opened replaces it.
     const saved = settings.pushRecentArmy({ name: editing.value.name ?? '', faction: editing.faction, scale: editing.scale, cost: cost(editing.value), units: editing.value.units, cards: editing.value.cards });
     const old = editing.id ? armies.find((a) => a.id === editing.id) : undefined;
@@ -91,13 +94,14 @@ export function ArmiesScreen() {
 
   if (editing) {
     const spent = cost(editing.value);
+    const problems = editing.value.units.length ? validatePlayerArmy({ cards: editing.value.cards, units: editing.value.units, minerals: editing.budget }) : [];
     return (
       <div>
         <div className="row between" style={{ alignItems: 'baseline' }}>
           <h1>{editing.id ? 'Edit army' : 'New army'}</h1>
           <span className="muted small">{spent} / {editing.budget} minerals · {supply(editing.value)} Supply</span>
         </div>
-        <p className="muted">Pick Units from the buildings that train them, choose the size and upgrades of each, then add the army's cards. Saved armies can be picked when setting up a battle.</p>
+        <p className="muted">Select a Faction card, add the Tactical cards that give the Army Slots you need, then pick Units from the buildings that train them and choose the size and upgrades of each. Saved armies can be picked when setting up a battle.</p>
 
         <Panel title="Size of game" tag={SCALE_NOTE[editing.scale].note}>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -135,10 +139,10 @@ export function ArmiesScreen() {
         />
 
         <div className="row" style={{ gap: 8, marginTop: 12 }}>
-          <Btn variant="primary" size="lg" disabled={!editing.value.units.length} onClick={save}>Save army</Btn>
+          <Btn variant="primary" size="lg" disabled={!editing.value.units.length || problems.length > 0} title={problems[0]?.text} onClick={save}>Save army</Btn>
           <Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn>
           <Btn disabled={!editing.value.units.length} onClick={() => setPrinting({ name: editing.value.name?.trim() || `${editing.faction} army`, faction: editing.faction, scale: editing.scale, units: editing.value.units, cards: editing.value.cards })}>Print this army</Btn>
-          {spent > editing.budget && <span className="small danger-text">{spent - editing.budget} minerals over the limit. It can still be saved.</span>}
+          {problems[0] && <span className="small danger-text">{problems[0].text}</span>}
         </div>
       </div>
     );
@@ -179,6 +183,11 @@ export function ArmiesScreen() {
               {(() => {
                 const short = missingModels(a.units, owned);
                 return short.length ? <div className="small danger-text">Needs {short.map((x) => `${x.short}× ${x.name}`).join(', ')} beyond your Collection.</div> : null;
+              })()}
+              {(() => {
+                // An army saved before it was checked: it opens for editing, and cannot go into battle as it is.
+                const wrong = validatePlayerArmy({ cards: a.cards, units: a.units, minerals: Math.max(SCALE_NOTE[a.scale].budget, cost(a)) })[0];
+                return wrong ? <div className="small danger-text">{wrong.text}</div> : null;
               })()}
               <div className="row" style={{ gap: 6, marginTop: 6 }}>
                 <Btn size="sm" variant="primary" onClick={() => edit(a)}>Edit</Btn>

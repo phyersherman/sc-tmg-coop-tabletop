@@ -63,13 +63,17 @@ describe('high ground and scatter', () => {
 });
 
 describe('shooting from high ground', () => {
-  it('a model on the plateau sees down over its edge; one at its foot is covered from the ground', async () => {
+  it('a model on the plateau sees down over its edge, but not into the Dead Zone at its foot', async () => {
     const { losBlocked } = await import('../../src/engine/sense/geometry2d');
     const onTop = { x: 13, y: 18 };
     expect(rampLevel(onTop, ramp)).toBe(1);
     const atFoot = { x: 13, y: 22.6 }; // 0.45" south of the plateau's edge
-    // Marine (Size 1) on the plateau, Hydralisk (Size 1) hugging the cliff below: the plateau is under the Marine, not between.
-    expect(losBlocked(onTop, 1, atFoot, 1, [ramp])).toBe(false);
+    // The plateau is under the model on it, not between: it sees a model on the ground clear of the cliff's foot.
+    expect(losBlocked(onTop, 1, { x: 13, y: 24 }, 1, [ramp])).toBe(false);
+    // Elevation Dead Zone (7.1.1): one Within 1" of the base of the same piece, and more than 3" away, is not seen.
+    expect(losBlocked(onTop, 1, atFoot, 1, [ramp])).toBe(true);
+    // Close Quarters: from the plateau's edge, Within 3" of it, the model at the foot is seen.
+    expect(losBlocked({ x: 13, y: 21.5 }, 1, atFoot, 1, [ramp])).toBe(false);
     // From the open ground beyond, the Hydralisk at the cliff's foot is in Direct Cover behind the plateau.
     const beyond = { x: 13, y: 8 };
     expect(losBlocked(beyond, 1, atFoot, 1, [ramp])).toBe(true);

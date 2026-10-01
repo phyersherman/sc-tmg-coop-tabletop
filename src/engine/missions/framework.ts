@@ -3,12 +3,16 @@ import type { GameState, MarkerControl, ScoringAnswers, ScoringPrompt } from '..
 import type { MissionCtx, MissionMode } from '../types/mission';
 import type { Scale } from '../types/game';
 
-/** Apply sticky marker control from the player's report. Returns markers captured this round per side. */
+/**
+ * Apply sticky marker control from the player's report. Returns markers captured this round per side.
+ * A marker that is not active (a Supply Drop before it lands, a closed vent, a marker already taken) is not in
+ * play: nobody takes it and nobody contests it, so whoever stands on it when it activates starts from nothing.
+ */
 export function applyMarkerControl(state: GameState, answers: ScoringAnswers): { ai: number[]; players: number[] } {
   const captured = { ai: [] as number[], players: [] as number[] };
   for (const m of state.markers) {
     const a: MarkerControl | undefined = answers.markers[m.id];
-    if (m.locked) continue;
+    if (m.locked || !m.active) continue;
     if (!a || a === 'contested' || a === 'none') continue;
     if (m.controlledBy !== a) {
       if (m.controlledBy !== null) captured[a].push(m.id);
@@ -16,6 +20,12 @@ export function applyMarkerControl(state: GameState, answers: ScoringAnswers): {
     }
   }
   return captured;
+}
+
+/** A counted answer from the Scoring form: a whole number, held within what the prompt allows. */
+export function countAnswer(answers: ScoringAnswers, id: string, min: number, max: number): number {
+  const n = Math.floor(Number(answers.extra[id] ?? 0));
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : min;
 }
 
 export function markerPrompts(state: GameState): ScoringPrompt[] {
@@ -49,8 +59,16 @@ export function baseBriefing(state: GameState): string[] {
   ];
 }
 
+/** How a Supply value on a Skirmish mission card grows with the size of the game: twice at Standard, three times at Grand. */
+export const SCALE_FACTOR: Record<Scale, number> = { skirmish: 1, standard: 2, grand: 3 };
+
+/** A mission's Supply values at each scale, from its Skirmish values. */
+export function scaledSupply(scale: Scale, skirmish: { start: number; escalation: number }): { start: number; escalation: number } {
+  return { start: skirmish.start * SCALE_FACTOR[scale], escalation: skirmish.escalation * SCALE_FACTOR[scale] };
+}
+
 export function defaultSupply(scale: Scale): { start: number; escalation: number } {
-  return scale === 'skirmish' ? { start: 3, escalation: 1 } : scale === 'standard' ? { start: 6, escalation: 2 } : { start: 9, escalation: 3 };
+  return scaledSupply(scale, { start: 3, escalation: 1 });
 }
 
 /** Default end-of-game result by VP. */

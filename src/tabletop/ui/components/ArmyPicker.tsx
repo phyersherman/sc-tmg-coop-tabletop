@@ -6,15 +6,13 @@ import type { PlayerUnit } from '@engine/sense/types';
 import { toggleUpgrade } from '@engine/units/weapons';
 import { makePlayerUnit } from '@engine/sense/playerUnits';
 import { physicalModelId } from '@engine/army/collection';
+import { SLOT_TYPES, addUnitProblem, armySlots, cardNeeds, isCreepCard, slotOf, slotsUsed, startingSupply, validatePlayerArmy, vespeneLimit, vespeneSpent } from '@engine/army/rules';
 import { RESOURCE_OF } from '@engine/abilities/index';
 import type { RecentArmy } from '@tt/store/settingsStore';
 import { Btn, Stepper } from './Basics';
 import { UnitSheet } from './UnitCard';
 import { configCost, configLabel, type UnitConfig } from './UnitBuilder';
 import { cardArt, modelPhoto } from '@data/modelPhotos';
-
-/** A Creep card (printed "CREEP CARD"): the one kind of Tactical card an army takes only once. */
-const isCreepCard = (c: CardDef) => / Creep$/.test(c.name);
 
 /** The buildings each faction trains its units from, as the game's command card lays them out. */
 /** A unit, card or building shown by its initials ("SIE" for a Siege Tank, "RF" for a two-word card). */
@@ -65,8 +63,7 @@ function upgradeOptions(def: UnitDef) {
   ];
 }
 
-type Slot = 'Core' | 'Elite' | 'Support' | 'Hero' | 'Air';
-const SLOTS: Slot[] = ['Core', 'Elite', 'Support', 'Hero', 'Air'];
+const SLOTS = SLOT_TYPES;
 
 interface Tip { title: string; meta?: string; body: ReactNode; x: number; y: number }
 
@@ -138,18 +135,22 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
 
   const units = value.units;
   const spent = units.reduce((a, u) => a + configCost(u), 0);
-  const gas = Math.floor(budget * 0.1);
+  const gas = vespeneLimit(budget);
   const cardDefs = value.cards.map((id) => CARDS.find((c) => c.id === id)).filter((c): c is CardDef => !!c);
   const factionCard = cardDefs.find((c) => c.isFactionCard);
-  const gasSpent = cardDefs.reduce((a, c) => a + c.cost, 0);
+  const gasSpent = vespeneSpent(cardDefs);
   const tags = new Set<string>([faction, ...(factionCard?.factionTags ?? [])]);
   const factionCards = CARDS.filter((c) => c.isFactionCard && (c.faction === faction || tags.has(c.faction)));
   const tacticalCards = CARDS.filter((c) => !c.isFactionCard && (c.faction === faction || tags.has(c.faction)));
   const resource = RESOURCE_OF[faction] ?? 'CP';
-  const slots: Record<Slot, number> = { Core: 0, Elite: 0, Support: 0, Hero: 0, Air: 0 };
-  for (const c of cardDefs) for (const s of SLOTS) slots[s] += c.slots[s] ?? 0;
-  const usedSlots: Record<Slot, number> = { Core: 0, Elite: 0, Support: 0, Hero: 0, Air: 0 };
-  for (const u of units) { const role = unitById(u.defId).role; if (role in usedSlots) usedSlots[role as Slot]++; }
+  // Army Building (Part 9.1): the Army Slots the cards give against the starting Supply of the Units, and
+  // everything that stops this army being fielded as it stands.
+  const slots = armySlots(cardDefs);
+  const usedSlots = slotsUsed(units);
+  const army = { factionCard, cards: cardDefs, units };
+  /** The Army Slots a Unit of the army occupies: "2 Core". */
+  const slotLabel = (u: PlayerUnit) => { const d = unitById(u.defId); const n = startingSupply(d, u.composition); return slotOf(d) ? `${n} ${d.role} Army Slot${n === 1 ? '' : 's'}` : 'no Army Slot'; };
+  const problems = units.length || value.cards.length ? validatePlayerArmy({ cards: value.cards, units, minerals: budget }) : [];
 
   // Models of each miniature already in the army (a Raider is a Marine).
   const usedModels = useMemo(() => units.reduce<Record<string, number>>((a, u) => ({ ...a, [physicalModelId(u.defId)]: (a[physicalModelId(u.defId)] ?? 0) + u.maxModels }), {}), [units]);
@@ -179,9 +180,11 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
   const cfg: UnitConfig | null = def ? { defId: def.id, composition: comp?.label ?? 'small', upgrades, name: name.trim() || def.name } : null;
   const cost = cfg ? configCost(cfg) : 0;
   const maxCopies = def && comp ? (leftFor(def) === Infinity ? 6 : Math.floor(leftFor(def) / comp.models)) : 0;
+  /** Why the Unit on the bench cannot join the army: no Faction card, a Faction Tag, a Unique Unit, no free Army Slot. */
+  const addWhy = def && comp ? addUnitProblem(def, comp.label, army, count) : null;
   const pick = (d: UnitDef) => { setSel(d.id); setComposition('small'); setUpgrades([]); setName(''); setCount(1); };
   const add = () => {
-    if (!cfg || !def) return;
+    if (!cfg || !def || addWhy) return;
     const next = units.slice();
     for (let i = 0; i < count; i++) {
       const idx = next.filter((u) => u.defId === cfg.defId).length + 1;
@@ -190,12 +193,20 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
     onChange({ ...value, units: next });
   };
   const setFactionCard = (id: string) => onChange({ ...value, cards: [id, ...value.cards.filter((c) => !CARDS.find((d) => d.id === c)?.isFactionCard)] });
-  // A click takes another copy of a card; a right-click puts one copy back. A Creep card is taken once: a second
-  // click puts it back. (Only one Faction card is ever in the army.)
+  // A click takes another copy of a card; a right-click puts one copy back. An army has one Creep card: a click on
+  // another swaps it in, a click on the one it has puts it back. (Only one Faction card is ever in the army.)
+  const otherCreep = (c: CardDef) => cardDefs.filter((x) => isCreepCard(x) && x.id !== c.id);
+  /** Vespene Gas spent once this card is taken (a Creep card takes the place of the one in the army). */
+  const gasWith = (c: CardDef) => gasSpent + c.cost - (isCreepCard(c) ? vespeneSpent(otherCreep(c)) : 0);
   const addTactical = (c: CardDef) => {
-    const i = value.cards.indexOf(c.id);
-    if (i >= 0 && isCreepCard(c)) return removeTactical(c);
-    if (gasSpent + c.cost > gas) return;
+    if (cardNeeds(c, factionCard)) return;
+    if (isCreepCard(c)) {
+      if (value.cards.includes(c.id)) return removeTactical(c);
+      if (gasWith(c) > gas) return;
+      const others = new Set(otherCreep(c).map((x) => x.id));
+      return onChange({ ...value, cards: [...value.cards.filter((id) => !others.has(id)), c.id] });
+    }
+    if (gasWith(c) > gas) return;
     onChange({ ...value, cards: [...value.cards, c.id] });
   };
   const removeTactical = (c: CardDef) => {
@@ -250,6 +261,7 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
       <div className="grid grid-2">
         <div className="stack">
           <h3>Train Units</h3>
+          {!factionCard && <p className="small muted" style={{ margin: 0 }}>Select a Faction card first. It gives the army its starting Army Slots and decides which Units and Tactical cards may be included.</p>}
           <div className="army-buildings">
             {buildings.map((b) => (
               <div key={b.name} className="army-building">
@@ -257,10 +269,14 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
                 <div className="cmd-grid">
                   {b.defs.map((d) => {
                     const left = leftFor(d);
-                    const canBuild = left === Infinity || left >= Math.min(...d.compositions.map((c) => c.models));
+                    const owns = left === Infinity || left >= Math.min(...d.compositions.map((c) => c.models));
+                    // Addable when any of its Composition Options is: the smallest may fit the free Army Slots.
+                    const whys = d.compositions.map((c) => addUnitProblem(d, c.label, army));
+                    const why = whys.every(Boolean) ? whys[0]! : null;
+                    const canBuild = owns && !why;
                     return (
                       <button key={d.id} type="button" className={`cmd-btn ${sel === d.id ? 'on' : ''}`} aria-disabled={!canBuild} onClick={() => canBuild && pick(d)}
-                        {...hover({ title: d.name, meta: `${d.role}${d.unique ? ' · unique' : ''} · ${d.compositions.map((c) => `${c.models} for ${c.cost}`).join(' / ')}`, body: <>Speed {d.stats.speed ? d.stats.speed.join('/') : '–'}" · Armour {d.stats.armour}+{d.stats.evade ? ` · Evade ${d.stats.evade}+` : ''} · HP {d.stats.hp}{d.stats.shields ? ` +${d.stats.shields} shields` : ''}<br />{d.tags.join(', ')}{!canBuild ? <><br />You do not own enough {d.name} models.</> : left !== Infinity ? <><br />{left} model{left === 1 ? '' : 's'} left in your Collection.</> : null}<UnitTipKit def={d} /></> })}>
+                        {...hover({ title: d.name, meta: `${d.role}${d.unique ? ' · unique' : ''} · ${d.compositions.map((c) => `${c.models} for ${c.cost}, Supply ${c.supply}`).join(' / ')}`, body: <>Speed {d.stats.speed ? d.stats.speed.join('/') : '–'}" · Armour {d.stats.armour}+{d.stats.evade ? ` · Evade ${d.stats.evade}+` : ''} · HP {d.stats.hp}{d.stats.shields ? ` +${d.stats.shields} shields` : ''}<br />{d.tags.join(', ')}{why ? <><br />{why}</> : !owns ? <><br />You do not own enough {d.name} models.</> : left !== Infinity ? <><br />{left} model{left === 1 ? '' : 's'} left in your Collection.</> : null}<UnitTipKit def={d} /></> })}>
                         <Icon name={`u_${d.id}`} size={44} />
                         <span className="cmd-cost">{Math.min(...d.compositions.map((c) => c.cost))}</span>
                       </button>
@@ -295,14 +311,15 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
               <div className="row" style={{ marginTop: 8 }}>
                 <input placeholder={`Name (optional), e.g. ${def.name} A`} value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, minWidth: 140 }} />
                 <label>Copies</label><Stepper value={count} onChange={setCount} min={1} max={Math.max(1, Math.min(6, maxCopies))} />
-                <Btn variant="primary" disabled={maxCopies < 1 || spent + cost * count > budget} title={maxCopies < 1 ? `You do not own enough ${def.name} models` : spent + cost * count > budget ? 'Over the mineral budget' : undefined} onClick={add}>Add</Btn>
+                <Btn variant="primary" disabled={maxCopies < 1 || spent + cost * count > budget || !!addWhy} title={addWhy ?? (maxCopies < 1 ? `You do not own enough ${def.name} models` : spent + cost * count > budget ? 'Over the Mineral limit' : undefined)} onClick={add}>Add</Btn>
                 <Btn size="sm" variant="ghost" onClick={() => setCard({ defId: def.id, upgrades, models: comp.models, title: def.name, meta: `${cost} minerals · Supply ${comp.supply}` })}>Card</Btn>
               </div>
+              {addWhy && <p className="small danger-text" style={{ margin: '6px 0 0' }}>{addWhy}</p>}
             </div>
           )}
 
           <h3>Cards</h3>
-          <p className="small muted" style={{ margin: 0 }}>Your Faction card and Tactical cards give army slots and {resource}. Vespene Gas {gasSpent} / {gas}{SLOTS.filter((s) => slots[s] || usedSlots[s]).map((s) => <span key={s} className={usedSlots[s] > slots[s] ? 'danger-text' : ''}> · {s} {usedSlots[s]}/{slots[s]}</span>)}</p>
+          <p className="small muted" style={{ margin: 0 }}>The Faction card and Tactical cards give Army Slots and {resource}. Each Unit occupies Army Slots of its type equal to its starting Supply. <span className={gasSpent > gas ? 'danger-text' : ''}>Vespene Gas {gasSpent} / {gas}</span>{SLOTS.filter((s) => slots[s] || usedSlots[s]).map((s) => <span key={s} className={usedSlots[s] > slots[s] ? 'danger-text' : ''}> · {s} {usedSlots[s]}/{slots[s]}</span>)}</p>
           <div className="cmd-grid">
             {factionCards.map((c) => (
               <button key={c.id} type="button" className={`cmd-btn card-btn ${factionCard?.id === c.id ? 'on' : ''}`} onClick={() => setFactionCard(c.id)}
@@ -312,10 +329,14 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
             ))}
             {tacticalCards.map((c) => {
               const n = value.cards.filter((id) => id === c.id).length;
-              const off = !n && (gasSpent + c.cost > gas);
+              const creep = isCreepCard(c);
+              // Faction Tags (9.1.2): a card the Faction card does not allow is not on offer; one already in the army can only be put back.
+              const needs = cardNeeds(c, factionCard);
+              const noGas = gasWith(c) > gas;
+              const off = !n && (!!needs || noGas);
               return (
-                <button key={c.id} type="button" className={`cmd-btn card-btn ${n ? 'on' : ''}`} aria-disabled={off} onClick={() => !off && addTactical(c)} onContextMenu={(e) => { e.preventDefault(); removeTactical(c); }}
-                  {...hover({ title: c.name, meta: `Tactical card · ${c.cost} gas · ${c.resource} ${resource} · slots ${SLOTS.filter((s) => c.slots[s]).map((s) => `${c.slots[s]} ${s}`).join(', ') || 'none'}${isCreepCard(c) ? ' · one per army' : ''}`, body: <>{cardBody(c)}{n ? <><br />{isCreepCard(c) ? 'In your army. Click to remove.' : `${n} in your army. Click to add another, right-click to remove one.`}</> : off ? <><br />Not enough Vespene Gas.</> : null}</> })}>
+                <button key={c.id} type="button" className={`cmd-btn card-btn ${n ? 'on' : ''}`} aria-disabled={off} onClick={() => (needs ? removeTactical(c) : !off && addTactical(c))} onContextMenu={(e) => { e.preventDefault(); removeTactical(c); }}
+                  {...hover({ title: c.name, meta: `${creep ? 'Creep card' : 'Tactical card'} · ${c.cost} gas · ${c.resource} ${resource} · slots ${SLOTS.filter((s) => c.slots[s]).map((s) => `${c.slots[s]} ${s}`).join(', ') || 'none'}${creep ? ' · one per army' : ''}`, body: <>{cardBody(c)}{needs ? <><br />{needs}{n ? ' Click to remove.' : ''}</> : n ? <><br />{creep ? 'In your army. Click to remove.' : noGas ? `${n} in your army. Not enough Vespene Gas for another. Right-click to remove one.` : `${n} in your army. Click to add another, right-click to remove one.`}</> : noGas ? <><br />Not enough Vespene Gas.</> : creep && otherCreep(c).length ? <><br />Takes the place of {otherCreep(c)[0]!.name}.</> : null}</> })}>
                   <Icon name={`c_${c.id}`} size={52} />
                   <span className="cmd-cost">{c.cost}</span>
                   {n > 0 && <span className="cmd-count">{n === 1 ? '✓' : `×${n}`}</span>}
@@ -330,11 +351,16 @@ export function ArmyPicker({ faction, onFaction, lockFaction, budget, scale, own
             <h3>Your army</h3>
             <span className={`tag ${spent > budget ? 'danger' : 'accent'}`}>{spent} / {budget} minerals</span>
           </div>
+          {problems.length > 0 && (
+            <ul className="small danger-text" style={{ margin: 0, paddingLeft: 18 }}>
+              {problems.map((p) => <li key={p.text}>{p.text}</li>)}
+            </ul>
+          )}
           {units.length === 0 && <p className="muted">No Units yet. Train them from the buildings on the left.</p>}
           {units.map((u) => (
             <div key={u.id} className="army-unit-row">
               <Icon name={`u_${u.defId}`} size={36} />
-              <span><b>{u.name}</b><br /><span className="small muted">{configLabel(u)}</span></span>
+              <span><b>{u.name}</b><br /><span className="small muted">{configLabel(u)} · {slotLabel(u)}</span></span>
               <span className="small">{configCost(u)}</span>
               <Btn size="sm" variant="ghost" onClick={() => setCard({ defId: u.defId, upgrades: u.upgrades, models: u.models, title: u.name, meta: `${configCost(u)} minerals · ${u.models} model${u.models === 1 ? '' : 's'}` })}>card</Btn>
               <Btn size="sm" variant="ghost" onClick={() => onChange({ ...value, units: units.filter((x) => x.id !== u.id) })}>remove</Btn>

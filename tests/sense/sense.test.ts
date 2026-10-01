@@ -101,7 +101,8 @@ describe('pipeline and queries', () => {
     // Marker control: marker 1 at (6,18)
     s = apply(s, { t: 'sense', snapshot: { at: 3, calibrated: true, ai: { [u.id]: [{ x: 6, y: 16 }] }, players: { p2: [{ x: 7, y: 19 }] }, terrain: {}, unknown: [] } });
     const ctl = suggestedMarkerControl(s);
-    expect(ctl[1]).toBe('players'); // goliath (supply 2) vs hydralisks
+    // Goliath (Supply 2) against Hydralisks (Supply 2): a tie is Contested, and control does not change (Part 8.9.1).
+    expect(ctl[1]).toBe('contested');
     expect(ctl[5]).toBe('none');
   });
   it('turns generic orders into definite ones when positions are known', () => {

@@ -34,6 +34,9 @@ describe('SIDEARM in the simulation', () => {
     // An enemy in reach of both the Autocannon and the machine gun.
     const target = s.army.units.find((u) => u.location === 'table') ?? s.army.units[0]!;
     target.location = 'table';
+    // Standing in the open, not BURROWED (a Burrowed unit is HIDDEN from 12" away).
+    target.statuses = [];
+    target.special = {};
     s.sense!.ai[target.id] = [{ x: 18, y: 8 }];
     target.est = { x: 18, y: 8 };
     s = apply(s, { t: 'playerAttack', unitId: 'g1', weaponId: 'goliath:autocannon:3', targetId: target.id });
@@ -69,6 +72,9 @@ describe('casualties leave the table', () => {
     }
     const target = s.army.units.find((u) => u.location === 'table') ?? s.army.units[0]!;
     target.location = 'table';
+    // Standing in the open, not BURROWED (a Burrowed unit is HIDDEN from 12" away).
+    target.statuses = [];
+    target.special = {};
     const gp = s.sense!.players['g1']![0]!;
     // A pack of Zerglings 12" south of the Goliath, a couple of them nearer: the nearest are within the machine
     // gun's 8" only once the pack is measured base to base... except the ones that die first.

@@ -15,11 +15,15 @@ import type { AiUnitInstance } from '../types/army';
 import type { PlayerUnit, Pt, UnitEffect, EffectMods } from '../sense/types';
 import { CARDS, unitById } from '@data/index';
 import { speedFor } from '../units/speed';
-import { baseFits, pathOptionsFor, placeUnit, shapeAt, syncModelPositions, unitShapes } from '../sense/placement';
-import { shortestPath } from '../sense/geometry2d';
+import { baseFits, edgeDistance, edgeToPoint, pathOptionsFor, placeUnit, sameElevationAsMarker, shapeAt, syncModelPositions, unitShapes, type Shape } from '../sense/placement';
+import { baseElevation, isHighGround, losBetweenBases, segmentHitsRect, shortestPath } from '../sense/geometry2d';
+import { aiUnitSize, playerUnitSize, playerUnitSupply } from '../sense/playerUnits';
 import { currentSupply } from '../units/supply';
-import { makePlayerUnit, playerUnitDef } from '../sense/playerUnits';
-import { playerSegments, closestOnSegment } from '../terrain/geometry';
+import { makePlayerUnit, playerUnitDef, playerUnitFlying } from '../sense/playerUnits';
+import { aiSegments, playerSegments, closestOnSegment, pieceLocal, pieceParts, pointInRect, zoiRect } from '../terrain/geometry';
+import { firedWeapon, ownsAbility, raiseKeyword } from '../units/firing';
+import { targetNumber } from '../combat/resolve';
+import { MARKER_RADIUS_IN } from '@data/bases';
 
 export type Resource = 'CP' | 'BM' | 'PE';
 export const RESOURCE_OF: Record<string, Resource> = { Terran: 'CP', Zerg: 'BM', Protoss: 'PE' };
@@ -36,12 +40,16 @@ export interface AbilityContext {
   point?: Pt;
   /** Option picked for multi-choice abilities (Raynor's Orders). */
   option?: number;
+  /** The player whose card or unit this is (0-based). */
+  owner?: number;
 }
 
 export interface AbilitySpec {
   target: TargetKind;
   /** Range in inches from the using unit (or constraint description for points). */
   range?: number;
+  /** A range an upgrade changes (Optical Flare with the A-13 Flash Grenade Launcher). */
+  rangeFor?: (pu: PlayerUnit) => number;
   /** Short hint for the target picker. */
   targetHint?: string;
   /** For card boosts: the active unit must match. */
@@ -99,6 +107,28 @@ function heal(pu: PlayerUnit, x: number): number {
   return before - pu.damageMarker;
 }
 
+/** How many models of one of your units are Within `inches` of another unit, base edge to base edge. All of them when positions are not known. */
+function modelsNear(state: GameState, unit: PlayerUnit, other: PlayerUnit, inches: number): number {
+  const mine = unitShapes(state, 'players', unit.id);
+  const theirs = unitShapes(state, 'players', other.id);
+  if (!mine.length || !theirs.length) return unit.models;
+  return mine.filter((m) => theirs.some((t) => edgeDistance(m, t) <= inches + 0.05)).length;
+}
+
+/** Inside the AI's Zone of Influence: no Unit arriving from Reserves, by any means, may end there (Part 8.3.3). */
+export function inEnemyZoi(state: GameState, p: Pt): boolean {
+  const t = state.terrain.table;
+  return aiSegments(state.deployment).some((seg) => pointInRect(p, zoiRect(seg, t)));
+}
+
+/** Whether any model of one of your units stands in the AI's Zone of Influence. */
+export function unitInEnemyZoi(state: GameState, pu: PlayerUnit): boolean {
+  const t = state.terrain.table;
+  const zones = aiSegments(state.deployment).map((seg) => zoiRect(seg, t));
+  // Within: any part of a base inside the zone.
+  return unitShapes(state, 'players', pu.id).some((s) => zones.some((z) => s.x + s.r > z.x && s.x - s.r < z.x + z.w && s.y + s.r > z.y && s.y - s.r < z.y + z.h));
+}
+
 /**
  * RESPAWN (X): return up to X destroyed models, never pushing the unit into a higher Supply bracket (Part 12).
  * Returns how many came back.
@@ -119,13 +149,17 @@ function setUnitAt(state: GameState, pu: PlayerUnit, p: Pt): void {
   placeUnit(state, 'players', pu.id, p, { avoidEngaging: true });
 }
 
-function summon(state: GameState, defId: string, p: Pt, opts: { expires?: boolean } = {}): PlayerUnit {
+function summon(state: GameState, defId: string, p: Pt, opts: { expires?: boolean; /** Whose unit it is. */ owner?: number; /** SUMMON: it cannot be Activated in the Phase it arrives in, and acts from the next. */ thisPhaseOnly?: boolean } = {}): PlayerUnit {
   const def = unitById(defId);
   const pu = makePlayerUnit(uid(state, defId), defId, 'small', [], def.name);
   pu.location = 'table';
   pu.summoned = true;
   pu.deployedRound = state.round;
-  pu.activated = { movement: true, assault: true, combat: true };
+  pu.movedRound = state.round;
+  if (opts.owner) pu.owner = opts.owner;
+  pu.activated = opts.thisPhaseOnly
+    ? { movement: state.phase === 'movement', assault: state.phase === 'assault', combat: state.phase === 'combat' }
+    : { movement: true, assault: true, combat: true };
   if (opts.expires) pu.expiresEndOfRound = true;
   state.playerUnits.push(pu);
   setUnitAt(state, pu, p);
@@ -190,17 +224,21 @@ export function removeToken(state: GameState, id: string): void {
 
 /** Creep: within 6" of a Creep Tumor or a Source of Creep (Omega Worm). */
 export function onCreep(state: GameState, pu: PlayerUnit): boolean {
-  const p = unitPos(state, pu);
-  if (!p) return false;
-  if ((state.tokens ?? []).some((t) => t.kind === 'creepTumor' && dist(t, p) <= 6)) return true;
-  return state.playerUnits.some((o) => o.defId === 'omega_worm' && o.location === 'table' && !o.destroyed && (() => { const q = unitPos(state, o); return !!q && dist(q, p) <= 6; })());
+  const def = playerUnitDef(pu);
+  // ON CREEP: a Ground Zerg Unit Within 6" of a Creep Tumor token or a Source of Creep.
+  if (def.faction !== 'Zerg' || !isGround(pu) || pu.location !== 'table') return false;
+  const mine = unitShapes(state, 'players', pu.id);
+  if (!mine.length) return false;
+  if ((state.tokens ?? []).some((t) => t.kind === 'creepTumor' && mine.some((m) => edgeToPoint(m, t) <= 6.05))) return true;
+  return state.playerUnits.some((o) => o.defId === 'omega_worm' && o.location === 'table' && !o.destroyed && (o.deployedRound ?? 0) < state.round
+    && unitShapes(state, 'players', o.id).some((w) => mine.some((m) => edgeDistance(m, w) <= 6.05)));
 }
 
 const precisionFrom = (text: string) => Number(/PRECISION \((\d+)\)/.exec(text)?.[1] ?? 0);
 
 // ------------------------------------------------------------------ unit abilities
 
-const placeSpec = (range: number, extra?: (ctx: AbilityContext) => string | null): AbilitySpec => ({
+const placeSpec = (range: number, extra?: (ctx: AbilityContext) => string | null, noEngage = false): AbilitySpec => ({
   target: 'self',
   automated: true,
   apply: (ctx) => {
@@ -208,6 +246,8 @@ const placeSpec = (range: number, extra?: (ctx: AbilityContext) => string | null
     const err = extra?.(ctx);
     if (err) return err;
     pu.placeRange = range;
+    pu.placeNoEngage = noEngage;
+    pu.placeAsAction = false;
     return `${pu.name} may be PLACEd up to ${range}": drag it on the map.`;
   },
 });
@@ -240,9 +280,10 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
     friendlyFilter: (pu) => isBio(pu),
     targetHint: 'another friendly Biological unit within 4"',
     automated: true,
-    apply: ({ unit, friendly }) => {
+    apply: ({ unit, friendly, state }) => {
       if (!friendly || friendly.id === unit!.id) return '!Pick another friendly Biological unit.';
-      const x = unit!.models + (unit!.upgrades.some((u) => /stabilizer/i.test(u)) ? 1 : 0);
+      // HEAL (X): X is the number of this unit's models Within 4" of the target (Stabilizer Medpacks counts one more).
+      const x = modelsNear(state, unit!, friendly, 4) + (hasAbility(unit!, 'Stabilizer Medpacks') ? 1 : 0);
       const healed = heal(friendly, x);
       return `${unit!.name} Medpack heals ${friendly.name} for ${healed} (HEAL ${x}).`;
     },
@@ -250,6 +291,7 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
   'Optical Flare': {
     target: 'enemy',
     range: 12,
+    rangeFor: (pu) => (hasAbility(pu, 'A-13 Flash Grenade Launcher') ? 16 : 12),
     automated: true,
     apply: ({ enemy, state }) => {
       const e = enemy!;
@@ -269,13 +311,13 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
       return `Target Lock on ${e.label}: Goliath Autocannons gain Surge (Light, Armoured) D3+1 against it.`;
     },
   },
-  'Combat Shield': { target: 'self', automated: false, apply: ({ unit }) => reminder(unit, 'Combat Shield', 'May Evade against Close Combat attacks and damage from enemy abilities this round.') },
-  'Leg Enhancements': { target: 'self', automated: true, apply: ({ unit }) => { unit!.bonusMove = 2; return `${unit!.name} may make a free 2" Move: drag it on the map.`; } },
+  'Combat Shield': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Combat Shield', 'May make an Evade Roll against Close Combat Attacks and Damage from enemy Special Abilities this Round.', { evadeMelee: true }); return `${unit!.name} raises Combat Shield: it may make an Evade Roll against Close Combat Attacks this Round.`; } },
+  'Leg Enhancements': { target: 'self', automated: true, apply: ({ unit }) => { if (unit!.engaged) return '!An Engaged Unit cannot perform a Move action.'; unit!.bonusMove = 2; return `${unit!.name} may make a free 2" Move: drag it on the map.`; } },
   Charge: chargeTwoDice('Charge'),
   'Metabolic Boost': chargeTwoDice('Metabolic Boost'),
   Leap: { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Leap', '+2" to the next charge distance.', { chargeBonus: 2 }, 'charge'); return `${unit!.name}: Leap, +2" to its next charge.`; } },
   'Adrenal Overload': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Adrenal Overload', '+1 to IMPACT hit rolls this round.', { impactHit: 1 }); return `${unit!.name}: Adrenal Overload, +1 to IMPACT hit rolls.`; } },
-  Blink: placeSpec(6, ({ unit }) => (unit!.engaged ? '!Blink cannot be used while Engaged. Disengage first.' : null)),
+  Blink: placeSpec(6, ({ unit }) => (unit!.engaged ? '!Blink cannot be used while Engaged. Disengage first.' : null), true),
   'Leaping Strike': placeSpec(6, ({ unit }) => (unit!.engaged ? '!Only while unengaged.' : null)),
   'Path of Shadows': {
     target: 'self',
@@ -288,6 +330,7 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
     apply: ({ unit }) => {
       const pu = unit!;
       if (pu.engaged) return '!Only while unengaged.';
+      if (hasAbility(pu, 'Underdeveloped Claws')) return '!This Unit cannot gain the Burrowed Status.';
       const on = pu.statuses?.includes('Burrowed');
       pu.statuses = on ? (pu.statuses ?? []).filter((s) => s !== 'Burrowed') : [...(pu.statuses ?? []), 'Burrowed'];
       return `${pu.name} ${on ? 'unburrows' : 'burrows (HIDDEN, Size 0, cannot contest markers)'}.`;
@@ -303,7 +346,8 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
     automated: true,
     apply: ({ unit, state }) => {
       const n = onCreep(state, unit!) ? 3 : 2;
-      return `${unit!.name} respawns ${respawn(unit!, n)} model${respawn(unit!, 0) === 1 ? '' : 's'} (RESPAWN ${n}).`;
+      const back = respawn(unit!, n);
+      return `${unit!.name} respawns ${back} model${back === 1 ? '' : 's'} (RESPAWN ${n}).`;
     },
   },
   'Roachling Infestation': {
@@ -313,9 +357,15 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
     apply: ({ unit, state }) => {
       const p = unitPos(state, unit!);
       if (!p) return '!Place the unit on the table first.';
-      const r = summon(state, 'roachling', { x: p.x + 1.2, y: p.y + 1.2 });
+      const r = summon(state, 'roachling', { x: p.x + 1.2, y: p.y + 1.2 }, { owner: unit!.owner, thisPhaseOnly: true });
       r.summoned = false;
       r.name = 'Roachlings';
+      // A summoned Unit cannot be set Within the opponent's Zone of Influence.
+      if (unitInEnemyZoi(state, r)) {
+        state.playerUnits = state.playerUnits.filter((x) => x.id !== r.id);
+        if (state.sense) delete state.sense.players[r.id];
+        return "!The Roachlings cannot be set Within the enemy's Zone of Influence.";
+      }
       return `${unit!.name} spawns Roachlings next to it (they cannot activate this phase).`;
     },
   },
@@ -336,7 +386,7 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
       return `Crushing Grip: ${enemy!.label} counts as activated this phase.`;
     },
   },
-  'Mutating Carapace': { target: 'enemy', range: 18, automated: false, apply: ({ unit, enemy }) => reminder(unit, 'Mutating Carapace', `Evade (+2) against all attacks from ${enemy!.label} this round.`) },
+  'Mutating Carapace': { target: 'enemy', range: 18, automated: true, apply: ({ unit, enemy }) => { addEffect(unit!, 'Mutating Carapace', `Evade Roll, with a +2 Modifier, against all attacks made by ${enemy!.label} this Round.`, { evadeVs: enemy!.id, evadeBonus: 2 }); return `Mutating Carapace: ${unit!.name} may make an Evade Roll with a +2 Modifier against all attacks made by ${enemy!.label}.`; } },
   'Force Field': {
     target: 'point',
     range: 8,
@@ -414,18 +464,18 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
     automated: true,
     apply: ({ state, point, unit }) => {
       const pu = unit!;
-      const models = state.sense?.players[pu.id] ?? [];
+      const models = unitShapes(state, 'players', pu.id);
       if (!models.length) return '!The Ravagers must be on the battlefield.';
-      const reach = models.filter((m) => dist(m, point!) <= 14.05).length;
-      if (!reach) return '!No model of this unit is within 14" of that spot.';
+      // One token for each model of the unit, each set Within 14" of its own model: one spot at a time.
+      const mine = (state.tokens ?? []).filter((t) => t.kind === 'bile' && t.ownerId === pu.id && t.round === state.round).length;
+      const free = models.filter((m) => edgeToPoint(m, point!) <= 14.05).length;
+      if (!free) return '!No model of this unit is Within 14" of that spot.';
+      if (mine >= pu.models) return '!Every model of this unit has set its Corrosive Bile token.';
       const radius = hasAbility(pu, 'Bloated Bile Ducts') ? 2 : 1;
-      // One glob per model that can reach the spot, set a little apart so each one shows on the map.
-      for (let i = 0; i < reach; i++) {
-        const a = (i / reach) * Math.PI * 2;
-        const at = reach === 1 ? point! : { x: point!.x + Math.cos(a) * 0.6, y: point!.y + Math.sin(a) * 0.6 };
-        addToken(state, 'bile', at, 'Corrosive Bile', { ownerId: pu.id, radius });
-      }
-      return `Corrosive Bile: ${reach} glob${reach === 1 ? '' : 's'} in the air. At the end of the Assault phase every unit within ${radius}" of one suffers 5 hits from each.`;
+      addToken(state, 'bile', point!, 'Corrosive Bile', { ownerId: pu.id, radius });
+      const left = pu.models - mine - 1;
+      pu.pendingUses = left > 0 ? { name: 'Corrosive Bile', left } : undefined;
+      return `Corrosive Bile: token ${mine + 1} of ${pu.models} set.${left > 0 ? ` Set ${left} more.` : ''} At the End of the Assault Phase each Unit Within ${radius}" of a token suffers HITS 5 (1) for each.`;
     },
   },
   'Deep Tunnel': {
@@ -493,7 +543,7 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
       return `Orders: ${f.name} may activate again this phase.`;
     },
   },
-  'Domineering Presence': { target: 'friendly', range: 6, automated: true, apply: ({ friendly }) => { addEffect(friendly!, 'Domineering Presence', '+1 Supply for markers and objectives this round.', { supplyBonus: 1 }); return `${friendly!.name} counts +1 Supply for markers this round.`; } },
+  'Domineering Presence': { target: 'friendly', range: 6, targetHint: 'another friendly unit within 6"', automated: true, apply: ({ friendly, unit }) => { if (friendly!.id === unit!.id) return '!Select another Friendly Unit.'; addEffect(friendly!, 'Domineering Presence', '+1 Supply for markers and objectives this round.', { supplyBonus: 1 }); return `${friendly!.name} counts +1 Supply for markers this round.`; } },
   // Reactions resolved during AI attacks are offered in the saves panel; used from the card they are reminders.
   'Life Support': { target: 'none', automated: false, apply: ({ unit }) => reminder(unit, 'Life Support', 'Use when rolling saves: reduce damage by 1 per Medic model within 4".') },
   Transfusion: { target: 'none', automated: false, apply: ({ unit }) => reminder(unit, 'Transfusion', 'Use when rolling saves: reduce damage by 2.') },
@@ -508,6 +558,9 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
   'Debilitating Saliva': { target: 'none', automated: false, apply: ({ unit }) => reminder(unit, 'Debilitating Saliva', 'An enemy within 8" declaring a ranged attack gets DEBUFF Hit (1).') },
 };
 
+/** A unit that may gain the Burrowed Status: not a Structure, and not one whose card forbids it (Roachlings). */
+const canBurrow = (pu: PlayerUnit): boolean => !pu.summoned && !playerUnitDef(pu).abilities.some((a) => a.name === 'Underdeveloped Claws' || a.name === 'Structure');
+
 function hasStayInPlayCreep(state: GameState): boolean {
   return (state.playerCards ?? []).some((c) => c.defId === 'malignant_creep' || c.defId === 'accelerating_creep');
 }
@@ -515,12 +568,14 @@ function hasStayInPlayCreep(state: GameState): boolean {
 // ------------------------------------------------------------------ card boosts
 
 const activeIs = (pred: (pu: PlayerUnit) => boolean, label: string) => ({ needsUnit: pred, targetHint: label });
-const firstWeapon = (source: string, text: string, mods: EffectMods, pred: (pu: PlayerUnit) => boolean = () => true, label = 'the active unit'): AbilitySpec => ({
+const firstWeapon = (source: string, text: string, mods: EffectMods, pred: (pu: PlayerUnit) => boolean = () => true, label = 'the active unit', needs?: (ctx: AbilityContext) => string | null): AbilitySpec => ({
   target: 'self',
   ...activeIs(pred, label),
   automated: true,
-  apply: ({ unit }) => { addEffect(unit!, source, text, mods, 'firstWeapon'); return `${source}: ${unit!.name}. ${text}`; },
+  apply: (ctx) => { const why = needs?.(ctx); if (why) return why; addEffect(ctx.unit!, source, text, mods, 'firstWeapon'); return `${source}: ${ctx.unit!.name}. ${text}`; },
 });
+/** Stationary: no model of the unit has moved, been moved or been PLACED this Round. */
+export const isStationary = (state: GameState, u: { movedRound?: number }): boolean => u.movedRound !== state.round;
 const dropPoint = (source: string): AbilitySpec => ({
   target: 'point',
   targetHint: 'a spot more than 10" from every enemy',
@@ -574,11 +629,16 @@ const toReserves = (source: string): AbilitySpec => ({
     return `${source}: ${pu.name} returns to Reserves.`;
   },
 });
-const anyEdgeDeploy = (source: string, pred: (pu: PlayerUnit) => boolean, label: string): AbilitySpec => ({
+const anyEdgeDeploy = (source: string, pred: (pu: PlayerUnit) => boolean, label: string, /** "Cannot be used if another Friendly … Unit has already Deployed this Round": which units count. */ bars?: { who: (pu: PlayerUnit) => boolean; what: string }): AbilitySpec => ({
   target: 'self',
   ...activeIs((pu) => pu.location === 'reserves' && pred(pu), label),
   automated: true,
-  apply: ({ unit }) => { unit!.deployAnyEdge = true; return `${source}: ${unit!.name} may deploy from any non-player table edge, more than 10" from enemies.`; },
+  apply: ({ unit, state }) => {
+    const pu = unit!;
+    if (bars && state.playerUnits.some((o) => o.id !== pu.id && !o.summoned && ownerOf(o) === ownerOf(pu) && o.deployedRound === state.round && bars.who(o))) return `!${source} cannot be used: another Friendly ${bars.what} Unit has already Deployed this Round.`;
+    pu.deployAnyEdge = true;
+    return `${source}: ${pu.name} may deploy from any non-player table edge, more than 10" from enemies.`;
+  },
 });
 
 export const CARD_BOOSTS: Record<string, AbilitySpec> = {
@@ -586,10 +646,10 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
     target: 'point',
     targetHint: 'ground level, more than 10" from every enemy',
     automated: true,
-    apply: ({ state, point }) => {
-      if (state.playerUnits.some((p) => p.defId === 'pylon' && p.location === 'table' && !p.destroyed)) return '!You already have a Pylon on the battlefield.';
+    apply: ({ state, point, owner }) => {
+      if (state.playerUnits.some((p) => p.defId === 'pylon' && p.location === 'table' && !p.destroyed && ownerOf(p) === (owner ?? 0))) return '!You already have a Pylon on the battlefield.';
       if (nearestEnemyDist(state, point!) <= 10) return '!Must be more than 10" from every enemy model.';
-      summon(state, 'pylon', point!);
+      summon(state, 'pylon', point!, { owner });
       return 'A Pylon warps in. From next round, a Ground unit may deploy from its base once per round (Warp Conduit).';
     },
   },
@@ -597,10 +657,10 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
     target: 'point',
     targetHint: 'ground level, more than 10" from every enemy',
     automated: true,
-    apply: ({ state, point }) => {
-      if (state.playerUnits.some((p) => p.defId === 'omega_worm' && p.location === 'table' && !p.destroyed)) return '!You already have an Omega Worm on the battlefield.';
+    apply: ({ state, point, owner }) => {
+      if (state.playerUnits.some((p) => p.defId === 'omega_worm' && p.location === 'table' && !p.destroyed && ownerOf(p) === (owner ?? 0))) return '!You already have an Omega Worm on the battlefield.';
       if (nearestEnemyDist(state, point!) <= 10) return '!Must be more than 10" from every enemy model.';
-      summon(state, 'omega_worm', point!);
+      summon(state, 'omega_worm', point!, { owner });
       return 'An Omega Worm bursts up. It is a Source of Creep and an entry point for up to 2 Supply per round.';
     },
   },
@@ -608,9 +668,9 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
     target: 'point',
     targetHint: 'more than 1" from every enemy',
     automated: true,
-    apply: ({ state, point }) => {
+    apply: ({ state, point, owner }) => {
       if (nearestEnemyDist(state, point!) <= 1) return '!More than 1" from every enemy model.';
-      summon(state, 'point_defense_drone', point!, { expires: true });
+      summon(state, 'point_defense_drone', point!, { expires: true, owner });
       return 'Point Defence Drone set until the end of the round: the first ranged attack at a friendly unit within 4" loses 2 dice.';
     },
   },
@@ -643,13 +703,22 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
       return `Wild Mutation: ${unit!.name} +1 Speed and PRECISION (1) on its first weapon.`;
     },
   },
-  'Go! Go! Go!': { target: 'self', ...activeIs((pu) => isBio(pu) && pu.location === 'table', 'the active Biological unit'), automated: true, apply: ({ unit }) => { unit!.bonusMove = 2; return `Go! Go! Go!: ${unit!.name} may make a free 2" Move.`; } },
+  'Go! Go! Go!': { target: 'self', ...activeIs((pu) => isBio(pu) && pu.location === 'table', 'the active Biological unit'), automated: true, apply: ({ unit }) => { if (unit!.engaged) return '!An Engaged Unit cannot perform a Move action.'; if ((unit!.statuses ?? []).includes('Siege Mode')) return '!A Unit in SIEGE MODE cannot perform a Move action.'; unit!.bonusMove = 2; return `Go! Go! Go!: ${unit!.name} may make a free 2" Move.`; } },
   'Zealous Charge': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Zealous Charge', '+2 Speed this round.', { speed: 2 }); return `Zealous Charge: ${unit!.name} +2 Speed.`; } },
-  Phase: { target: 'self', automated: true, apply: ({ unit }) => { unit!.placeRange = 3; return `Phase: ${unit!.name} may be PLACEd up to 3".`; } },
-  'Ready for Pickup?': { target: 'self', once: 'game', automated: true, apply: ({ unit }) => { unit!.placeRange = 12; return `Ready for Pickup?: ${unit!.name} may be PLACEd up to 12", but not within Engagement Range. This replaces its action.`; } },
+  Phase: { target: 'self', ...activeIs((pu) => pu.location === 'table', 'the active unit'), automated: true, apply: ({ unit }) => { unit!.placeRange = 3; unit!.placeNoEngage = false; unit!.placeAsAction = false; return `Phase: ${unit!.name} may be PLACEd up to 3".`; } },
+  'Ready for Pickup?': {
+    target: 'self', once: 'game', ...activeIs((pu) => pu.location === 'table', 'the active unit'), automated: true,
+    apply: ({ unit, state }) => {
+      const pu = unit!;
+      // It resolves instead of a standard action: the unit must still have its action this Phase.
+      if (state.phase !== 'scoring' && pu.activated[state.phase]) return `!${pu.name} has already taken its action this Phase.`;
+      pu.placeRange = 12; pu.placeNoEngage = true; pu.placeAsAction = true;
+      return `Ready for Pickup?: ${pu.name} may be PLACEd up to 12", but not within Engagement Range. This replaces its action.`;
+    },
+  },
   'Field Repair': { target: 'self', ...activeIs(isMech, 'the active Mechanical unit'), automated: true, apply: ({ unit }) => `Field Repair: ${unit!.name} repairs ${heal(unit!, 2)} damage.` },
   // ---- Cards that came with the Immortal, Siege Tank and Ravager ---------------------------------------------
-  "Pound 'em Flat!": firstWeapon("Pound 'em Flat!", 'Its first ranged weapon gains PRECISION (2) while it stands still.', { precision: 2, weaponPhase: 'Assault' }, isMech, 'the active Mechanical unit'),
+  "Pound 'em Flat!": firstWeapon("Pound 'em Flat!", 'Its first ranged weapon gains PRECISION (2).', { precision: 2, weaponPhase: 'Assault' }, isMech, 'the active Mechanical unit', ({ unit, state }) => (isStationary(state, unit!) ? null : '!The active Unit has moved this Round: it has lost the Stationary Status.')),
   'Spawn Larva': {
     target: 'self',
     ...activeIs((pu) => isBio(pu) && playerUnitDef(pu).stats.size === 1 && !(playerUnitDef(pu).tags as string[]).includes('Unique'), 'the active non-Unique Biological unit of Size 1'),
@@ -667,7 +736,7 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
       const at = state.sense?.players[pu.id]?.[pu.models - 1] ?? state.sense?.players[pu.id]?.[0];
       if (!at) return '!The Roaches must be on the battlefield.';
       // MORPH (Name): one model becomes the new unit, in base contact, and cannot act again this round.
-      const born = summon(state, 'ravager', at);
+      const born = summon(state, 'ravager', at, { owner: pu.owner });
       born.summoned = false;
       born.name = 'Ravager';
       if (pu.models === 1) { pu.destroyed = true; pu.location = 'destroyed'; if (state.sense) delete state.sense.players[pu.id]; }
@@ -679,7 +748,7 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
     target: 'self',
     ...activeIs(isBio, 'the active Biological unit'),
     automated: true,
-    apply: ({ unit }) => { unit!.statuses = [...new Set([...(unit!.statuses ?? []), 'Hidden' as const])]; return `Darkness Descends: ${unit!.name} is HIDDEN until the end of the round.`; },
+    apply: ({ unit, state }) => { unit!.statuses = [...new Set([...(unit!.statuses ?? []), 'Hidden' as const])]; unit!.hiddenThroughRound = state.round; return `Darkness Descends: ${unit!.name} is HIDDEN until the end of the round.`; },
   },
   "Anakh Su'n": {
     target: 'self',
@@ -725,8 +794,8 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
       return `Mass Recall: ${back.map((b) => b.name).join(', ') || 'no units'} return${back.length === 1 ? 's' : ''} to Reserves.`;
     },
   },
-  'Warp In': anyEdgeDeploy('Warp In', isGround, 'a Ground unit in Reserves'),
-  'Armed and Ready': anyEdgeDeploy('Armed and Ready', isBio, 'a Biological unit in Reserves'),
+  'Warp In': anyEdgeDeploy('Warp In', isGround, 'a Ground unit in Reserves', { who: isGround, what: 'Ground' }),
+  'Armed and Ready': anyEdgeDeploy('Armed and Ready', isBio, 'a Biological unit in Reserves', { who: isBio, what: 'Biological' }),
   'Timing Push': anyEdgeDeploy('Timing Push', (pu) => /zergling/i.test(pu.defId), 'a Zergling unit in Reserves'),
   'Tactical Retreat': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Tactical Retreat', 'Ignores the Disengage penalty this round.', { ignoreDisengage: true }); unit!.disengagedThisRound = false; return `Tactical Retreat: ${unit!.name} ignores the Disengage penalty.`; } },
   'Terran Tenacity': { target: 'none', once: 'game', automated: true, apply: ({ state }) => {
@@ -738,8 +807,8 @@ export const CARD_BOOSTS: Record<string, AbilitySpec> = {
     return 'Terran Tenacity: you claim the First Player Marker.';
   } },
   'Bound by the Khala': { target: 'none', automated: false, apply: () => 'Bound by the Khala: after this activation, activate another friendly Unit at once, before the AI takes its turn.' },
-  'Lie in Wait': { target: 'self', ...activeIs((pu) => pu.location === 'table' && !pu.engaged && isGround(pu), 'the active unengaged Ground unit'), automated: true, apply: ({ unit }) => { unit!.statuses = [...new Set([...(unit!.statuses ?? []), 'Burrowed' as const])]; return `Lie in Wait: ${unit!.name} burrows.`; } },
-  'Rapid Burrowing': { target: 'friendly', automated: true, friendlyFilter: (pu) => !pu.engaged && playerUnitDef(pu).faction === 'Zerg', apply: ({ friendly }) => { friendly!.statuses = [...new Set([...(friendly!.statuses ?? []), 'Burrowed' as const])]; return `Rapid Burrowing: ${friendly!.name} burrows.`; } },
+  'Lie in Wait': { target: 'self', ...activeIs((pu) => pu.location === 'table' && !pu.engaged && isGround(pu) && canBurrow(pu), 'the active unengaged Ground unit'), automated: true, apply: ({ unit }) => { unit!.statuses = [...new Set([...(unit!.statuses ?? []), 'Burrowed' as const])]; return `Lie in Wait: ${unit!.name} burrows.`; } },
+  'Rapid Burrowing': { target: 'friendly', targetHint: 'a friendly, unengaged Ground Zerg unit on the battlefield', automated: true, friendlyFilter: (pu) => pu.location === 'table' && !pu.engaged && isGround(pu) && playerUnitDef(pu).faction === 'Zerg' && canBurrow(pu), apply: ({ friendly }) => { friendly!.statuses = [...new Set([...(friendly!.statuses ?? []), 'Burrowed' as const])]; return `Rapid Burrowing: ${friendly!.name} burrows.`; } },
   'Nasty Surprise': { target: 'self', automated: true, apply: ({ unit }) => { unit!.statuses = (unit!.statuses ?? []).filter((s) => s !== 'Burrowed'); return `Nasty Surprise: ${unit!.name} unburrows.`; } },
   'Additional Supply Depots': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Additional Supply Depots', '+1 Supply for markers and objectives this round.', { supplyBonus: 1 }); return `Additional Supply Depots: ${unit!.name} +1 Supply for markers.`; } },
   'Gravitic Boosters': { target: 'self', automated: true, apply: ({ unit }) => { addEffect(unit!, 'Gravitic Boosters', '+1" to the next charge distance.', { chargeBonus: 1 }, 'charge'); return `Gravitic Boosters: ${unit!.name} +1" on its next charge.`; } },
@@ -868,7 +937,9 @@ export function unitAbilities(state: GameState, pu: PlayerUnit): UsableAbility[]
   for (const ab of def.abilities) {
     if (ab.upgradeCost && !pu.upgrades.includes(ab.id)) continue;
     const spec = UNIT_ABILITIES[ab.name];
-    const cost = ab.cost ? (ab.cost.amount === 'X' ? 1 : ab.cost.amount) : 0;
+    // An ability resolved in several steps (one Corrosive Bile token for each model) is paid for once.
+    const more = pu.pendingUses?.name === ab.name && pu.pendingUses.left > 0;
+    const cost = more ? 0 : abilityCost(state, pu, ab).cost;
     let reason: string | undefined;
     if (ab.kind === 'Passive') reason = 'Passive';
     else if (PROMPTED_REACTIONS.has(ab.name)) reason = 'Offered when it triggers';
@@ -879,9 +950,9 @@ export function unitAbilities(state: GameState, pu: PlayerUnit): UsableAbility[]
     else if (ab.kind === 'Active' && state.activeUnitId && state.activeUnitId !== pu.id) reason = 'Another unit is active';
     else if (ab.kind === 'Active' && state.phase !== 'scoring' && pu.activated[state.phase] && state.activeUnitId !== pu.id) reason = 'Already acted this phase';
     else if (ab.phase !== 'Any' && ab.phase.toLowerCase() !== state.phase) reason = `${ab.phase} phase`;
-    else if (!spec.repeatable && (pu.used ?? []).includes(ab.name)) reason = 'Used this round';
+    else if (!spec.repeatable && !more && (pu.used ?? []).includes(ab.name)) reason = 'Used this round';
     else if (spec.once === 'game' && (pu.usedGame ?? []).includes(ab.name)) reason = 'Used this game';
-    else if (cost > 0 && !autoPay(state, cost)) reason = `Needs ${cost} ${playerResource(state)}`;
+    else if (cost > 0 && !autoPay(state, cost, [], ownerOf(pu))) reason = `Needs ${cost} ${playerResource(state, ownerOf(pu))}`;
     out.push({ ability: ab, spec, cost, ok: !reason, reason });
   }
   return out;
@@ -895,6 +966,39 @@ export const PROMPTED_REACTIONS = new Set([
   "Hierarch’s Stand", 'Lightning Dash', 'Hallucination', 'Debilitating Saliva', 'Lunge', 'Concussive Shells',
   'Life Support', 'Transfusion', 'Zealous Round', 'Shield Overcharge', 'Improved Barrier', 'Prophetic Vision',
 ]);
+
+/**
+ * What an ability costs this unit right now, after the reductions its army gives it: Khalai Ingenuity (a Friendly
+ * Pylon Within 4", once per Round, 1 less PE), Psionic Link (the Queen's own abilities with 7 Friendly models Within
+ * 6", once per Round), Advanced Training (an Academy: a Support unit's CP ability, once per Round) and Raiders Roll!
+ * (Stimpack as the Raiders deploy). `commit` marks the once-per-Round reductions as used: call it when the cost is paid.
+ */
+export function abilityCost(state: GameState, pu: PlayerUnit, ab: AbilityDef, optionCost?: number): { cost: number; notes: string[]; commit: () => void } {
+  const base = optionCost ?? (ab.cost ? (ab.cost.amount === 'X' ? 1 : ab.cost.amount) : 0);
+  let cost = base;
+  const notes: string[] = [];
+  const marks: (() => void)[] = [];
+  const res = ab.cost?.resource;
+  const owner = ownerOf(pu);
+  if (cost > 0 && res === 'CP' && ab.name === 'Stimpack' && hasAbility(pu, 'Raiders Roll!') && pu.deployedRound === state.round && state.activeUnitId === pu.id && state.phase === 'movement' && !(pu.used ?? []).includes('Raiders Roll!')) {
+    cost -= 1; notes.push('Raiders Roll!'); marks.push(() => { pu.used = [...(pu.used ?? []), 'Raiders Roll!']; });
+  }
+  if (cost > 0 && res === 'PE') {
+    const pylon = state.playerUnits.find((o) => o.defId === 'pylon' && o.location === 'table' && !o.destroyed && ownerOf(o) === owner && (o.deployedRound ?? 0) < state.round && !(o.used ?? []).includes('Khalai Ingenuity')
+      && (() => { const a = unitShapes(state, 'players', o.id), b = unitShapes(state, 'players', pu.id); return a.length > 0 && b.length > 0 && a.some((x) => b.some((y) => edgeDistance(x, y) <= 4.05)); })());
+    if (pylon) { cost -= 1; notes.push('Khalai Ingenuity'); marks.push(() => { pylon.used = [...(pylon.used ?? []), 'Khalai Ingenuity']; }); }
+  }
+  if (cost > 0 && res === 'BM' && hasAbility(pu, 'Psionic Link') && !(pu.used ?? []).includes('Psionic Link')) {
+    const me = unitShapes(state, 'players', pu.id);
+    const near = state.playerUnits.filter((o) => o.id !== pu.id && o.location === 'table' && !o.destroyed).flatMap((o) => unitShapes(state, 'players', o.id)).filter((m) => me.some((q) => edgeDistance(m, q) <= 6.05)).length;
+    if (near >= 7) { cost -= 1; notes.push('Psionic Link'); marks.push(() => { pu.used = [...(pu.used ?? []), 'Psionic Link']; }); }
+  }
+  if (cost > 0 && res === 'CP' && playerUnitDef(pu).role === 'Support') {
+    const academy = (state.playerCards ?? []).find((c) => ownerOf(c) === owner && c.usedRound !== state.round && !!cardDef(c.defId)?.boosts.some((b) => b.name === 'Advanced Training'));
+    if (academy) { cost -= 1; notes.push('Advanced Training'); marks.push(() => { academy.usedRound = state.round; }); }
+  }
+  return { cost: Math.max(0, cost), notes, commit: () => marks.forEach((m) => m()) };
+}
 
 export interface UsableBoost {
   card: PlayerCard;
@@ -910,8 +1014,14 @@ export interface UsableBoost {
  * ready and not yet used this game, or null.
  */
 export function tenacityOffer(state: GameState): PlayerCard | null {
-  if (state.step.kind !== 'PHASE_START' || state.firstPlayer !== 'ai') return null;
+  // Terran Tenacity is an Active ability of the Movement Phase.
+  if (state.step.kind !== 'PHASE_START' || state.firstPlayer !== 'ai' || state.phase !== 'movement') return null;
   return (state.playerCards ?? []).find((c) => !c.exhausted && !(c.usedGame ?? []).includes('Terran Tenacity') && !!cardDef(c.defId)?.boosts.some((b) => b.name === 'Terran Tenacity')) ?? null;
+}
+
+/** A card ability with a Phase Limitation can be used only in that Phase (Part 10.1). */
+export function boostPhaseProblem(state: GameState, boost: { phase?: string }): string | undefined {
+  return boost.phase && boost.phase !== 'Any' && boost.phase.toLowerCase() !== state.phase ? `${boost.phase} phase` : undefined;
 }
 
 export function cardBoosts(state: GameState, active: PlayerUnit | null): UsableBoost[] {
@@ -922,9 +1032,12 @@ export function cardBoosts(state: GameState, active: PlayerUnit | null): UsableB
     for (const boost of def.boosts) {
       const spec = CARD_BOOSTS[boost.name];
       let reason: string | undefined;
+      const wrongPhase = boostPhaseProblem(state, boost);
       if (card.exhausted) reason = 'Exhausted';
       // Another player's card: theirs to play, on their own units.
       else if (active && ownerOf(card) !== ownerOf(active)) reason = `Player ${ownerOf(card) + 1}'s card`;
+      else if (boost.kind === 'Passive') reason = 'Passive';
+      else if (wrongPhase && boost.kind !== 'Reaction') reason = wrongPhase;
       else if (!spec) reason = 'Resolve on the table';
       else if (SAVE_BOOSTS[boost.name]) reason = 'Used while rolling saves';
       else if (spec.once === 'game' && (card.usedGame ?? []).includes(boost.name)) reason = 'Used this game';
@@ -944,9 +1057,15 @@ export function activeEffects(pu: PlayerUnit): UnitEffect[] {
 }
 
 /** Speed including buffs. */
-export function effectiveSpeed(pu: PlayerUnit): number {
+export function effectiveSpeed(pu: PlayerUnit, state?: GameState): number {
   const base = speedFor(playerUnitDef(pu), pu.models);
-  return base + activeEffects(pu).reduce((a, e) => a + (e.mods.speed ?? 0), 0);
+  let speed = base + activeEffects(pu).reduce((a, e) => a + (e.mods.speed ?? 0), 0);
+  // ON CREEP: Creep Speed (+2, the Queen's upgrade) and Speed on Creep (+1, the Accelerating Creep card).
+  if (state && base > 0 && onCreep(state, pu)) {
+    if (hasAbility(pu, 'Creep Speed')) speed += 2;
+    if (cardsOf(state, ownerOf(pu)).some((c) => !!cardDef(c.defId)?.boosts.some((b) => b.name === 'Speed on Creep'))) speed += 1;
+  }
+  return speed;
 }
 
 function effectAppliesTo(e: UnitEffect, w: WeaponProfile, targetDist: number | null): boolean {
@@ -957,14 +1076,55 @@ function effectAppliesTo(e: UnitEffect, w: WeaponProfile, targetDist: number | n
 }
 
 /** The weapon as modified by the unit's effects (and target debuffs), plus the one-shot effects it spends. */
-/** How many models of a unit a Blast Template covers: the ones within its radius of the model it is centred on. */
+/** The Blast Template's radius, in inches (a 3" template). */
 export const BLAST_RADIUS_IN = 1.5;
+
+/** One unit's models under a Blast Template. */
+export interface BlastHit { side: 'ai' | 'players'; id: string; models: number }
+
+/** Size 2 or larger terrain on the line from the Target Point to a model: that model is not affected (Part 8.7.6). */
+function templateBlocked(state: GameState, a: Pt, b: Pt): boolean {
+  return state.terrain.pieces.some((t) => t.size >= 2 && !isHighGround(t) && pieceParts(t).some((r) => segmentHitsRect(pieceLocal(a, r), pieceLocal(b, r), r)));
+}
+
+/**
+ * A Blast Template set over the target Unit (Part 8.7.6): centred on the model of the target that puts the most of
+ * its Unit under it (the attacker's choice; on a tie, the one nearest the attacker). A model is affected when its
+ * base is partly or wholly covered, it stands on the Target Point's elevation, no Size 2+ terrain stands between
+ * the Target Point and it, and it is a type the weapon can hit (Ground or Flying). Returns the Target Point, the
+ * models of the target it covers, and every other Unit's covered models (Spillover, Friendly or Enemy).
+ */
+export function blastTemplate(state: GameState, targetSide: 'ai' | 'players', targetId: string, from: Pt | null, weaponTarget: 'All' | 'Ground' | 'Flying' = 'Ground'): { centre: Pt | null; main: number; spill: BlastHit[] } {
+  const shapes = unitShapes(state, targetSide, targetId);
+  if (!shapes.length) return { centre: null, main: 1, spill: [] };
+  const affected = (sh: Shape, centre: Shape) => edgeToPoint(sh, centre) <= BLAST_RADIUS_IN + 0.01
+    && sameElevationAsMarker(state, sh, centre)
+    && (Math.hypot(sh.x - centre.x, sh.y - centre.y) < 0.01 || !templateBlocked(state, centre, sh));
+  const covering = (c: Shape) => shapes.filter((sh) => affected(sh, c)).length;
+  const centre = shapes.reduce((best, c) => {
+    const d = covering(c) - covering(best);
+    if (d !== 0) return d > 0 ? c : best;
+    return from && dist(c, from) < dist(best, from) ? c : best;
+  });
+  const main = Math.max(1, covering(centre));
+  const flyingOk = weaponTarget !== 'Ground';
+  const groundOk = weaponTarget !== 'Flying';
+  const spill: BlastHit[] = [];
+  const consider = (side: 'ai' | 'players', id: string, defId: string) => {
+    if (side === targetSide && id === targetId) return;
+    const flying = (unitById(defId).tags as string[]).includes('Flying');
+    if (flying ? !flyingOk : !groundOk) return;
+    const n = unitShapes(state, side, id).filter((sh) => affected(sh, centre)).length;
+    if (n) spill.push({ side, id, models: n });
+  };
+  for (const u of state.army.units) if (u.location === 'table') consider('ai', u.id, u.defId);
+  for (const p of state.playerUnits) if (p.location === 'table' && !p.destroyed) consider('players', p.id, p.defId);
+  return { centre: { x: centre.x, y: centre.y }, main, spill };
+}
+
+/** How many models of a unit a Blast Template covers. */
 export function blastCover(state: GameState, target: AiUnitInstance, from: Pt | null): number {
-  const pts = state.sense?.ai[target.id] ?? (target.est ? [target.est] : []);
-  if (!pts.length) return 1;
-  // The template is set over the model nearest the firer and covers whatever else falls under it.
-  const centre = from ? pts.reduce((a, b) => (dist(a, from) <= dist(b, from) ? a : b)) : pts[0]!;
-  return Math.max(1, pts.filter((p) => dist(p, centre) <= BLAST_RADIUS_IN + 0.05).length);
+  return blastTemplate(state, 'ai', target.id, from).main;
 }
 
 /**
@@ -972,33 +1132,55 @@ export function blastCover(state: GameState, target: AiUnitInstance, from: Pt | 
  * which needs the battlefield to know what it covers and what the target is standing near.
  */
 export function weaponWithEffects(pu: PlayerUnit, w: WeaponProfile, target: AiUnitInstance | null, targetDist: number | null, state?: GameState): { weapon: WeaponProfile; spent: string[]; notes: string[]; /** Models the Blast Template covered: its Surge result, and the dice it adds. */ blast?: number } {
-  const keywords = w.keywords.map((k) => ({ ...k }));
-  const bump = (k: string, v: number) => {
-    const kw = keywords.find((x) => x.k === k);
-    if (kw) kw.v = (kw.v ?? 0) + v;
-    else keywords.push({ k, v });
-  };
-  let roa = w.roa;
-  let range = w.range;
-  let surgeTypes = w.surgeTypes.slice() as SurgeType[];
-  let surgeDie = w.surgeDie;
+  // The unit's own Passives and upgrades, and the keywords that depend on the target (BURST FIRE, LOCKED IN).
+  const tdef = target ? unitById(target.defId) : undefined;
+  // Within 3" of a Mission Marker: from the nearest base edge to the marker's edge.
+  const mine = state ? unitShapes(state, 'players', pu.id) : [];
+  const theirs = state && target ? unitShapes(state, 'ai', target.id) : [];
+  const onMarker = (shapes: ReturnType<typeof unitShapes>, m: Pt) => shapes.some((sh) => edgeToPoint(sh, m) - MARKER_RADIUS_IN <= 3.05);
+  const fired = firedWeapon(w, {
+    def: playerUnitDef(pu),
+    upgrades: pu.upgrades,
+    statuses: pu.statuses,
+    targetDist,
+    target: target && tdef ? {
+      def: tdef,
+      size: (target.statuses ?? []).includes('Burrowed') ? 0 : aiUnitSize(target),
+      stationary: !!state && target.location === 'table' && isStationary(state, target),
+      engagedWithOtherFriendly: !!state && state.playerUnits.some((o) => o.id !== pu.id && o.location === 'table' && !o.destroyed && o.engagedWith.includes(target.id)),
+    } : undefined,
+    sharedMarker: !!state && !!target && state.markers.some((m) => onMarker(mine, m) && onMarker(theirs, m)),
+    nearShade: !!state && !!target && shadeNear(state, target),
+  });
+  const keywords = fired.weapon.keywords.map((k) => ({ ...k }));
+  let roa = fired.weapon.roa;
+  let range = fired.weapon.range;
+  let surgeTypes = fired.weapon.surgeTypes.slice() as SurgeType[];
+  let surgeDie = fired.weapon.surgeDie;
+  const dmg = fired.weapon.dmg;
   const spent: string[] = [];
-  const notes: string[] = [];
+  const notes: string[] = [...fired.notes];
   for (const e of activeEffects(pu)) {
     if (!effectAppliesTo(e, w, targetDist)) continue;
     const m = e.mods;
     let used = false;
-    if (m.precision) { bump('PRECISION', m.precision); used = true; }
-    if (m.critical) { bump('CRITICAL HIT', m.critical); used = true; }
-    if (m.antiEvade) { bump('ANTI-EVADE', m.antiEvade); used = true; }
-    if (m.instant) { if (!keywords.some((k) => k.k === 'INSTANT')) keywords.push({ k: 'INSTANT' }); used = true; }
+    // Keywords do not stack: the highest value of each counts (Part 2.6.1). A BUFF to RoA or Range adds up.
+    if (m.precision) { raiseKeyword(keywords, 'PRECISION', m.precision); used = true; }
+    if (m.critical) { raiseKeyword(keywords, 'CRITICAL HIT', m.critical); used = true; }
+    if (m.antiEvade) { raiseKeyword(keywords, 'ANTI-EVADE', m.antiEvade); used = true; }
+    if (m.instant) { raiseKeyword(keywords, 'INSTANT'); used = true; }
     if (m.roa) { roa += m.roa; used = true; }
     if (m.rangeBuff && range !== 'E') { range = range + m.rangeBuff; used = true; }
     if (m.surgeDie) { surgeDie = m.surgeDie; used = true; }
-    if (m.pinpoint) { if (!keywords.some((k) => k.k === 'PINPOINT')) keywords.push({ k: 'PINPOINT' }); used = true; }
-    if (m.indirect) { if (!keywords.some((k) => k.k === 'INDIRECT FIRE')) keywords.push({ k: 'INDIRECT FIRE' }); used = true; }
-    if (m.lockedIn) { bump('LOCKED IN', m.lockedIn); used = true; }
-    if (m.longRange) { const kwv = keywords.find((k) => k.k === 'LONG RANGE'); if (kwv) kwv.v = Math.max(kwv.v ?? 0, m.longRange); else keywords.push({ k: 'LONG RANGE', v: m.longRange }); used = true; }
+    if (m.pinpoint) { raiseKeyword(keywords, 'PINPOINT'); used = true; }
+    if (m.indirect) { raiseKeyword(keywords, 'INDIRECT FIRE'); used = true; }
+    // LOCKED IN gained for this shot: its dice are added when the target has the Stationary Status.
+    if (m.lockedIn) {
+      raiseKeyword(keywords, 'LOCKED IN', m.lockedIn);
+      if (state && target && target.location === 'table' && isStationary(state, target) && !fired.notes.includes('LOCKED IN')) { roa += m.lockedIn; notes.push('LOCKED IN'); }
+      used = true;
+    }
+    if (m.longRange) { raiseKeyword(keywords, 'LONG RANGE', m.longRange); used = true; }
     if (used) {
       notes.push(e.source);
       if (e.until === 'firstWeapon') spent.push(e.id);
@@ -1011,29 +1193,8 @@ export function weaponWithEffects(pu: PlayerUnit, w: WeaponProfile, target: AiUn
     notes.push('Target Lock');
   }
   // Zeratul's mark: the unit he has sentenced dies to his blade.
-  if (w.phase === 'Combat' && target?.debuffs?.some((d) => d.sentenced) && hasAbility(pu, 'Sentenced to Death')) { bump('CRITICAL HIT', 2); notes.push('Sentenced to Death'); }
-  // Marine upgrades that depend on range.
-  if (targetDist !== null && targetDist <= 8 && /C-14/i.test(w.name)) {
-    if (pu.upgrades.some((u) => /slugthrower/i.test(u)) || pu.defId === 'raynor_s_raider__marine_') { bump('ANTI-EVADE', 1); notes.push('Slugthrower'); }
-    if (pu.upgrades.some((u) => /grenades/i.test(u)) || pu.defId === 'raynor_s_raider__marine_') { surgeDie = 'D6'; notes.push('Frag Grenades'); }
-  }
-  let dmg = w.dmg;
+  if (w.phase === 'Combat' && target?.debuffs?.some((d) => d.sentenced) && hasAbility(pu, 'Sentenced to Death')) { raiseKeyword(keywords, 'CRITICAL HIT', 2); notes.push('Sentenced to Death'); }
   let blast: number | undefined;
-  const statuses = pu.statuses ?? [];
-  const ranged = w.phase === 'Assault' && w.range !== 'E';
-  // For the Ancients: a long shot is a careful one.
-  if (ranged && hasAbility(pu, 'For the Ancients') && targetDist !== null && targetDist > 8) { bump('PRECISION', 1); notes.push('For the Ancients'); }
-  // Fury Unyielding: both of them standing on the same objective.
-  if (ranged && state && target && hasAbility(pu, 'Fury Unyielding')) {
-    const me = state.sense?.players[pu.id]?.[0];
-    const it = state.sense?.ai[target.id]?.[0] ?? target.est ?? null;
-    if (me && it && state.markers.some((m) => dist(me, m) <= 3.05 && dist(it, m) <= 3.05)) { bump('CRITICAL HIT', 1); notes.push('Fury Unyielding'); }
-  }
-  // Aftershock Rounds: a siege shell hits a big target harder than a small one.
-  if (statuses.includes('Siege Mode') && target && hasAbility(pu, 'Aftershock Rounds')) {
-    dmg = Math.max(1, unitById(target.defId).stats.size);
-    notes.push('Aftershock Rounds');
-  }
   // The Blast Template: its dice and its Surge are both the models it covers (Part 12.8).
   if (w.blast && state && target) {
     blast = blastCover(state, target, state.sense?.players[pu.id]?.[0] ?? null);
@@ -1043,12 +1204,39 @@ export function weaponWithEffects(pu: PlayerUnit, w: WeaponProfile, target: AiUn
   return { weapon: { ...w, keywords, roa, range, dmg, surgeTypes, surgeDie }, spent, notes, blast };
 }
 
+/** Psionic Presence: the enemy Unit is Within 4" of the Shade token of Adepts that have it. */
+function shadeNear(state: GameState, target: AiUnitInstance): boolean {
+  const foe = unitShapes(state, 'ai', target.id);
+  if (!foe.length) return false;
+  return (state.tokens ?? []).some((t) => {
+    if (t.kind !== 'shade' || !t.ownerId) return false;
+    const owner = state.playerUnits.find((p) => p.id === t.ownerId);
+    return !!owner && !owner.destroyed && hasAbility(owner, 'Psionic Presence') && foe.some((f) => edgeToPoint(f, t) <= 4.05);
+  });
+}
+
+/**
+ * Whether something of yours takes HIDDEN off an enemy Unit: Within 6" of a Faction Indicator set by Scanner Sweep,
+ * Surveillance or Oversight Mode, of your Omega Worm (Detection), or of a Nerazim Watchers' Shade (Nerazim Farsight).
+ */
+export function aiRevealed(state: GameState, u: AiUnitInstance): boolean {
+  const foe = unitShapes(state, 'ai', u.id);
+  if (!foe.length) return false;
+  const within = (p: Pt) => foe.some((f) => edgeToPoint(f, p) <= 6.05);
+  if ((state.tokens ?? []).some((t) => t.kind === 'indicator' && DETECTORS.has(t.label) && within(t))) return true;
+  if ((state.tokens ?? []).some((t) => t.kind === 'shade' && within(t) && (() => { const o = state.playerUnits.find((p) => p.id === t.ownerId); return !!o && !o.destroyed && hasAbility(o, 'Nerazim Farsight'); })())) return true;
+  return state.playerUnits.some((o) => o.location === 'table' && !o.destroyed && hasAbility(o, 'Detection') && (o.deployedRound ?? 0) < state.round && unitShapes(state, 'players', o.id).some((s) => foe.some((f) => edgeDistance(s, f) <= 6.05)));
+}
+const DETECTORS = new Set(['Surveillance', 'Scanner Sweep', 'Oversight Mode']);
+
 /** Charge modifiers from effects (2D6, +X") and the effects a charge spends. */
-export function chargeMods(pu: PlayerUnit): { twoDice: boolean; bonus: number; impactHit: number; spent: string[] } {
+export function chargeMods(pu: PlayerUnit, state?: GameState): { twoDice: boolean; bonus: number; impactHit: number; spent: string[] } {
   let twoDice = false;
   let bonus = 0;
   let impactHit = 0;
   const spent: string[] = [];
+  // Malevolent Matriarch (Malignant Creep): a Zerg Unit that declares a Charge while ON CREEP has +1 to IMPACT Hit Rolls.
+  if (state && onCreep(state, pu) && cardsOf(state, ownerOf(pu)).some((c) => !!cardDef(c.defId)?.boosts.some((b) => b.name === 'Malevolent Matriarch'))) impactHit += 1;
   for (const e of activeEffects(pu)) {
     if (e.mods.chargeTwoDice) twoDice = true;
     if (e.mods.chargeBonus) bonus += e.mods.chargeBonus;
@@ -1065,20 +1253,20 @@ export function spendEffects(pu: PlayerUnit, ids: string[]): void {
 
 /** Guardian Shield / Point Defence Drone: dice removed from a ranged attack at `target`. */
 export function defensiveDiceRemoval(state: GameState, target: PlayerUnit, instant: boolean): { remove: number; notes: string[]; consumeDroneId?: string } {
-  const tp = unitPos(state, target);
-  if (!tp) return { remove: 0, notes: [] };
+  const theirs = unitShapes(state, 'players', target.id);
+  if (!theirs.length) return { remove: 0, notes: [] };
+  // Within 4": base edge to base edge, between the closest models of the two units.
+  const within4 = (pu: PlayerUnit) => pu.id === target.id || unitShapes(state, 'players', pu.id).some((m) => theirs.some((t) => edgeDistance(m, t) <= 4.05));
   let remove = 0;
   const notes: string[] = [];
   for (const pu of state.playerUnits) {
     if (pu.location !== 'table' || pu.destroyed) continue;
-    const p = unitPos(state, pu);
-    if (!p) continue;
     const shield = activeEffects(pu).find((e) => e.mods.auraFewerDice);
-    if (shield && dist(p, tp) <= 4) { remove = Math.max(remove, shield.mods.auraFewerDice ?? 0); notes.push(`Guardian Shield (${pu.name})`); }
+    if (shield && within4(pu)) { remove = Math.max(remove, shield.mods.auraFewerDice ?? 0); notes.push(`Guardian Shield (${pu.name})`); }
   }
   let consumeDroneId: string | undefined;
   if (!instant) {
-    const drone = state.playerUnits.find((pu) => pu.defId === 'point_defense_drone' && pu.location === 'table' && !pu.destroyed && pu.id !== target.id && (() => { const p = unitPos(state, pu); return !!p && dist(p, tp) <= 4; })());
+    const drone = state.playerUnits.find((pu) => pu.defId === 'point_defense_drone' && pu.location === 'table' && !pu.destroyed && pu.id !== target.id && within4(pu));
     if (drone) { remove += 2; notes.push('Point Defence Laser'); consumeDroneId = drone.id; }
   }
   return { remove, notes, consumeDroneId };
@@ -1086,18 +1274,13 @@ export function defensiveDiceRemoval(state: GameState, target: PlayerUnit, insta
 
 /** Whether the unit has this ability (and its upgrade, if the ability needs one). */
 export function hasAbility(pu: PlayerUnit, name: string): boolean {
-  return playerUnitDef(pu).abilities.some((a) => a.name === name && (!a.upgradeCost || pu.upgrades.includes(a.id)));
+  return ownsAbility(playerUnitDef(pu), pu.upgrades, name);
 }
 
 export const isBurrowed = (pu: PlayerUnit): boolean => (pu.statuses ?? []).includes('Burrowed');
 /** BURROWED units have HIDDEN too. */
 export const isHidden = (pu: PlayerUnit): boolean => (pu.statuses ?? []).some((s) => s === 'Hidden' || s === 'Burrowed');
 
-/**
- * Whether your unit may make an Evade Roll against this AI attack, and the number it needs.
- * Eligible when HIDDEN or BURROWED, when engaged and hit by a Ranged Attack, or with Combat Shield against close combat.
- * Units without an Evade value (–) never evade. ANTI-EVADE on the AI weapon raises the target number.
- */
 /**
  * A unit's own Reaction abilities against an attack on it, offered while you roll its saves. `tough` turns failed
  * Armour dice into successes, `reduce` takes damage off the total, `capDmg` caps the attacking weapon's Damage
@@ -1120,37 +1303,143 @@ export const SELF_REACTIONS: SelfReaction[] = [
   { name: 'Prophetic Vision', evade: 4, note: 'Evade 4+, which nothing can modify', ok: () => true },
 ];
 
+/**
+ * The Reactions of its own a unit may use against an attack on it: the ones on its card that are Reactions (the
+ * Praetor Guard's Shield Overcharge is a Passive, and applies by itself), bought where they are upgrades, not yet
+ * used this Round unless REPEATABLE, and usable as the unit stands.
+ */
+export function selfReactionsFor(state: GameState, pu: PlayerUnit): { ability: AbilityDef; reaction: SelfReaction }[] {
+  if (pu.destroyed || pu.location !== 'table') return [];
+  return playerUnitDef(pu).abilities.flatMap((ab) => {
+    const r = SELF_REACTIONS.find((x) => x.name === ab.name);
+    if (!r || ab.kind !== 'Reaction' || !hasAbility(pu, ab.name) || !r.ok(state, pu)) return [];
+    if (!UNIT_ABILITIES[ab.name]?.repeatable && (pu.used ?? []).includes(ab.name)) return [];
+    return [{ ability: ab, reaction: r }];
+  });
+}
+
 /** SHIELDED: a unit keeps the Status while its Shield value has not been spent (Part 12). */
 export const isShielded = (pu: PlayerUnit): boolean => (pu.shieldsLeft ?? 0) > 0;
 
-/** TOUGH a unit always has when it saves: Heavy Plating, which the tank loses while it is dug in. */
-export function passiveTough(pu: PlayerUnit): number {
-  return hasAbility(pu, 'Heavy Plating') && !(pu.statuses ?? []).includes('Siege Mode') ? 1 : 0;
+/**
+ * TOUGH a unit has on an Armour Roll without being asked: Heavy Plating (not in SIEGE MODE), the Praetor Guard's
+ * Shield Overcharge (TOUGH (2) on its first Armour Roll each Round) and Ancillary Carapace (TOUGH (1) on the first
+ * Armour Roll of each Activation). Keywords do not stack: the highest counts. `mark` records the once-only ones as
+ * used, when the roll is made.
+ */
+export function passiveToughFor(pu: PlayerUnit, state?: GameState, activationKey?: string): { tough: number; mark: () => void } {
+  let tough = hasAbility(pu, 'Heavy Plating') && !(pu.statuses ?? []).includes('Siege Mode') ? 1 : 0;
+  const marks: (() => void)[] = [];
+  const praetor = playerUnitDef(pu).abilities.some((a) => a.name === 'Shield Overcharge' && a.kind === 'Passive');
+  if (praetor && state && !(pu.used ?? []).includes('Shield Overcharge')) { tough = Math.max(tough, 2); marks.push(() => { pu.used = [...(pu.used ?? []), 'Shield Overcharge']; }); }
+  if (hasAbility(pu, 'Ancillary Carapace') && state && activationKey && pu.toughKey !== activationKey) { tough = Math.max(tough, 1); marks.push(() => { pu.toughKey = activationKey; }); }
+  return { tough, mark: () => marks.forEach((m) => m()) };
+}
+export const passiveTough = (pu: PlayerUnit, state?: GameState, activationKey?: string): number => passiveToughFor(pu, state, activationKey).tough;
+
+/** The enemy Activation an attack belongs to: what "once per Activation" effects are counted against. */
+export const activationKey = (state: GameState, attackerUnitId: string): string => `${state.round}:${state.phase}:${attackerUnitId}`;
+
+/**
+ * Standing on HIGH GROUND: any part of the base on the plateau of a Size 3+ piece (its ramp is MID GROUND, and a
+ * base on two levels counts as the higher).
+ */
+export function onHighGround(state: GameState, p: Pt & { r?: number; half?: number }): boolean {
+  return baseElevation(p, state.terrain.pieces.filter(isHighGround)).zone === 'plateau';
 }
 
+/**
+ * HIGH GROUND Cover (Part 7.1.3): every model of the target stands on HIGH GROUND and at least one model of the
+ * attacker does not. Flying Units never benefit from it, and their attacks never come from a lower elevation.
+ */
+export function highGroundCover(state: GameState, defender: (Pt & { r?: number; half?: number })[], attacker: (Pt & { r?: number; half?: number })[], defenderFlying: boolean, attackerFlying: boolean): boolean {
+  if (defenderFlying || attackerFlying || !defender.length || !attacker.length) return false;
+  return defender.every((p) => onHighGround(state, p)) && attacker.some((p) => !onHighGround(state, p));
+}
+
+/**
+ * Whether your unit may make an Evade Roll against this AI attack, and the number it needs. Eligible when HIDDEN or
+ * BURROWED, with Precognition, when Engaged and hit by a Ranged Attack, on HIGH GROUND against a Ranged Attack from
+ * below, against INDIRECT FIRE it cannot be seen by, with Lurking (Stationary, the first Ranged Attack of the Round),
+ * with Combat Shield raised against Close Combat, against the enemy Mutating Carapace names, against an Engaged
+ * Indomitable unit firing out of its fight, or when a Reaction granted it. A Null Evade (-) never rolls.
+ * ANTI-EVADE and the Modifiers move the Target Number, never below 2+ or above 6+.
+ */
 export function evadeFor(state: GameState, pu: PlayerUnit, attack: { phase: string; weapon: string; attacker: { unitId: string } }): { value: number; reason: string } | null {
   const base = playerUnitDef(pu).stats.evade;
   if (!base) return null;
-  let reason: string | null = null;
-  if (isHidden(pu)) reason = isBurrowed(pu) ? 'Burrowed' : 'Hidden';
-  else if (attack.phase === 'Assault' && pu.engaged) reason = 'engaged against a ranged attack';
-  else if (attack.phase === 'Combat' && hasAbility(pu, 'Combat Shield')) reason = 'Combat Shield';
-  else {
-    // Hallucination and Hierarch's Stand: eligible against the enemy attack they answered.
-    const grant = activeEffects(pu).find((e) => e.mods.mayEvade);
-    if (grant) reason = grant.source;
-  }
-  if (!reason) return null;
   const ai = state.army.units.find((u) => u.id === attack.attacker.unitId);
   const w = ai ? unitById(ai.defId).weapons.find((x) => x.name === attack.weapon) : undefined;
+  const ranged = attack.phase === 'Assault';
+  const fx = activeEffects(pu);
+  const carapace = ai ? fx.find((e) => e.mods.evadeVs === ai.id) : undefined;
+  let reason: string | null = null;
+  let bonus = 0;
+  if (isHidden(pu)) reason = isBurrowed(pu) ? 'Burrowed' : 'Hidden';
+  else if (hasAbility(pu, 'Precognition')) reason = 'Precognition';
+  else if (ranged && pu.engaged) reason = 'engaged against a ranged attack';
+  else if (!ranged && fx.some((e) => e.mods.evadeMelee)) reason = 'Combat Shield';
+  else {
+    // Hallucination and Hierarch's Stand: eligible against the enemy attack they answered.
+    const grant = fx.find((e) => e.mods.mayEvade);
+    if (grant) reason = grant.source;
+  }
+  if (carapace) { reason ??= 'Mutating Carapace'; bonus += carapace.mods.evadeBonus ?? 0; }
+  if (!reason && ranged && ai) {
+    const mine = unitShapes(state, 'players', pu.id);
+    const theirs = unitShapes(state, 'ai', ai.id);
+    if (highGroundCover(state, mine, theirs.length ? theirs : ai.est ? [ai.est] : [], playerUnitFlying(pu), (unitById(ai.defId).tags as string[]).includes('Flying'))) reason = 'high ground';
+  }
+  if (!reason && ranged && ai && w?.keywords.some((k) => k.k === 'INDIRECT FIRE')) {
+    const a = unitShapes(state, 'ai', ai.id), b = unitShapes(state, 'players', pu.id);
+    if (a.length && b.length && !a.some((m) => b.some((t) => losBetweenBases(m, aiUnitSize(ai), t, playerUnitSize(pu), state.terrain.pieces)))) reason = 'indirect fire';
+  }
+  if (!reason && ranged && hasAbility(pu, 'Lurking') && pu.location === 'table' && isStationary(state, pu) && pu.lurkedRound !== state.round) {
+    reason = 'Lurking';
+    if (onCreep(state, pu)) bonus += 1;
+  }
+  // Indomitable: an Engaged unit firing at a Unit it is not Engaged with gives that Unit an Evade Roll.
+  if (!reason && ranged && ai && ai.engaged && !pu.engagedWith.includes(ai.id) && ownsAbility(unitById(ai.defId), ai.upgrades, 'Indomitable')) reason = 'Indomitable';
+  if (!reason) return null;
   const anti = w?.keywords.find((k) => k.k === 'ANTI-EVADE')?.v ?? 0;
-  return { value: Math.min(7, base + anti), reason };
+  return { value: targetNumber(base + anti - bonus), reason };
 }
 
 /** HIDDEN / BURROWED units can only be targeted from within 4". */
 export function hiddenFrom(pu: PlayerUnit, attackerDist: number): boolean {
   const hidden = (pu.statuses ?? []).some((s) => s === 'Hidden' || s === 'Burrowed');
   return hidden && attackerDist > 4;
+}
+
+/**
+ * A unit's Supply for Controlling and Contesting Mission Markers, or null when it can never do either (a Structure).
+ * Commander adds 1, Domineering Presence and Additional Supply Depots add what they say, and Freedom Fighters keeps
+ * every Friendly Unit Within 8" of Jim Raynor from counting for less than 1.
+ */
+export function contestSupply(state: GameState, pu: PlayerUnit): number | null {
+  if (pu.destroyed || pu.location === 'destroyed') return null;
+  if (playerUnitDef(pu).abilities.some((a) => a.name === 'Structure')) return null;
+  let supply = playerUnitSupply(pu);
+  if (hasAbility(pu, 'Commander')) supply += 1;
+  supply += activeEffects(pu).reduce((a, e) => a + (e.mods.supplyBonus ?? 0), 0);
+  if (supply < 1) {
+    const mine = unitShapes(state, 'players', pu.id);
+    const raynor = state.playerUnits.some((o) => o.location === 'table' && !o.destroyed && hasAbility(o, 'Freedom Fighters')
+      && (o.id === pu.id || unitShapes(state, 'players', o.id).some((s) => mine.some((m) => edgeDistance(s, m) <= 8.05))));
+    if (raynor) supply = 1;
+  }
+  return supply;
+}
+
+/** A unit's Supply for Disengage checks: 0 while BURROWED, and Commander counts 1 more. */
+export function disengageSupply(pu: PlayerUnit): number {
+  if (isBurrowed(pu)) return 0;
+  return playerUnitSupply(pu) + (hasAbility(pu, 'Commander') ? 1 : 0);
+}
+
+/** What a unit takes of its player's Supply Pool: nothing with Advanced Medic Facilities. */
+export function poolSupply(pu: PlayerUnit): number {
+  return hasAbility(pu, 'Advanced Medic Facilities') ? 0 : playerUnitSupply(pu);
 }
 
 /** Cleanup & Refresh for the player side (start of a new round). */
@@ -1160,12 +1449,21 @@ export function refreshPlayerSide(state: GameState): string[] {
   const before = (state.tokens ?? []).length;
   for (const t of (state.tokens ?? []).filter((x) => !x.stayInPlay)) removeToken(state, t.id);
   if (before && before !== (state.tokens ?? []).length) lines.push('Cleanup: tokens removed.');
+  state.reacted = [];
   for (const pu of state.playerUnits) {
     pu.used = [];
     pu.effects = (pu.effects ?? []).filter((e) => e.until !== 'round' && e.until !== 'charge' && e.until !== 'action');
     pu.bonusMove = 0;
     pu.placeRange = 0;
+    pu.placeAsAction = false;
+    pu.placeNoEngage = false;
+    pu.pendingUses = undefined;
     pu.dashFrom = undefined;
+    // Darkness Descends: HIDDEN until the End of the Round.
+    if (pu.hiddenThroughRound !== undefined && pu.hiddenThroughRound < state.round) {
+      pu.statuses = (pu.statuses ?? []).filter((x) => x !== 'Hidden');
+      pu.hiddenThroughRound = undefined;
+    }
     if (pu.expiresEndOfRound && pu.location === 'table') {
       pu.location = 'destroyed';
       pu.destroyed = true;
@@ -1177,17 +1475,22 @@ export function refreshPlayerSide(state: GameState): string[] {
   return lines;
 }
 
-/** Deploy entry points granted by structures: Pylon (any Ground unit) and Omega Worm (up to 2 Supply). */
+/**
+ * Deploy entry points granted by your own structures: the Pylon's Warp Conduit (one Ground Unit a Round) and the
+ * Omega Worm's Omega Network (Units with a combined Supply of 2 or less each Round). Neither works in the Round the
+ * structure was set down.
+ */
 export function extraEntryPoints(state: GameState, pu: PlayerUnit): { p: Pt; source: string }[] {
-  if (state.conduitUsedRound === state.round) return [];
   const out: { p: Pt; source: string }[] = [];
   const def: UnitDef = playerUnitDef(pu);
+  const need = currentSupply(def, pu.models);
+  const wormUsed = state.omegaUsed?.round === state.round ? state.omegaUsed.supply : 0;
   for (const s of state.playerUnits) {
-    if (s.location !== 'table' || s.destroyed || (s.deployedRound ?? 0) >= state.round) continue;
+    if (s.location !== 'table' || s.destroyed || (s.deployedRound ?? 0) >= state.round || ownerOf(s) !== ownerOf(pu)) continue;
     const p = unitPos(state, s);
     if (!p) continue;
-    if (s.defId === 'pylon' && isGround(pu)) out.push({ p, source: 'Warp Conduit' });
-    if (s.defId === 'omega_worm' && currentSupply(def, pu.models) <= 2) out.push({ p, source: 'Omega Network' });
+    if (s.defId === 'pylon' && isGround(pu) && state.conduitUsedRound !== state.round) out.push({ p, source: 'Warp Conduit' });
+    if (s.defId === 'omega_worm' && wormUsed + need <= 2) out.push({ p, source: 'Omega Network' });
   }
   return out;
 }

@@ -7,7 +7,7 @@ import { useUi } from '@tt/store/uiStore';
 import { useGame } from '@tt/store/gameStore';
 import { Stepper } from '../components/Basics';
 import { DieFace, DieTumble } from '../components/DiceRoll';
-import { buildPools, chargeAckId, commandFor, facesFromCount, planAttack, planCharge, resultItem, saveOptions, type CombatItem, type Pool, type PoolId } from './combatPools';
+import { buildPools, chargeAckId, commandFor, facesFromCount, planAttack, pickSaveOption, planCharge, resultItem, saveOptions, type CombatItem, type Pool, type PoolId } from './combatPools';
 import { StepIcon } from '../tabletop/StepIcon';
 import { factionPhoto, modelPhoto } from '@data/modelPhotos';
 
@@ -219,7 +219,7 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
   const applyEntry = () => {
     if (!enter || !pool) return;
     if (pool.entry === 'value') setInput(pool, [enter.a]);
-    else setInput(pool, facesFromCount(pool.dice, enter.a, Math.min(enter.a, enter.b), pool.need ?? 4));
+    else setInput(pool, facesFromCount(pool.dice, enter.a, pool.id === 'attack' && cur?.meta.farDice ? enter.a : Math.min(enter.a, enter.b), pool.need ?? 4));
   };
   const openEntry = () => pool && cur && setEntering({ key: cur.key, pool: pool.id, a: pool.entry === 'value' ? 1 : 0, b: 0 });
   const primary = () => {
@@ -306,7 +306,6 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
 
   if (!cur) return null;
   const saveOpts = cur.pending && !cur.attack && pool?.id === 'armour' && pool.faces === null ? saveOptions(g, cur.pending) : null;
-  const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   return (
     <div className={`combat-tray side-${cur.side} ${className}`} style={style} role="region" aria-label="Combat">
       <Side name={cur.meta.attacker} role={cur.side === 'ai' ? 'AI' : 'YOU'} faction={cur.meta.attackerFaction} talkKey={cur.key} weapon={cur.meta.weapon} defId={defOf(g, cur.side === 'ai' ? 'ai' : 'players', cur.attackerId)} />
@@ -326,8 +325,8 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
                 {p.note && state !== 'hidden' && <div className="ct-note">{p.note}</div>}
                 {i === cursor && saveOpts && (saveOpts.boosts.length > 0 || saveOpts.reactions.length > 0) && (
                   <div className="ct-chips">
-                    {saveOpts.boosts.map((b) => <button key={b.cardId} type="button" className={`ct-chip ${cur.input.boosts.includes(b.cardId) ? 'on' : ''}`} title={`${b.card}: ${b.text}`} onClick={() => { cur.input.boosts = toggle(cur.input.boosts, b.cardId); refresh(); }}>{b.name}</button>)}
-                    {saveOpts.reactions.map((r) => <button key={r.key} type="button" className={`ct-chip ${cur.input.reactions.includes(r.key) ? 'on' : ''}`} title={`${r.unit}: reduce damage by ${r.reduce}${r.cost ? `, costs ${r.cost}` : ''}`} onClick={() => { cur.input.reactions = toggle(cur.input.reactions, r.key); refresh(); }}>{r.name}</button>)}
+                    {saveOpts.boosts.map((b) => <button key={b.cardId} type="button" className={`ct-chip ${cur.input.boosts.includes(b.cardId) ? 'on' : ''}`} title={`${b.card}: ${b.text}`} onClick={() => { pickSaveOption(g, cur.pending!, cur.input, { boost: b.cardId }); refresh(); }}>{b.name}</button>)}
+                    {saveOpts.reactions.map((r) => <button key={r.key} type="button" className={`ct-chip ${cur.input.reactions.includes(r.key) ? 'on' : ''}`} title={`${r.unit}: reduce damage by ${r.reduce}${r.cost ? `, costs ${r.cost}` : ''}`} onClick={() => { pickSaveOption(g, cur.pending!, cur.input, { reaction: r.key }); refresh(); }}>{r.name}</button>)}
                   </div>
                 )}
               </div>

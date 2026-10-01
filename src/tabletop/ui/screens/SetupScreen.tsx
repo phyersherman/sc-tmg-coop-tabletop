@@ -19,6 +19,7 @@ import { UnitBuilder, configCost } from '../components/UnitBuilder';
 import { ArmyPicker, type ArmyValue } from '../components/ArmyPicker';
 import { makeInstance } from '@engine/army/builder';
 import { physicalModelId } from '@engine/army/collection';
+import { validatePlayerArmy } from '@engine/army/rules';
 import { mapsFor, piecesNeeded } from '@data/terrainMaps';
 import { mapLayout, remixId } from '@engine/terrain/remix';
 import { host, type TableHow } from '@tt/host';
@@ -129,6 +130,12 @@ export function SetupScreen() {
   const setMyFaction = (f: Faction) => setForces((cur) => cur.map((x, i) => (i === whose ? { ...x, faction: f } : x)));
   const costOf = (v: ArmyValue) => v.units.reduce((a, u) => a + configCost(u), 0);
   const myCost = costOf(me.value);
+  // Army Building (Part 9.1): an army with anything wrong in it does not go into battle. An army left empty is
+  // not checked: that player fields Units the app keeps no list of.
+  const armyProblem = inPlay
+    .map((f, i) => ({ player: i, problem: f.value.units.length || f.value.cards.length ? validatePlayerArmy({ cards: f.value.cards, units: f.value.units, minerals })[0] : undefined }))
+    .find((x) => x.problem);
+  const armyProblemText = armyProblem ? `${players > 1 ? `Player ${armyProblem.player + 1}: ` : ''}${armyProblem.problem!.text}` : '';
   const removeUnit = (id: string) => {
     if (!army) return;
     const units = army.units.filter((u) => u.id !== id);
@@ -137,7 +144,7 @@ export function SetupScreen() {
   };
 
   const launch = () => {
-    if (!army) return;
+    if (!army || armyProblem) return;
     const config: GameConfig = {
       playMode,
       camera: how === 'camera',
@@ -159,7 +166,7 @@ export function SetupScreen() {
     (go as (screen: string) => void)(next);
   };
 
-  const canNext = step !== 3 || (army && issues.every((i) => i.level !== 'error'));
+  const canNext = step === 2 ? !armyProblem : step !== 3 || (army && issues.every((i) => i.level !== 'error'));
 
   // The battle plan so far, one line per step: what was decided reads back as the wizard goes on.
   const planValue = (i: number): string => {
@@ -273,7 +280,7 @@ export function SetupScreen() {
               ))}
             </div>
           )}
-          <p className="small muted">Train Units from the buildings that make them, choose their upgrades, then pick your cards. {players > 1 ? 'Each player picks their own faction and cards, and spends only their own Command Points, Biomass or Psionic Energy in the battle.' : ''} The army starts empty each battle. Armies fielded before are listed at the bottom right.</p>
+          <p className="small muted">Select a Faction card, add the Tactical cards that give the Army Slots you need, then train Units from the buildings that make them and choose their upgrades. {players > 1 ? 'Each player picks their own faction and cards, and spends only their own Command Points, Biomass or Psionic Energy in the battle.' : ''} The army starts empty each battle. Armies fielded before are listed at the bottom right.</p>
           <ArmyPicker key={whose} faction={me.faction} onFaction={setMyFaction} budget={minerals} scale={scale} owned={modelLimit('player')} value={me.value} onChange={setMine} recent={settings.recentArmies} onForget={settings.removeRecentArmy} named />
           <p className="small muted" style={{ marginTop: 10 }}>This step can be skipped. The AI then has no list of your Units, and the players tell it what it sees at the table.</p>
         </Panel>
@@ -334,13 +341,19 @@ export function SetupScreen() {
           {outmatched && dropAnywhere && <p>The AI is {shortfall} minerals short of models. Destroyed Units return to make it up, and its Units may be set down anywhere more than 6" from yours.</p>}
           {sim && <p className="small">Playing as: <b>{HOW_NAME[how]}</b>{how === 'camera' ? '. Next, put a tag on each Unit and check that the camera sees the table.' : ''}</p>}
           {playMode === 'tabletop' && <p className="small muted">AI dice: {settings.appRollsAiDice ? 'rolled by the app' : 'rolled on the table'} (change in Settings).</p>}
-          <Btn variant="primary" size="lg" onClick={launch} disabled={!army}>Start the battle</Btn>
+          {armyProblem && <p className="small danger-text">{armyProblemText}</p>}
+          <Btn variant="primary" size="lg" onClick={launch} disabled={!army || !!armyProblem}>Start the battle</Btn>
         </Panel>
       )}
 
       <div className="row between" style={{ marginTop: 16 }}>
         <Btn variant="ghost" onClick={() => (step === 0 ? go('home') : setStep(step - 1))}>{step === 0 ? 'Cancel' : 'Back'}</Btn>
-        {step < 5 && <Btn variant="primary" onClick={() => { if (step === 2) toAiStep(); setStep(step + 1); }} disabled={!canNext}>Next</Btn>}
+        {step < 5 && (
+          <span className="row" style={{ gap: 10, alignItems: 'center' }}>
+            {step === 2 && armyProblem && <span className="small danger-text">{armyProblemText}</span>}
+            <Btn variant="primary" onClick={() => { if (step === 2) toAiStep(); setStep(step + 1); }} disabled={!canNext}>Next</Btn>
+          </span>
+        )}
       </div>
     </div>
   );

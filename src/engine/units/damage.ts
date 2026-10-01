@@ -23,16 +23,17 @@ export function applyDamage(
   def: UnitDef,
   target: DamageTarget,
   dmg: number,
-  opts: { maxRemovable?: number } = {},
+  opts: { maxRemovable?: number; /** Hit Points of each model when an upgrade changes them (Kinetic Foam). */ hp?: number } = {},
 ): DamageResult {
   const supplyBefore = currentSupply(def, target.models);
+  const baseHp = opts.hp ?? def.stats.hp;
   let models = target.models;
   let shieldsLeft = target.shieldsLeft;
   let total = target.damageMarker + Math.max(0, Math.floor(dmg));
   let removed = 0;
   const cap = opts.maxRemovable ?? Number.POSITIVE_INFINITY;
   while (models > 0 && removed < cap) {
-    const hp = def.stats.hp + shieldsLeft;
+    const hp = baseHp + shieldsLeft;
     if (total < hp) break;
     total -= hp;
     models--;
@@ -40,7 +41,9 @@ export function applyDamage(
     shieldsLeft = 0;
   }
   if (models === 0) total = 0;
-  else if (removed >= cap && cap !== Number.POSITIVE_INFINITY) total = target.damageMarker; // excess discarded, marker unchanged
+  // The cap is reached (the Visible models, or CONCENTRATED FIRE): what is left of the Total Damage is discarded.
+  // It is not recorded on the Damage Marker and does not carry over.
+  else if (removed >= cap && cap !== Number.POSITIVE_INFINITY) total = 0;
   return {
     models,
     damageMarker: models === 0 ? 0 : total,

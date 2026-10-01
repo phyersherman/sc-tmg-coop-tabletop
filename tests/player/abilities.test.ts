@@ -60,6 +60,11 @@ describe('cards and resources', () => {
     let s = terranGame();
     const bay = s.playerCards!.find((c) => c.defId === 'engineering_bay')!;
     const m = s.playerUnits.find((p) => p.id === 'm1')!;
+    // Infantry Weapons is an Active ability of the Assault Phase: it is not on offer in the Movement Phase.
+    expect(cardBoosts(s, m).find((b) => b.boost.name === 'Infantry Weapons')?.reason).toBe('Assault phase');
+    const early = apply(s, { t: 'useBoost', cardId: bay.id, boost: 'Infantry Weapons', unitId: 'm1' });
+    expect(early.playerCards!.find((c) => c.id === bay.id)!.exhausted).toBe(false);
+    s.phase = 'assault';
     expect(cardBoosts(s, m).some((b) => b.boost.name === 'Infantry Weapons' && b.ok)).toBe(true);
     s = apply(s, { t: 'useBoost', cardId: bay.id, boost: 'Infantry Weapons', unitId: 'm1' });
     expect(s.playerCards!.find((c) => c.id === bay.id)!.exhausted).toBe(true);
@@ -267,7 +272,15 @@ describe('burrow', () => {
     s = apply(s, { t: 'playerMove', unitId: 'r1', point: { x: 18, y: 6 }, kind: 'move' });
     if (s.activeUnitId) s = apply(s, { t: 'endActivation' });
     expect(r().statuses).toContain('Burrowed');
+    // Regeneration is an Assault Phase ability: nothing heals when the unit activates in the Movement Phase.
+    expect(r().damageMarker).toBe(3);
+    s.phase = 'assault';
+    s.step = { kind: 'PLAYERS_TURN', lines: [] };
+    r().activated.assault = false;
+    s = apply(s, { t: 'playerHold', unitId: 'r1' });
+    if (s.activeUnitId) s = apply(s, { t: 'endActivation' });
     expect(r().damageMarker).toBe(1);
+    r().activated.assault = false;
     // Assault: no shooting or charging while Burrowed.
     const ai = s.army.units[0]!;
     ai.location = 'table';
@@ -436,7 +449,10 @@ describe('charges', () => {
     expect(failed.sense!.players['z1']![0]).toEqual({ x: 18, y: 4 });
     expect(hit.lastCharge?.success).toBe(true);
     const hp = hit.sense!.players['z1']![0]!;
-    expect(Math.hypot(hp.x - 18, hp.y - 16)).toBeLessThan(1.5);
+    // The Charge Roll Distance (4 + 6) carries the Leading Model into Engagement Range, 1" short of base contact:
+    // it ends as close as the roll allows, never further than it rolled (Part 8.7.7).
+    expect(Math.hypot(hp.x - 18, hp.y - 16)).toBeLessThan(2.1);
+    expect(Math.hypot(hp.x - 18, hp.y - 4)).toBeLessThanOrEqual(10.01);
     expect(hit.playerUnits[0]!.engaged).toBe(true);
   });
 });

@@ -2,13 +2,15 @@ import type { GameEvent, GameState } from '@engine/types/game';
 import type { Command } from '@engine/director/reducer';
 import type { AttackParams, AttackResult } from '@engine/combat/resolve';
 import type { Faction } from '@engine/types/units';
-import { chargeImpactSetup, playerAttackSetup, withLeader } from '@engine/director/reducer';
+import { attackIsInstant, chargeImpactSetup, playerArmour, playerAttackSetup, withLeader } from '@engine/director/reducer';
 import { resolveAttack } from '@engine/combat/resolve';
 import { Rng } from '@engine/rng';
 import { unitById } from '@data/index';
 import { abilityGap, aiPos, chargeOptions, damageHelpers, modelsWithin, playerPos, playerWeapons } from '@engine/player/rules';
 import { playerUnitDef } from '@engine/sense/playerUnits';
-import { SAVE_BOOSTS, SELF_REACTIONS, UNIT_ABILITIES, cardDef, chargeMods, effectiveSpeed, evadeFor, ownerOf, passiveTough } from '@engine/abilities/index';
+import { SAVE_BOOSTS, abilityCost, activationKey, cardDef, chargeMods, effectiveSpeed, evadeFor, ownerOf, passiveToughFor, selfReactionsFor } from '@engine/abilities/index';
+import { targetNumber } from '@engine/combat/resolve';
+import { impactDice } from '@engine/units/firing';
 
 /**
  * The Combat Tray's model: one attack or charge as a row of dice pools (ATTACK ▸ SURGE ▸ ARMOUR ▸ EVADE ▸ DAMAGE,
@@ -65,6 +67,8 @@ export interface CombatMeta {
   weapon?: string;
   dice?: number;
   need?: number;
+  /** LONG RANGE: how many of the dice (the last ones) are rolled by models beyond the weapon's Range, at one harder. */
+  farDice?: number;
   crit?: boolean;
   surgeDie?: string;
   surgeTypes?: string[];
@@ -118,7 +122,8 @@ export function attackRollSpec(g: GameState, pa: { unitId: string; weaponId: str
   const from = playerPos(g, au);
   const tp = aiPos(g, tu);
   const longRange = w.range !== 'E' && !!from && !!tp && Math.hypot(from.x - tp.x, from.y - tp.y) > w.range;
-  return { au, tu, w, dice: pa.models * w.roa, need: Math.min(7, w.hit + (longRange ? 1 : 0)), longRange, faction: playerUnitDef(au).faction };
+  // A Target Number is never modified above 6+: a 6 always hits (Part 3.4, 3.6).
+  return { au, tu, w, dice: pa.models * w.roa, need: targetNumber(w.hit + (longRange ? 1 : 0)), longRange, faction: playerUnitDef(au).faction };
 }
 
 /** Faces standing in for dice rolled on the table: `successes` of them made `need`, `sixes` of those were 6s. */
@@ -142,7 +147,8 @@ export function planAttack(g: GameState, pa: { unitId: string; weaponId: string;
     plan: { kind: 'attack', ...pa },
     meta: {
       attacker: spec.au.name, defender: spec.tu.label, attackerFaction: spec.faction, defenderFaction: g.config.aiFaction,
-      weapon: w.name, dice: w.roa * setup.params.models, need: Math.min(7, w.hit - (setup.params.hitMod ?? 0)), models: setup.params.models,
+      weapon: w.name, dice: w.roa * setup.params.models, need: targetNumber(w.hit - (setup.params.hitMod ?? 0)), models: setup.params.models,
+      farDice: w.roa * (setup.params.farModels ?? 0),
       crit: w.keywords.some((k) => /CRITICAL|PRECISION/i.test(k.k)),
       surgeDie: w.surgeTypes.length && w.surgeDie ? w.surgeDie : undefined, surgeTypes: w.surgeTypes,
     },
@@ -161,7 +167,7 @@ export function planCharge(g: GameState, pc: { unitId: string; targetId: string;
   const lu = lg.playerUnits.find((p) => p.id === cu.id);
   const opt = lu ? chargeOptions(lg, lu).find((c) => c.unit.id === pc.targetId) : undefined;
   if (!opt) return null;
-  const cm = chargeMods(cu);
+  const cm = chargeMods(cu, g);
   const def = playerUnitDef(cu);
   return {
     key: `charge:${pc.unitId}:${pc.targetId}:${g.log.length}`,
@@ -171,8 +177,8 @@ export function planCharge(g: GameState, pc: { unitId: string; targetId: string;
     plan: { kind: 'charge', ...pc },
     meta: {
       attacker: cu.name, defender: tu.label, attackerFaction: def.faction, defenderFaction: g.config.aiFaction,
-      speed: effectiveSpeed(cu), bonus: cm.bonus, needed: opt.needed, twoDice: cm.twoDice,
-      impact: def.impact ? { dice: def.impact.dice * cu.models, need: Math.max(2, def.impact.hit - cm.impactHit) } : undefined,
+      speed: effectiveSpeed(cu, g), bonus: cm.bonus, needed: opt.needed, twoDice: cm.twoDice,
+      impact: def.impact ? { dice: impactDice(def, cu.upgrades) * cu.models, need: targetNumber(def.impact.hit - cm.impactHit) } : undefined,
     },
     input: emptyInput(),
     ackIds: [],
@@ -202,44 +208,72 @@ export function resultItem(g: GameState, from: { attack?: AttackResult; pending?
 /** Same key the game screen uses to hold the AI until a charge result is continued. */
 export const chargeAckId = (c: { round: number; unitId: string; reach: number; targetId: string }) => `charge:${c.round}:${c.unitId}:${c.reach}:${c.targetId}`;
 
-/** Cards and reactions you may use before your Armour roll, and your Evade. */
+/**
+ * Cards and Reactions you may use before your Armour roll, and your Evade. Each player may resolve only one Reaction
+ * per Activation (Part 10.4): what a player who has already reacted could use is not offered, and an INSTANT weapon
+ * allows no Reaction from your Units at all.
+ */
 export function saveOptions(g: GameState, a: AttackResult) {
   const pu = g.playerUnits.find((p) => p.id === a.defender.unitId);
+  const evade = pu ? evadeFor(g, pu, a) : null;
+  const reacted = g.reacted ?? [];
+  const instant = attackIsInstant(g, a);
   // Only the defending player's own cards: a Tactical card is played by the player who brought it.
-  const boosts = pu ? (g.playerCards ?? []).filter((c) => !c.exhausted && ownerOf(c) === ownerOf(pu)).flatMap((c) => {
+  const boosts = pu && !reacted.includes(ownerOf(pu)) ? (g.playerCards ?? []).filter((c) => !c.exhausted && ownerOf(c) === ownerOf(pu)).flatMap((c) => {
     const d = cardDef(c.defId);
-    const b = d?.boosts.find((x) => SAVE_BOOSTS[x.name] && SAVE_BOOSTS[x.name]!.filter(pu));
-    return d && b ? [{ cardId: c.id, name: b.name, card: d.name, text: SAVE_BOOSTS[b.name]!.text }] : [];
+    // A boost to the Evade Roll only where the unit makes one (Brood Instinct).
+    const b = d?.boosts.find((x) => SAVE_BOOSTS[x.name] && SAVE_BOOSTS[x.name]!.filter(pu) && (!SAVE_BOOSTS[x.name]!.evadeBonus || !!evade));
+    return d && b ? [{ cardId: c.id, name: b.name, card: d.name, text: SAVE_BOOSTS[b.name]!.text, owner: ownerOf(c) }] : [];
   }) : [];
-  // Reactions to damage, offered while you roll the saves. "Within 4"" is measured as every range is: base edge
-  // to base edge, between the closest models of the two units, not from one leading model to the other.
   /** A reaction offered while you roll saves: from a friendly unit nearby, or from the unit itself. */
-  type Reaction = { key: string; unitId: string; unit: string; name: string; reduce: number; cost: string; tough?: number; capDmg?: number; evade?: number; note?: string };
-  const helpers: Reaction[] = pu ? damageHelpers(g, pu) : [];
+  type Reaction = { key: string; unitId: string; unit: string; name: string; reduce: number; cost: string; owner: number; tough?: number; capDmg?: number; evade?: number; note?: string };
+  // Reactions to damage. "Within 4"" is measured as every range is: base edge to base edge, between the closest
+  // models of the two units.
+  const helpers: Reaction[] = pu && !instant ? damageHelpers(g, pu).flatMap((h): Reaction[] => {
+    const ru = g.playerUnits.find((x) => x.id === h.unitId);
+    return ru && !reacted.includes(ownerOf(ru)) ? [{ ...h, owner: ownerOf(ru) }] : [];
+  }) : [];
   // The unit's own Reactions to being attacked: soak the damage, harden the armour, cap it, or vanish into a roll.
-  const own: Reaction[] = pu && !pu.destroyed && pu.location === 'table' ? unitById(pu.defId).abilities.flatMap((ab): Reaction[] => {
-    const r = SELF_REACTIONS.find((x) => x.name === ab.name);
-    if (!r || !r.ok(g, pu)) return [];
-    const spec = UNIT_ABILITIES[ab.name];
-    if (!spec?.repeatable && (pu.used ?? []).includes(ab.name)) return [];
-    return [{
-      key: `${pu.id}:${ab.name}`, unitId: pu.id, unit: pu.name, name: ab.name,
+  const own: Reaction[] = pu && !instant && !reacted.includes(ownerOf(pu)) ? selfReactionsFor(g, pu).map(({ ability: ab, reaction: r }): Reaction => {
+    const cost = abilityCost(g, pu, ab).cost;
+    return {
+      key: `${pu.id}:${ab.name}`, unitId: pu.id, unit: pu.name, name: ab.name, owner: ownerOf(pu),
       reduce: r.reduce ?? 0, tough: r.tough, capDmg: r.capDmg, evade: r.evade, note: r.note,
-      cost: ab.cost ? `${ab.cost.amount} ${ab.cost.resource}` : '',
-    }];
+      cost: cost > 0 && ab.cost ? `${cost} ${ab.cost.resource}` : '',
+    };
   }) : [];
   const reactions = [...own, ...helpers];
-  return { pu, boosts, reactions, evade: pu ? evadeFor(g, pu, a) : null, armour: pu ? unitById(pu.defId).stats.armour : a.armour };
+  return { pu, boosts, reactions, evade, armour: pu ? playerArmour(g, pu) : a.armour };
+}
+
+/**
+ * Pick or unpick a card or Reaction for the roll. Picking one puts back whatever else that player had picked:
+ * each player resolves only one Reaction per Activation.
+ */
+export function pickSaveOption(g: GameState, a: AttackResult, input: CombatInput, pick: { boost?: string; reaction?: string }): void {
+  const opts = saveOptions(g, a);
+  const on = pick.boost ? input.boosts.includes(pick.boost) : !!pick.reaction && input.reactions.includes(pick.reaction);
+  const owner = pick.boost ? opts.boosts.find((b) => b.cardId === pick.boost)?.owner : opts.reactions.find((r) => r.key === pick.reaction)?.owner;
+  if (owner === undefined) return;
+  input.boosts = input.boosts.filter((id) => opts.boosts.find((b) => b.cardId === id)?.owner !== owner);
+  input.reactions = input.reactions.filter((k) => opts.reactions.find((r) => r.key === k)?.owner !== owner);
+  if (on) return;
+  if (pick.boost) input.boosts = [...input.boosts, pick.boost];
+  else if (pick.reaction) input.reactions = [...input.reactions, pick.reaction];
 }
 
 /** Your Armour roll against a pending AI attack, with the boosts you picked. */
 function savesMath(g: GameState, a: AttackResult, input: CombatInput) {
   const opts = saveOptions(g, a);
   const chosen = opts.boosts.filter((b) => input.boosts.includes(b.cardId)).map((b) => SAVE_BOOSTS[b.name]!);
-  // DODGE sends Surge hits back to the Armour pool; TOUGH turns failed saves into successes.
-  const back = Math.min(a.surge?.applied ?? 0, chosen.reduce((n, b) => n + (b.dodge ?? 0), 0));
   const reacting = opts.reactions.filter((r) => input.reactions.includes(r.key));
-  const tough = chosen.reduce((n, b) => n + (b.tough ?? 0), 0) + reacting.reduce((n, r) => n + (r.tough ?? 0), 0) + (opts.pu ? passiveTough(opts.pu) : 0);
+  // DODGE sends Surge and CRITICAL HIT dice back to the Armour pool; TOUGH turns failed saves into successes.
+  // Keywords do not stack: the highest value of each counts (Part 2.6.1).
+  const dodge = Math.max(0, ...chosen.map((b) => b.dodge ?? 0));
+  const surgeBack = Math.min(a.surge?.applied ?? 0, dodge);
+  const back = surgeBack + Math.min(a.critical, dodge - surgeBack);
+  const passive = opts.pu ? passiveToughFor(opts.pu, g, activationKey(g, a.attacker.unitId)).tough : 0;
+  const tough = Math.max(passive, ...chosen.map((b) => b.tough ?? 0), ...reacting.map((r) => r.tough ?? 0));
   const reduce = chosen.reduce((n, b) => n + (b.reduce ?? 0), 0) + reacting.reduce((n, r) => n + r.reduce, 0);
   const toSave = a.hits - (a.surge?.applied ?? 0) - a.critical + back;
   // No Armour dice to roll (every hit skipped Armour by Surge or CRITICAL HIT) counts as the Armour step done, or
@@ -249,7 +283,9 @@ function savesMath(g: GameState, a: AttackResult, input: CombatInput) {
   const pool = saved === null ? null : a.hits - saved;
   // Prophetic Vision replaces the Evade value outright; Improved Barrier caps the weapon's Damage.
   const forced = reacting.find((r) => r.evade !== undefined);
-  const evade = forced ? { value: forced.evade!, reason: forced.name } : opts.evade;
+  // Prophetic Vision's 4+ cannot be modified; Brood Instinct's +1 applies to any other Evade Roll.
+  const evadeBonus = chosen.reduce((n, b) => n + (b.evadeBonus ?? 0), 0);
+  const evade = forced ? { value: forced.evade!, reason: forced.name } : opts.evade && evadeBonus ? { value: targetNumber(opts.evade.value - evadeBonus), reason: `${opts.evade.reason} · Brood Instinct` } : opts.evade;
   const capDmg = reacting.reduce((n: number | undefined, r) => (r.capDmg === undefined ? n : Math.min(n ?? Infinity, r.capDmg)), undefined);
   return { ...opts, evade, capDmg, toSave, back, tough, reduce, made, saved, pool };
 }
@@ -272,7 +308,7 @@ function defencePools(g: GameState, item: CombatItem, a: AttackResult | undefine
     const owner = youRollSaves(g, p) ? 'you' : 'ai';
     out.push({
       id: 'armour', label: 'ARMOUR', owner, roller: 'defender', dice: m.toSave, need: m.armour, faces: m.toSave === 0 ? [] : item.input.armour ?? null, successes: m.saved, entry: 'count',
-      note: [m.back ? `DODGE: ${m.back} Surge hit${m.back === 1 ? '' : 's'} back` : '', m.tough ? `TOUGH (${m.tough})` : '', m.reduce ? `−${m.reduce} damage` : ''].filter(Boolean).join(' · ') || undefined,
+      note: [m.back ? `DODGE: ${m.back} hit${m.back === 1 ? '' : 's'} back to Armour` : '', m.tough ? `TOUGH (${m.tough})` : '', m.reduce ? `−${m.reduce} damage` : ''].filter(Boolean).join(' · ') || undefined,
     });
     if (m.evade && (m.pool === null || m.pool > 0)) {
       out.push({ id: 'evade', label: 'EVADE', owner, roller: 'defender', dice: m.pool ?? 0, need: m.evade.value, faces: m.pool === null ? null : item.input.evade ?? null, successes: item.input.evade ? count(item.input.evade, m.evade.value) : null, entry: 'count', note: m.evade.reason });
@@ -406,10 +442,13 @@ export function buildPools(g: GameState, item: CombatItem): Pool[] {
   const src = a ?? item.pending;
   const need = src?.hit ?? meta.need ?? 4;
   const attackFaces = input.attack ?? src?.rolls ?? null;
+  // LONG RANGE: the last `far` dice are rolled by models beyond the weapon's Range, at one harder.
+  const far = src?.farDice ?? meta.farDice ?? 0;
+  const hitCount = (faces: number[]) => faces.filter((f, i) => f >= (i >= faces.length - far ? targetNumber(need + 1) : need)).length;
   out.push({
     id: 'attack', label: 'ATTACK', owner: you, roller: 'attacker', dice: src?.dice ?? meta.dice ?? 0, need, faces: attackFaces,
-    successes: src ? src.hits : attackFaces ? count(attackFaces, need) : null, entry: 'count', sixes: meta.crit,
-    note: src?.precisionUsed ? `incl. ${src.precisionUsed} from PRECISION` : meta.models ? `${meta.models} model${meta.models === 1 ? '' : 's'} · ${meta.weapon}` : src?.weapon,
+    successes: src ? src.hits : attackFaces ? hitCount(attackFaces) : null, entry: 'count', sixes: meta.crit,
+    note: [src?.precisionUsed ? `incl. ${src.precisionUsed} from PRECISION` : meta.models ? `${meta.models} model${meta.models === 1 ? '' : 's'} · ${meta.weapon}` : src?.weapon, far ? `LONG RANGE: the last ${far} need ${targetNumber(need + 1)}+` : ''].filter(Boolean).join(' · ') || undefined,
   });
   const surgeDie = src?.surge?.die ?? meta.surgeDie;
   // The Surge die is only rolled when it can apply: the target has one of the weapon's Surge types.
