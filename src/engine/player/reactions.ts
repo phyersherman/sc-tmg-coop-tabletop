@@ -13,6 +13,7 @@ import type { GameState, PendingReaction } from '../types/game';
 import type { PlayerUnit } from '../sense/types';
 import { UNIT_ABILITIES, abilityCost, activeEffects, autoPay, cardDef, evadeFor, hasAbility, isHidden, ownerOf } from '../abilities/index';
 import { playerUnitDef } from '../sense/playerUnits';
+import { edgeToPoint, unitShapes } from '../sense/placement';
 import { abilityGap, chargeOptions, damageHelpers } from './rules';
 
 export interface ReactionOffer {
@@ -44,7 +45,8 @@ const affordable = (state: GameState, pu: PlayerUnit, cost: number) => cost <= 0
  * already resolved a Reaction in this Activation (Part 10.4), and it can pay.
  */
 function ready(state: GameState, pu: PlayerUnit, name: string): boolean {
-  if (!live(pu) || pu.summoned || !hasAbility(pu, name)) return false;
+  // A Structure never activates, but the Auto-Turret's Overwatch is a Reaction it makes all the same.
+  if (!live(pu) || (pu.summoned && name !== 'Overwatch') || !hasAbility(pu, name)) return false;
   if ((state.reacted ?? []).includes(ownerOf(pu))) return false;
   const spec = UNIT_ABILITIES[name];
   if (!spec?.repeatable && (pu.used ?? []).includes(name)) return false;
@@ -94,6 +96,7 @@ export function reactionOffers(state: GameState, pr: PendingReaction): ReactionO
         out.push(offer(ru, 'Hallucination'));
       }
     }
+    out.push(...darkSwarmOffers(state, pu));
     // Debilitating Saliva: the attacker is within 8" of this unit. Once is enough: the DEBUFF does not stack.
     if (!(ai.debuffs ?? []).some((d) => d.source === 'Debilitating Saliva')) {
       for (const ru of mine) {
@@ -112,13 +115,31 @@ export function reactionOffers(state: GameState, pr: PendingReaction): ReactionO
     if (!ai || ai.location !== 'table' || !live(pu)) return [];
     // Concussive Shells: the charge is against a friendly unit within 8" of this unit.
     if ((ai.statDebuffs ?? []).some((d) => d.stat === 'speed')) return [];
-    return mine.filter((ru) => ready(state, ru, 'Concussive Shells') && gapTo(state, ru, 'players', pu.id) <= 8.05).map((ru) => offer(ru, 'Concussive Shells'));
+    return mine.flatMap((ru) => ['Concussive Shells', 'Suppression Shells'].filter((n) => ready(state, ru, n) && gapTo(state, ru, 'players', pu.id) <= 8.05).map((n) => offer(ru, n)));
   }
   if (kind === 'afterCharge') {
     // Lightning Dash: a second Charge needs a different Enemy Unit within reach.
     if (!live(pu) || pu.dashFrom || !ready(state, pu, 'Lightning Dash')) return [];
     const others = chargeOptions(state, pu).filter((c) => c.unit.id !== pr.targetId && !pu.engagedWith.includes(c.unit.id));
     return others.length ? [offer(pu, 'Lightning Dash')] : [];
+  }
+  if (kind === 'aiMelee') {
+    if (!ai || ai.location !== 'table' || !live(pu)) return [];
+    const out = darkSwarmOffers(state, pu);
+    // Instinctive Reaction (Zagara's Swarm): the Friendly Unit attacked may make an Evade Roll.
+    if (playerUnitDef(pu).stats.evade && !evadeFor(state, pu, { phase: 'Combat', weapon: '', attacker: { unitId: ai.id } })) {
+      for (const c of state.playerCards ?? []) {
+        if (c.exhausted || ownerOf(c) !== ownerOf(pu) || (state.reacted ?? []).includes(ownerOf(c))) continue;
+        const b = cardDef(c.defId)?.boosts.find((x) => x.name === 'Instinctive Reaction');
+        if (b) out.push({ key: `card:${c.id}:${b.name}`, unitId: pu.id, unit: pu.name, name: b.name, text: b.text, cost: '', costAmount: 0, cardId: c.id });
+      }
+    }
+    return out;
+  }
+  if (kind === 'aiActivationEnd') {
+    // Overwatch: each Auto-Turret the Enemy Unit ended its Activation Within 8" of.
+    if (!ai || ai.location !== 'table') return [];
+    return mine.filter((ru) => ready(state, ru, 'Overwatch') && gapTo(state, ru, 'ai', ai.id) <= 8.05).map((ru) => offer(ru, 'Overwatch'));
   }
   if (kind === 'afterPlace') {
     // Veil of Shadows: the unit that was PLACEd resolves HEAL (2). Offered while it has Damage to heal.
@@ -130,6 +151,21 @@ export function reactionOffers(state: GameState, pr: PendingReaction): ReactionO
     });
   }
   return [];
+}
+
+/**
+ * Dark Swarm: the attacked unit stands Within 4" of a Friendly Dark Swarm token, and so does the Defiler that set it.
+ * Offered only where it gives the unit an Evade Roll it does not already have.
+ */
+function darkSwarmOffers(state: GameState, pu: PlayerUnit): ReactionOffer[] {
+  if (!playerUnitDef(pu).stats.evade || activeEffects(pu).some((e) => e.mods.mayEvade)) return [];
+  const mine = unitShapes(state, 'players', pu.id);
+  return state.playerUnits.filter(live).flatMap((ru) => {
+    if (!ready(state, ru, 'Dark Swarm')) return [];
+    const theirs = unitShapes(state, 'players', ru.id);
+    const ok = (state.tokens ?? []).some((t) => t.kind === 'darkSwarm' && t.ownerId === ru.id && mine.some((m) => edgeToPoint(m, t) <= 4.05) && theirs.some((m) => edgeToPoint(m, t) <= 4.05));
+    return ok ? [offer(ru, 'Dark Swarm')] : [];
+  });
 }
 
 /** Whether a unit already has an Evade Roll against enemy attacks from one of these Reactions. */
@@ -147,6 +183,8 @@ export function reactionMoment(state: GameState, pr: PendingReaction): string {
     case 'aiCharge': return `${foe} declares a Charge against ${name}.`;
     case 'afterCharge': return `${name} resolved a successful Charge.`;
     case 'afterPlace': return `${name} resolved a PLACE effect.`;
+    case 'aiActivationEnd': return `${foe} ends its Activation near ${name}.`;
+    case 'aiMelee': return `${foe} declares a Close Combat Attack against ${name}.`;
     default: return `${pr.source} deals ${pr.amount} Damage to ${name}.`;
   }
 }

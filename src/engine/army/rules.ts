@@ -108,6 +108,19 @@ export function cardNeeds(card: CardDef, factionCard: CardDef | null | undefined
   return m ? needText(m) : null;
 }
 
+/**
+ * Battle Preparation: Nova goes to war in one suit. An army cannot include both Nova Assault Mode and Nova Stealth
+ * Mode: the Unit already in the army that rules this one out, or null.
+ */
+export function excludedBy(def: UnitDef, units: Pick<UnitChoice, 'defId'>[]): UnitDef | null {
+  if (!def.abilities.some((a) => a.name === 'Battle Preparation')) return null;
+  for (const u of units) {
+    const other = knownUnit(u.defId);
+    if (other && other.id !== def.id && other.abilities.some((a) => a.name === 'Battle Preparation')) return other;
+  }
+  return null;
+}
+
 /** The Vespene Limit: 10% of the Minerals (Part 9.1.1). */
 export const vespeneLimit = (minerals: number): number => Math.floor(minerals * 0.1);
 
@@ -124,6 +137,8 @@ export function addUnitProblem(def: UnitDef, composition: 'small' | 'large', arm
   const needs = unitNeeds(def, factionCard);
   if (needs) return needs;
   if (def.unique && (copies > 1 || army.units.some((u) => u.defId === def.id))) return `${def.name} is Unique. Only one may be included in the army.`;
+  const rival = excludedBy(def, army.units);
+  if (rival) return `Battle Preparation: an army cannot include both ${rival.name} and ${def.name}.`;
   const slot = slotOf(def);
   if (!slot) return null;
   const free = armySlots(army.cards)[slot] - slotsUsed(army.units)[slot];
@@ -191,6 +206,8 @@ export function validatePlayerArmy(input: PlayerArmyInput): ArmyProblem[] {
   const copies = new Map<string, number>();
   for (const { def } of units) if (def.unique) copies.set(def.id, (copies.get(def.id) ?? 0) + 1);
   for (const [id, n] of copies) if (n > 1) out.push({ code: 'unique-unit', text: `${unitById(id).name} is Unique. Only one may be included in the army.` });
+  const nova = units.find(({ def }) => excludedBy(def, units.map((x) => x.u)));
+  if (nova) out.push({ code: 'unique-unit', text: `Battle Preparation: an army cannot include both ${excludedBy(nova.def, units.map((x) => x.u))!.name} and ${nova.def.name}.` });
 
   if (factionCard) {
     // Army Slots (9.1.6): the Faction card's and every Tactical card copy's, against the Units' starting Supply.

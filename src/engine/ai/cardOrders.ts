@@ -2,7 +2,7 @@ import type { AiOrder, GameState } from '../types/game';
 import type { AiObjective, AiUnitInstance } from '../types/army';
 import { unitById } from '@data/index';
 import { classify } from './profiles';
-import { cardBonuses, chargeOrder, deployOrder, headingText, moveOrder, rangedOrder, report, speedModFor } from './decide';
+import { cardBonuses, chargeOrder, deployOrder, focusText, headingText, moveOrder, rangedOrder, report, speedModFor } from './decide';
 import { drawFor, markOnceUsed, modsOf, noMap, primaryStep, usesDecks, type ActionCard, type CardStep, type MoveTo } from './actionDecks';
 import { findUnit, onTable } from '../director/selectors';
 import { aiBurrowed, aiHas, setAiBurrowed } from './burrow';
@@ -118,6 +118,36 @@ export function cardOrder(state: GameState, base: AiOrder, rng: Rng): AiOrder {
 }
 
 /**
+ * Lightning Dash, printed on the card as a buff: after a successful Charge the unit declares a second Charge against a
+ * different Enemy Unit, ignoring the restriction on Charging while Engaged. Devastating Charge does not trigger a second
+ * time, so this Charge makes no IMPACT; with nothing else in reach, it stays where it is, Engaged. Tabletop without a
+ * map only: the table finds the second target.
+ */
+export function lightningDashOrder(state: GameState, done: AiOrder, rng: Rng): AiOrder | null {
+  if (done.type !== 'charge' || done.dash || !noMap(state)) return null;
+  const u = state.army.units.find((x) => x.id === done.unitId);
+  if (!u || u.location !== 'table' || u.models <= 0) return null;
+  if (!(u.buffs ?? []).some((b) => b.name === 'Lightning Dash') && !done.card?.buffs.some((b) => b.name === 'Lightning Dash')) return null;
+  const o = chargeOrder(state, u, rng, classify(unitById(u.defId)), false);
+  delete o.impact;
+  const reach = o.charge ? o.charge.max : 0;
+  return {
+    ...o,
+    dash: true,
+    noRun: true,
+    card: done.card,
+    title: `${u.label}: Lightning Dash`,
+    lines: [
+      `Lightning Dash: declare a second CHARGE against a different Enemy Unit within ${reach}" of the Leading Model, ignoring the restriction on Charging while Engaged. Target ${o.focus ? focusText(o.focus) : 'the nearest one'}.`,
+      ...o.lines.slice(1).filter((l) => !/RUN up to|IMPACT/.test(l)),
+      'Devastating Charge does not trigger a second time: no IMPACT.',
+      'Otherwise: it stays where it is, Engaged.',
+    ],
+    reports: [report('charged', 'Charge succeeded'), report('chargeFailed', 'Charge failed'), report('noTarget', 'No other target')],
+  };
+}
+
+/**
  * What the abilities on a card do to the unit beyond its order: Stimpack's NON-LETHAL DAMAGE (2) and its PRECISION
  * on the rifles and close combat weapons, Adrenal Overload's +1 to IMPACT Hit Rolls. The AI pays no Command Points,
  * Biomass or Psionic Energy, but an ability's price in its own Hit Points is part of the ability.
@@ -136,7 +166,17 @@ function abilityEffects(state: GameState, u: AiUnitInstance, card: ActionCard): 
     if (st.name === 'Stimpack' && precision) {
       u.fx = [...(u.fx ?? []), { source: st.name, precision, weapons: ['c-14', 'quad k12'], weaponPhase: 'Assault' }, { source: st.name, precision, weaponPhase: 'Combat' }];
     }
+    // Nova's Super Stimpack sharpens all her Weapons; the Spec Ops Marauders' Commando Stimpack the Quad K12 and their fists.
+    if (st.name === 'Super Stimpack' && precision) u.fx = [...(u.fx ?? []), { source: st.name, precision }];
+    if (st.name === 'Commando Stimpack' && precision) {
+      u.fx = [...(u.fx ?? []), { source: st.name, precision, weapons: ['quad k12'], weaponPhase: 'Assault' }, { source: st.name, precision, weaponPhase: 'Combat' }];
+    }
     if (/\+1 Modifier to all IMPACT Hit Rolls/i.test(st.text)) u.fx = [...(u.fx ?? []), { source: st.name, impactHit: 1 }];
+    // Feedback: every Active ability the unit resolves this Round costs it NON-LETHAL DAMAGE (3).
+    if ((u.debuffs ?? []).some((d) => d.feedback) && u.location === 'table') {
+      u.damageMarker += 3;
+      lines.push(`Feedback: ${st.name} costs it NON-LETHAL DAMAGE (3). No model is removed for it.`);
+    }
   }
   void state;
   return lines;

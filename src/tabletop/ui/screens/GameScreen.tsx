@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import { TableSetup } from '../hud/TableSetup';
 import { TabletopLayout, TabletopTurn } from '../tabletop/TabletopLayout';
 import { ActionCardView } from '../tabletop/ActionCardView';
@@ -54,26 +53,17 @@ function FightersAsk({ max, impact, onRoll }: { max: number; impact: boolean; on
       <p className="small">Count the <b>Fighting Rank</b>, every model within 1" of an enemy model, and the <b>Supporting Rank</b>, every model touching a Fighting Rank model of its own Unit. The rest do not roll.</p>
       <div className="row">
         <Stepper value={n} onChange={setN} min={1} max={max} />
-        <Btn variant="primary" size="lg" onClick={() => onRoll(n)}>Roll for {n} model{n === 1 ? '' : 's'}</Btn>
+        <Btn variant="primary" size="lg" className="tt-primary" onClick={() => onRoll(n)}>Roll for {n} model{n === 1 ? '' : 's'}</Btn>
       </div>
     </div>
   );
 }
 
 /**
- * Dice are rolled in the tray at the top of the table, never inside a card: the AI's order says what to do on its
- * Unit's card, and its dice land up there, where every roll is read. Falls back to the card if there is no tray.
+ * The AI's order, inside its Unit's card on the stage (StagedUnit): the action card and what it asks of the table,
+ * then the dice tray under it, full width, with every roll and every button that answers one. Nothing here is
+ * drawn anywhere else first.
  */
-function InTray({ children }: { children: ReactNode }) {
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    const el = document.getElementById('tt-roll-slot');
-    setSlot(el);
-    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, []);
-  return slot ? createPortal(children, slot) : <>{children}</>;
-}
-
 function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dispatch: (c: Command) => void }) {
   const showRolls = useSettings((s) => s.appRollsAiDice);
   const [enemySupply, setEnemySupply] = useState(1);
@@ -87,102 +77,95 @@ function CommandCard({ order, g, dispatch }: { order: AiOrder; g: GameState; dis
   const def = unitById(u.defId);
   const camLine = order.lines.find((l) => l.startsWith('Camera:'));
   const sub = camLine ? camLine.replace(/^Camera:\s*/, '') : order.headingText ? `toward ${order.headingText}` : order.lines[0] ?? '';
-  const hasDice = order.batches.length > 0 || !!order.impact;
+  // A charge always rolls its distance first, IMPACT or not (Lightning Dash's second Charge has none).
+  const hasDice = order.batches.length > 0 || !!order.impact || (order.type === 'charge' && !!order.charge);
   const needsAsk = hasDice && stage === 'ask';
   const report = (id: string) => dispatch({ t: 'orderReport', report: id, enemySupply });
   const hasReport = (id: string) => order.reports.some((r) => r.id === id);
   const main = order.batches[0];
   const range = main ? (typeof main.range === 'number' ? main.range + (main.rangeMod ?? 0) : 0) : 0;
-  return (
-    <Panel className="cmd cmd-ai">
-      <div className="cmd-head">
-        <span className="cmd-face" aria-hidden="true"><DieFace faction={def.faction} value={6} /></span>
-        <h2 style={{ margin: 0 }}>{u.label}{order.card ? '' : `: ${VERB[order.type]}`}</h2>
-      </div>
-      {order.card
-        ? <ActionCardView g={g} card={order.card} unit={u} full reminders={details} entry={order.type === 'deploy' ? order.lines.find((l) => /^(Enter from|Set the whole unit down|BURROW AMBUSH|Camera: enter)/.test(l)) : undefined} />
-        : <>
-            <p className="cmd-sub">{sub}</p>
-            <p className="small muted" style={{ margin: '0 0 8px' }}>{def.name} · {u.models} models{order.focus ? ` · target: ${focusText(order.focus)}` : ''}</p>
-          </>}
-
-      {needsAsk && order.type === 'ranged' && (
-        <div className="stack">
+  const isCharge = order.type === 'charge' && needsAsk && !askFighters;
+  // What the order asks of the table, in a line or two, above the tray.
+  const ask = needsAsk && !askFighters
+    ? order.type === 'ranged'
+      ? <>
           <p className="ask">{camLine ? 'Roll the attack.' : `Fire at ${targetText(order.focus)} in Line of Sight within ${range}" of any of its models. Otherwise, do not fire.`}</p>
           {!camLine && main?.longRange ? <p className="ask">{`LONG RANGE (${main.longRange + (main.rangeMod ?? 0)}"): each model beyond the weapon's Range but Within ${main.longRange + (main.rangeMod ?? 0)}" of the target rolls at -1 to Hit.`}</p> : null}
-          <div className="row">
-            <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>{camLine ? 'Roll' : 'Open fire'}</Btn>
-            {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>{order.reports.find((r) => r.id === 'noTarget')?.label ?? 'No target'}</Btn>}
-          </div>
+        </>
+      : order.type === 'charge'
+        ? <>
+            <p className="ask">{camLine ? 'Roll the AI\'s charge distance on the table.' : order.dash ? `Lightning Dash: charge a different Enemy Unit within ${order.charge?.max ?? '?'}" of the Leading Model, ignoring the restriction on Charging while Engaged. No IMPACT this time. Otherwise, it stays where it is.` : `Charge ${targetText(order.focus, true)} within ${order.charge?.max ?? '?'}" of the Leading Model. Otherwise, do not charge.`}</p>
+            {/* The charge die goes the way the attack dice go: rolled by the app when it rolls the AI's dice, by the table otherwise. */}
+            {!camLine && order.charge && !showRolls && <p className="ask">Roll the AI's charge on the table. {chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>}
+          </>
+        : order.type === 'closeCombat'
+          ? <p className="ask">Close Ranks. Move its Leading Model up to 3" toward the enemy Unit it is Engaged with, then close the rest in around it.</p>
+          : null
+    : null;
+  // A charge rolls one die and has more than one answer; it stays on the tray until the table says how it went.
+  const chargeDie = isCharge && !camLine && order.charge && showRolls
+    ? <ChargeRoll faction={def.faction} dice={order.charge.dice} speed={order.charge.speed} bonus={order.charge.min - 1 - order.charge.speed} seed={`${g.config.seed}:${g.round}:${g.phase}:${order.unitId}:charge${order.dash ? ':dash' : ''}`} />
+    : null;
+  return (
+    <>
+      <div className="cmd-order">
+        {order.card
+          ? <ActionCardView g={g} card={order.card} unit={u} full reminders={details} entry={order.type === 'deploy' ? order.lines.find((l) => /^(Enter from|Set the whole unit down|BURROW AMBUSH|Camera: enter)/.test(l)) : undefined} />
+          : <>
+              <h3 className="cmd-verb">{VERB[order.type]}</h3>
+              <p className="cmd-sub">{sub}</p>
+              <p className="small muted">{def.name} · {u.models} models{order.focus ? ` · target: ${focusText(order.focus)}` : ''}</p>
+            </>}
+        {ask}
+        {/* The rules behind the order, for the operator: after the order, never between it and its dice. */}
+        <div className="row cmd-more">
+          <Btn size="sm" variant="ghost" onClick={() => setDetails((v) => !v)}>{details ? 'Hide the full rules' : 'Full rules for this order'}</Btn>
         </div>
-      )}
-      {needsAsk && !askFighters && order.type === 'charge' && (
-        <div className="stack">
-          <p className="ask">{camLine ? 'Roll the AI\'s charge distance on the table.' : `Charge ${targetText(order.focus, true)} within ${order.charge?.max ?? '?'}" of the Leading Model. Otherwise, do not charge.`}</p>
-          {/* The charge die goes the way the attack dice go: rolled by the app when it rolls the AI's dice, by the table
-              otherwise. */}
-          {!camLine && order.charge && !showRolls && <p className="ask">Roll the AI's charge on the table. {chargeRollText(order.charge.dice, order.charge.speed, order.charge.min - 1 - order.charge.speed)}</p>}
-          {/* The charge roll and what the table makes of it, together in the tray. */}
-          <InTray key="charge">
-          {!camLine && order.charge && showRolls && <ChargeRoll faction={def.faction} dice={order.charge.dice} speed={order.charge.speed} bonus={order.charge.min - 1 - order.charge.speed} seed={`${g.config.seed}:${g.round}:${g.phase}:${order.unitId}:charge`} />}
-          <div className="row">
-            {order.impact ? <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge made, roll IMPACT</Btn> : <Btn variant="primary" size="lg" className="tt-primary" onClick={() => report('charged')}>Charge made</Btn>}
-            {hasReport('chargeFailed') && <Btn size="lg" onClick={() => report('chargeFailed')}>Charge failed</Btn>}
-            {hasReport('attacked') && order.batches.length > 0 && <Btn size="lg" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>No charge, fire instead</Btn>}
-            {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>No target, it ran</Btn>}
-          </div>
-          </InTray>
-        </div>
-      )}
-      {needsAsk && askFighters && (
-        <FightersAsk max={u.models} impact={rollWhat === 'impact'} onRoll={(n) => { setFighters(n); setAskFighters(false); setStage('roll'); }} />
-      )}
-      {needsAsk && !askFighters && order.type === 'closeCombat' && (
-        <div className="stack">
-          <p className="ask">Close Ranks. Move its Leading Model up to 3" toward the enemy Unit it is Engaged with, then close the rest in around it.</p>
-          <div className="row"><Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('batches'); setAskFighters(true); }}>Ranks closed</Btn></div>
-        </div>
-      )}
-      {needsAsk && order.type !== 'ranged' && order.type !== 'charge' && order.type !== 'closeCombat' && (
-        <div className="row"><Btn variant="primary" size="lg" className="tt-primary" onClick={() => setStage('roll')}>Roll</Btn></div>
-      )}
+        {details && (
+          <ol className="order-lines">
+            {order.lines.map((l, i) => <li key={i} className={l.startsWith('Otherwise') ? 'otherwise' : ''}>{l}</li>)}
+          </ol>
+        )}
+      </div>
 
-      {stage === 'roll' && rollWhat === 'batches' && <InTray key="batches">{order.batches.map((b, i) => <DiceBlock key={i} batch={b} showRolls={showRolls} faction={def.faction} models={order.type === 'closeCombat' ? fighters ?? undefined : undefined} />)}</InTray>}
-      {stage === 'roll' && rollWhat === 'impact' && order.impact && <InTray key="impact"><DiceBlock batch={order.impact} showRolls={showRolls} title="IMPACT" faction={def.faction} models={fighters ?? undefined} /></InTray>}
-
-
-      {!hasDice && (
-        <div className="row">
-          {order.reports.map((r) => <Btn key={r.id} size="lg" variant={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'primary' : ''} className={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'tt-primary' : ''} onClick={() => report(r.id)}>{r.label}</Btn>)}
-        </div>
-      )}
-      {/* The dice and the button that finishes them sit together in the tray above the cards. */}
-      {stage === 'roll' && (
-        <InTray key="resolve">
-        <div className="row">
+      {/* The tray: the dice and every button that starts, answers or finishes them. */}
+      <div className="cmd-tray" aria-label="Dice">
+        {chargeDie}
+        {needsAsk && askFighters && (
+          <FightersAsk max={u.models} impact={rollWhat === 'impact'} onRoll={(n) => { setFighters(n); setAskFighters(false); setStage('roll'); }} />
+        )}
+        {stage === 'roll' && rollWhat === 'batches' && order.batches.map((b, i) => <DiceBlock key={i} batch={b} showRolls={showRolls} faction={def.faction} models={order.type === 'closeCombat' ? fighters ?? undefined : undefined} />)}
+        {stage === 'roll' && rollWhat === 'impact' && order.impact && <DiceBlock batch={order.impact} showRolls={showRolls} title="IMPACT" faction={def.faction} models={fighters ?? undefined} />}
+        <div className="row cmd-actions">
+          {needsAsk && !askFighters && order.type === 'ranged' && (
+            <>
+              <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>{camLine ? 'Roll' : 'Open fire'}</Btn>
+              {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>{order.reports.find((r) => r.id === 'noTarget')?.label ?? 'No target'}</Btn>}
+            </>
+          )}
+          {isCharge && (
+            <>
+              {order.impact ? <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('impact'); setAskFighters(true); }}>Charge made, roll IMPACT</Btn> : <Btn variant="primary" size="lg" className="tt-primary" onClick={() => report('charged')}>Charge made</Btn>}
+              {hasReport('chargeFailed') && <Btn size="lg" onClick={() => report('chargeFailed')}>Charge failed</Btn>}
+              {hasReport('attacked') && order.batches.length > 0 && <Btn size="lg" onClick={() => { setRollWhat('batches'); setStage('roll'); }}>No charge, fire instead</Btn>}
+              {hasReport('noTarget') && <Btn size="lg" onClick={() => report('noTarget')}>{order.dash ? 'No other target' : 'No target, it ran'}</Btn>}
+            </>
+          )}
+          {needsAsk && !askFighters && order.type === 'closeCombat' && <Btn variant="primary" size="lg" className="tt-primary" onClick={() => { setRollWhat('batches'); setAskFighters(true); }}>Ranks closed</Btn>}
+          {needsAsk && !askFighters && order.type !== 'ranged' && order.type !== 'charge' && order.type !== 'closeCombat' && <Btn variant="primary" size="lg" className="tt-primary" onClick={() => setStage('roll')}>Roll</Btn>}
+          {!hasDice && order.reports.map((r) => <Btn key={r.id} size="lg" variant={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'primary' : ''} className={r.id === 'done' || r.id === 'reached' || r.id === 'charged' ? 'tt-primary' : ''} onClick={() => report(r.id)}>{r.label}</Btn>)}
           {stage === 'roll' && rollWhat === 'impact' && (
             <>
               <span className="row small"><span className="muted">Enemy Supply Engaged</span><Stepper value={enemySupply} onChange={setEnemySupply} min={0} max={12} /></span>
               <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('charged')}>Charge resolved</Btn>
             </>
           )}
-          {stage === 'roll' && rollWhat === 'batches' && order.type === 'ranged' && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('attacked')}>Attack resolved</Btn>}
-          {stage === 'roll' && rollWhat === 'batches' && order.type === 'charge' && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('attacked')}>Attack resolved</Btn>}
+          {stage === 'roll' && rollWhat === 'batches' && (order.type === 'ranged' || order.type === 'charge') && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('attacked')}>Attack resolved</Btn>}
           {stage === 'roll' && rollWhat === 'batches' && order.type === 'closeCombat' && <Btn size="lg" variant="primary" className="tt-primary" onClick={() => report('done')}>Combat resolved</Btn>}
-          {stage === 'roll' && <Btn size="sm" variant="ghost" onClick={() => setStage('ask')}>Back</Btn>}
+          {(stage === 'roll' || askFighters) && <Btn size="sm" variant="ghost" onClick={() => { setStage('ask'); setAskFighters(false); }}>Back</Btn>}
         </div>
-        </InTray>
-      )}
-      {/* The rules behind the order, for the operator: after the one action, never between the steps and it. */}
-      <div className="row cmd-more">
-        <Btn size="sm" variant="ghost" onClick={() => setDetails((v) => !v)}>{details ? 'Hide the full rules' : 'Full rules for this order'}</Btn>
       </div>
-      {details && (
-        <ol className="order-lines">
-          {order.lines.map((l, i) => <li key={i} className={l.startsWith('Otherwise') ? 'otherwise' : ''}>{l}</li>)}
-        </ol>
-      )}
-    </Panel>
+    </>
   );
 }
 
@@ -392,7 +375,15 @@ function EndOfRoundChoices({ g, dispatch }: { g: GameState; dispatch: (c: Comman
       <h4>End of the Round abilities</h4>
       {pending.map((p) => (
         <div key={p.token.id} className="eor-choice">
-          {p.kind === 'shade' ? (
+          {p.kind === 'surprise' ? (
+            <>
+              <span><b>Surprise!</b> Set Nova in Coherency with the Holo Decoy?</span>
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                {p.candidates.map((c) => <Btn key={c.id} size="sm" variant="primary" onClick={() => dispatch({ t: 'endOfRoundEffect', tokenId: p.token.id, accept: true, unitId: c.id })}>Set {c.name}</Btn>)}
+                <Btn size="sm" variant="ghost" onClick={() => dispatch({ t: 'endOfRoundEffect', tokenId: p.token.id, accept: false })}>Stay</Btn>
+              </div>
+            </>
+          ) : p.kind === 'shade' ? (
             <>
               <span><b>Psionic Transfer:</b> move {p.owner!.name} to their Shade?</span>
               <div className="row" style={{ gap: 6 }}>

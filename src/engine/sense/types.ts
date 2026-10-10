@@ -69,6 +69,8 @@ export interface PlayerUnit {
   placeNoEngage?: boolean;
   /** Round in which Lurking answered its one Ranged Attack. */
   lurkedRound?: number;
+  /** Zagara's last Broodmother: its effect cannot be chosen again the next Round. */
+  broodmother?: { round: number; option: number };
   /** The enemy Activation in which a once-per-Activation TOUGH (Ancillary Carapace) was last used. */
   toughKey?: string;
 }
@@ -89,6 +91,20 @@ export interface EffectMods {
   chargeBonus?: number;
   /** Replace the weapon's Surge die (Grenades - Frag). */
   surgeDie?: 'D3' | 'D3+1' | 'D6';
+  /** Farsight: an Evade Roll against any attack this Round. */
+  evadeAll?: boolean;
+  /** Khala's Gift: its first Special Ability this Round costs this much less. */
+  costCut?: number;
+  /** TOUGH (X) on its Armour Rolls (Broodmother). */
+  tough?: number;
+  /** Poisonous Essence: Biological Enemy Units Engaged with it suffer NON-LETHAL DAMAGE (X) at the End of the Assault Phase. */
+  poison?: number;
+  /** The weapon's Damage becomes this (Head Shot). */
+  dmgSet?: number;
+  /** CONCENTRATED FIRE (X) for the shot (Head Shot). */
+  concentrated?: number;
+  /** Surge types the weapon gains (Explosive Shrapnel Shells). */
+  surgeTypes?: ('Light' | 'Armoured')[];
   /** Only for weapons whose name matches (case-insensitive substring list). */
   weapons?: string[];
   /** Only Close Combat / only Ranged weapons. */

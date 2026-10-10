@@ -131,6 +131,8 @@ export function checkDeploy(state: GameState, pu: PlayerUnit, pt: Pt): RuleCheck
     if (conduit) via = conduit.source;
     else if (ambush) via = 'Burrow Ambush';
     else if (pu.deployAnyEdge && edgeD <= speed + 0.05 && !enemyWithin(10)) via = 'another table edge';
+    // Internal Tech Module: the Raven may come on from any table edge, no model Within 8" of an Enemy model.
+    else if (hasAbility(pu, 'Internal Tech Module') && edgeD <= speed + 0.05 && !enemyWithin(8)) via = 'Internal Tech Module';
     else if (prism) { via = 'Phase Prism'; swapId = prism.id; }
     else if (reinforce) via = 'Rapid Reinforcements';
     else return no(`Too far from your entry edge: ${d === Infinity ? 'no path' : `${d.toFixed(1)}"`} (max ${speed}").${extraEntryPoints(state, pu).length ? ' Or deploy within Speed of your Pylon / Omega Worm.' : ''}`);
@@ -311,6 +313,10 @@ export function validTargets(state: GameState, pu: PlayerUnit, weapon: WeaponPro
     // The weapon as it is fired at this target: upgrades and effects may lengthen it or add keywords.
     const w = firedAt(state, pu, weapon, u);
     const has = (k: string) => w.keywords.some((x) => x.k === k);
+    // Bombard: the Bile Bomb may instead target an Enemy Unit Within 3" of its token, whatever the Range, without
+    // Line of Sight and ignoring HIDDEN.
+    const bomb = /bile bomb/i.test(weapon.name) && (state.tokens ?? []).some((t) => t.kind === 'bileBomb' && t.ownerId === pu.id && unitShapes(state, 'ai', u.id).some((sh) => edgeToPoint(sh, t) <= 3.05));
+    if (bomb) { out.push({ unit: u, distance: d, longRange: false, visible: true }); continue; }
     // A BURROWED unit is HIDDEN: it can be targeted only from within 4", unless something of yours reveals it.
     if (aiBurrowed(u) && d > 4 && !aiRevealed(state, u)) continue;
     // An Engaged Unit may only target what it is Engaged with; Indomitable lets it fire out of the fight.

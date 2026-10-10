@@ -1,6 +1,6 @@
 {
-  "version": "2026-09-16",
-  "takenAt": "2026-09-16",
+  "version": "2026-10-09",
+  "takenAt": "2026-10-09",
   "source": "https://sc.starcraft-tmg.com (Command Center beta v1.4, guest access)",
   "cards": [
     {
@@ -12,9 +12,10 @@
       "cost": 0,
       "resource": 1,
       "slots": {
+        "Elite": 1,
+        "Air": 1,
         "Core": 3,
-        "Support": 1,
-        "Elite": 1
+        "Support": 1
       },
       "factionTags": [],
       "boosts": [
@@ -117,9 +118,9 @@
       "cost": 0,
       "resource": 1,
       "slots": {
+        "Core": 3,
         "Elite": 2,
-        "Hero": 1,
-        "Core": 3
+        "Hero": 1
       },
       "factionTags": [
         "Khalai"
@@ -176,7 +177,7 @@
       "faction": "Protoss",
       "isFactionCard": false,
       "unique": true,
-      "cost": 35,
+      "cost": 40,
       "resource": 1,
       "slots": {
         "Core": 2
@@ -261,8 +262,8 @@
       "cost": 40,
       "resource": 1,
       "slots": {
-        "Hero": 1,
         "Elite": 1,
+        "Hero": 1,
         "Core": 1
       },
       "factionTags": [],
@@ -297,12 +298,64 @@
       ]
     },
     {
+      "id": "templar_archives",
+      "name": "Templar Archives",
+      "faction": "Protoss",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 40,
+      "resource": 1,
+      "slots": {
+        "Support": 2
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Ancestral Wisdom",
+          "text": "Once per Round, when a Friendly Support Unit activates a Special Ability that costs PE, resolve that ability with its PE cost reduced by 1 (to a minimum of 0). Do not Exhaust this card.",
+          "kind": "Reaction",
+          "phase": "Any"
+        }
+      ]
+    },
+    {
+      "id": "templar_caste",
+      "name": "Templar Caste",
+      "faction": "Protoss",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Hero": 1,
+        "Support": 2,
+        "Core": 3
+      },
+      "factionTags": [
+        "Templar Caste"
+      ],
+      "boosts": [
+        {
+          "name": "Our Duty is Unending",
+          "text": "Once per Game. Select up to two of your Exhausted Tactical Cards. Return them to the Ready state.",
+          "kind": "Active",
+          "phase": "Any"
+        },
+        {
+          "name": "Khassar de Templari",
+          "text": "Instead of performing an action, select one other Friendly Biological Unit that has already been Activated this Phase. That Unit immediately performs one action available in the current Phase, then suffers NON-LETHAL DAMAGE (3).",
+          "kind": "Active",
+          "phase": "Any"
+        }
+      ]
+    },
+    {
       "id": "twilight_council",
       "name": "Twilight Council",
       "faction": "Protoss",
       "isFactionCard": false,
       "unique": true,
-      "cost": 45,
+      "cost": 40,
       "resource": 1,
       "slots": {
         "Elite": 1,
@@ -413,7 +466,7 @@
       "faction": "Terran",
       "isFactionCard": false,
       "unique": true,
-      "cost": 35,
+      "cost": 40,
       "resource": 1,
       "slots": {
         "Support": 2
@@ -461,7 +514,7 @@
       "faction": "Terran",
       "isFactionCard": false,
       "unique": false,
-      "cost": 25,
+      "cost": 30,
       "resource": 1,
       "slots": {
         "Core": 1
@@ -509,7 +562,7 @@
       "faction": "Terran",
       "isFactionCard": false,
       "unique": true,
-      "cost": 45,
+      "cost": 40,
       "resource": 2,
       "slots": {
         "Core": 1,
@@ -537,11 +590,11 @@
       "faction": "Terran",
       "isFactionCard": false,
       "unique": true,
-      "cost": 40,
+      "cost": 35,
       "resource": 1,
       "slots": {
-        "Support": 1,
-        "Core": 1
+        "Core": 1,
+        "Support": 1
       },
       "factionTags": [],
       "boosts": [
@@ -635,6 +688,38 @@
       ]
     },
     {
+      "id": "nova_covert_ops",
+      "name": "Nova Covert Ops",
+      "faction": "Terran",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Core": 3,
+        "Elite": 1,
+        "Support": 1,
+        "Hero": 1
+      },
+      "factionTags": [
+        "Nova Covert Ops"
+      ],
+      "boosts": [
+        {
+          "name": "Griffin Support",
+          "text": "Set a Friendly Sabotage Drone Unit Within 12\" of a Friendly Unit, more than 1\" away from any Enemy model. Remove this Unit at the End of the Round.",
+          "kind": "Active",
+          "phase": "Movement"
+        },
+        {
+          "name": "Mark for Death",
+          "text": "Target an Enemy Unit on the battlefield. When a Friendly Unit makes an Attack targeting that Unit, its first Melee or Ranged Weapon used gains CRITICAL HIT (1) and PRECISION (1).",
+          "kind": "Active",
+          "phase": "Movement"
+        }
+      ]
+    },
+    {
       "id": "orbital_command",
       "name": "Orbital Command",
       "faction": "Terran",
@@ -670,8 +755,9 @@
       "cost": 0,
       "resource": 1,
       "slots": {
-        "Core": 3,
         "Hero": 1,
+        "Air": 1,
+        "Core": 3,
         "Support": 1
       },
       "factionTags": [
@@ -701,9 +787,9 @@
       "cost": 40,
       "resource": 1,
       "slots": {
-        "Core": 1,
         "Elite": 1,
-        "Hero": 1
+        "Hero": 1,
+        "Core": 1
       },
       "factionTags": [],
       "boosts": [
@@ -724,9 +810,10 @@
       "cost": 0,
       "resource": 1,
       "slots": {
-        "Elite": 1,
+        "Core": 3,
         "Support": 1,
-        "Core": 3
+        "Air": 1,
+        "Elite": 1
       },
       "factionTags": [],
       "boosts": [
@@ -741,6 +828,27 @@
           "text": "Once per Game. Immediately claim the First Player Marker. No other player may claim the First Player Marker for the remainder of this Phase.",
           "kind": "Active",
           "phase": "Movement"
+        }
+      ]
+    },
+    {
+      "id": "vanadium_plating",
+      "name": "Vanadium Plating",
+      "faction": "Terran",
+      "isFactionCard": false,
+      "unique": false,
+      "cost": 25,
+      "resource": 1,
+      "slots": {
+        "Support": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Crystalline Alloy",
+          "text": "Use before a Friendly Mechanical Unit makes an Armour Roll. That Unit gains DODGE (2) for this roll.",
+          "kind": "Reaction",
+          "phase": "Any"
         }
       ]
     },
@@ -803,12 +911,40 @@
       ]
     },
     {
+      "id": "defiler_mound",
+      "name": "Defiler Mound",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 35,
+      "resource": 1,
+      "slots": {
+        "Elite": 1,
+        "Support": 1
+      },
+      "factionTags": [],
+      "boosts": [
+        {
+          "name": "Poisonous Essence",
+          "text": "Set a Faction Indicator on the active Friendly Unit. At the end of the Assault Phase, all Biological Enemy Units Engaged with the marked Unit suffer NON-LETHAL DAMAGE (2).",
+          "kind": "Active",
+          "phase": "Movement"
+        },
+        {
+          "name": "Tunnel Network",
+          "text": "The active, Unengaged Ground Unit is returned to Reserves instead of performing an action.",
+          "kind": "Active",
+          "phase": "Movement"
+        }
+      ]
+    },
+    {
       "id": "evolution_chamber",
       "name": "Evolution Chamber",
       "faction": "Zerg",
       "isFactionCard": false,
       "unique": false,
-      "cost": 30,
+      "cost": 25,
       "resource": 1,
       "slots": {
         "Core": 1
@@ -862,7 +998,7 @@
       "faction": "Zerg",
       "isFactionCard": false,
       "unique": false,
-      "cost": 35,
+      "cost": 30,
       "resource": 1,
       "slots": {
         "Elite": 2
@@ -886,8 +1022,8 @@
       "cost": 0,
       "resource": 1,
       "slots": {
-        "Elite": 2,
         "Hero": 1,
+        "Elite": 2,
         "Core": 3
       },
       "factionTags": [
@@ -1032,6 +1168,39 @@
       ]
     },
     {
+      "id": "reactive_creep",
+      "name": "Reactive Creep",
+      "faction": "Zerg",
+      "isFactionCard": false,
+      "unique": true,
+      "cost": 10,
+      "resource": 0,
+      "slots": {},
+      "factionTags": [
+        "Zagara's Swarm"
+      ],
+      "boosts": [
+        {
+          "name": "Reactive Tissue",
+          "text": "While a Friendly Zerg Unit is ON CREEP, it gains DODGE (1) against any attacks targeting it.",
+          "kind": "Passive",
+          "phase": "Any"
+        },
+        {
+          "name": "Living Glob of Tissue",
+          "text": "Creep Tumor tokens have STAY IN PLAY and DISPLACEMENT.",
+          "kind": "Passive",
+          "phase": "Any"
+        },
+        {
+          "name": "Creep Removal",
+          "text": "If an Enemy Unit ends a Move, Deploy, Run, Charge or Disengage action Within 1\" of a Friendly Creep Tumor token, remove that token from the battlefield.",
+          "kind": "Passive",
+          "phase": "Any"
+        }
+      ]
+    },
+    {
       "id": "roach_warren",
       "name": "Roach Warren",
       "faction": "Zerg",
@@ -1079,7 +1248,7 @@
       "faction": "Zerg",
       "isFactionCard": false,
       "unique": true,
-      "cost": 40,
+      "cost": 35,
       "resource": 2,
       "slots": {
         "Core": 2
@@ -1101,6 +1270,43 @@
       ]
     },
     {
+      "id": "zagara_s_swarm",
+      "name": "Zagara's Swarm",
+      "faction": "Zerg",
+      "isFactionCard": true,
+      "unique": true,
+      "cost": 0,
+      "resource": 1,
+      "slots": {
+        "Hero": 1,
+        "Support": 1,
+        "Core": 4
+      },
+      "factionTags": [
+        "Zagara's Swarm"
+      ],
+      "boosts": [
+        {
+          "name": "Scourge Queen",
+          "text": "If the active Unit contains more models than the combined number of models in all Engaged Enemy Units, its Close Combat Weapons gain INSTANT and PRECISION (4).",
+          "kind": "Active",
+          "phase": "Combat"
+        },
+        {
+          "name": "Instinctive Reaction",
+          "text": "Use when an Enemy Unit declares a Close Combat Attack against a Friendly Unit. That Friendly Unit becomes eligible to make an Evade Roll against that attack.",
+          "kind": "Reaction",
+          "phase": "Any"
+        },
+        {
+          "name": "Zerg Creep",
+          "text": "During Army Building, select exactly one Creep Card and add it to their Army List, paying its listed cost (if any).",
+          "kind": "Passive",
+          "phase": "Any"
+        }
+      ]
+    },
+    {
       "id": "zerg_swarm",
       "name": "Zerg Swarm",
       "faction": "Zerg",
@@ -1110,8 +1316,9 @@
       "resource": 1,
       "slots": {
         "Core": 3,
-        "Elite": 1,
-        "Support": 1
+        "Air": 1,
+        "Support": 1,
+        "Elite": 1
       },
       "factionTags": [],
       "boosts": [

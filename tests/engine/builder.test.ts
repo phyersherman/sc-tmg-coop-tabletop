@@ -17,13 +17,15 @@ describe('army builder', () => {
     expect(a.spent).toBeLessThanOrEqual(1000);
     expect(a.spent).toBeGreaterThanOrEqual(850);
     const models: Record<string, number> = {};
-    for (const u of a.units) models[u.defId] = (models[u.defId] ?? 0) + u.maxModels;
+    // Counted by miniature: a Spec Ops Marauder is fielded with Marauder models.
+    for (const u of a.units) { const m = /__(.+)_$/.exec(u.defId)?.[1] ?? u.defId; models[m] = (models[m] ?? 0) + u.maxModels; }
     for (const [id, n] of Object.entries(models)) expect(n).toBeLessThanOrEqual((terranOwn as any)[id]);
     expect(a.units.filter((u) => u.defId === 'jim_raynor').length).toBeLessThanOrEqual(1);
     expect(validateArmy(a, UNITS, CARDS).filter((i) => i.level === 'error')).toEqual([]);
     // A Terran Faction card leads it. Which one is the army's own business: Jim Raynor needs a Hero slot, and
-    // Terran Armed Forces has none, so he comes under Raynor's Raiders or with a Supply Depot.
-    expect(['terran_armed_forces', 'raynor_s_raiders']).toContain(a.factionCardId);
+    // Terran Armed Forces has none, so he comes under Raynor's Raiders or with a Supply Depot. Spec Ops Marauders
+    // (Marauder models) bring Nova Covert Ops.
+    expect(['terran_armed_forces', 'raynor_s_raiders', 'nova_covert_ops']).toContain(a.factionCardId);
     expect(a.factionCards).toEqual({ Terran: a.factionCardId });
   });
   it('respects heroAllowed=false and picks sub-faction cards', () => {
@@ -236,7 +238,7 @@ describe('validateArmy holds the AI to Army Building', () => {
   });
 
   it('reports Vespene Gas overspent, a card of the wrong army, and a race without its Faction card', () => {
-    expect(errors(army([['marine', 'small'], ['marauder', 'small']], { budget: 500, tacticalCards: ['barracks', 'barracks', 'barracks'] }))).toEqual(['Tactical cards cost 75 Vespene Gas. The limit is 50.']);
+    expect(errors(army([['marine', 'small'], ['marauder', 'small']], { budget: 500, tacticalCards: ['barracks', 'barracks'] }))).toEqual(['Tactical cards cost 60 Vespene Gas. The limit is 50.']);
     expect(errors(army([['marine', 'small'], ['marauder', 'small']], { tacticalCards: ['spawning_pool'] }))).toEqual(['Spawning Pool belongs to no race the army fields.']);
     expect(errors(army([['marine', 'small'], ['zergling', 'small']], {}))).toEqual(['The Zerg Units have no Faction card.']);
     expect(errors(army([['marine', 'small'], ['zergling', 'small']], { factionCards: { Terran: 'terran_armed_forces', Zerg: 'zerg_swarm' } }))).toEqual(['Zerg Swarm takes exactly one Creep card. The army has 0.']);

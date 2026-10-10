@@ -1,6 +1,6 @@
 {
-  "version": "2026-09-16",
-  "takenAt": "2026-09-16",
+  "version": "2026-10-09",
+  "takenAt": "2026-10-09",
   "source": "https://sc.starcraft-tmg.com (Command Center beta v1.4, guest access)",
   "units": [
     {
@@ -30,9 +30,9 @@
       "compositions": [
         {
           "label": "small",
-          "cost": 150,
-          "supply": 1,
-          "models": 4
+          "models": 4,
+          "cost": 160,
+          "supply": 1
         }
       ],
       "squadProfile": [
@@ -123,7 +123,7 @@
           "name": "Psionic Transfer",
           "phase": "Movement",
           "kind": "Active",
-          "text": "Set a Shade token Wholly Within 12\" of any model in this Unit. At the End of the Round, the controlling player may set all models of this Unit in Coherency, treating the Shade token as the Leading Model. The Shade token has DISPLACEMENT.",
+          "text": "Set a Shade token Wholly Within 12\" of any model in this Unit. At the End of the Round, the controlling player may set all models of this Unit In Coherency, treating the Shade token as the Leading Model. The Shade token has DISPLACEMENT.",
           "cost": {
             "resource": "PE",
             "amount": 1
@@ -186,7 +186,7 @@
         {
           "label": "small",
           "models": 1,
-          "cost": 250,
+          "cost": 270,
           "supply": 1
         }
       ],
@@ -280,6 +280,148 @@
         "dice": 6,
         "hit": 4
       }
+    },
+    {
+      "id": "high_templar",
+      "name": "High Templar",
+      "faction": "Protoss",
+      "role": "Support",
+      "tags": [
+        "Biological",
+        "Light",
+        "Psionic",
+        "Ground"
+      ],
+      "unique": false,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          4,
+          7
+        ],
+        "armour": 5,
+        "hp": 3,
+        "size": 2,
+        "evade": 6,
+        "shields": 3,
+        "combatRange": 4
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "models": 2,
+          "supply": 1,
+          "cost": 120
+        },
+        {
+          "label": "large",
+          "supply": 2,
+          "cost": 200,
+          "models": 4
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 0
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "supply": 1
+        },
+        {
+          "min": 3,
+          "max": 4,
+          "supply": 2
+        }
+      ],
+      "weapons": [
+        {
+          "id": "high_templar:psi-blast:4",
+          "name": "Psi Blast",
+          "phase": "Assault",
+          "range": 8,
+          "target": "All",
+          "roa": 1,
+          "hit": 3,
+          "dmg": 2,
+          "surgeTypes": [
+            "Light"
+          ],
+          "keywords": [
+            {
+              "k": "INSTANT"
+            }
+          ],
+          "text": "RANGE: 8 | TARGET: All | RoA: 1 | HIT: 3+ | DMG: 2\nSURGE: Light (D3)\n\nINSTANT",
+          "surgeDie": "D3"
+        },
+        {
+          "id": "high_templar:strike:5",
+          "name": "Strike",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 1,
+          "hit": 4,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [],
+          "text": "RANGE: E | TARGET: Ground | RoA: 1 | HIT: 4+ | DMG: 1\nSURGE: -"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "high_templar:our-minds-as-one:0",
+          "name": "Our Minds as One",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "While this Unit's Current Supply Value is 2, it gains the following effects:\nThe first Special Ability resolved by this Unit each Round has its PE cost reduced by 1 (to a minimum of 0).\nApply a +1 Modifier to the dice rolled for its Psionic Storm Special Ability."
+        },
+        {
+          "id": "high_templar:psionic-storm:1",
+          "name": "Psionic Storm",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Set a Psionic Storm token Within 10\" and Line of Sight of this Unit. This token is not removed if this Unit is Destroyed. At the End of each Phase, set a Psionic Storm Blast Template on the centre of this token. For each Unit that has at least one model whose base is partially covered by the template, roll 3 dice, plus 1 additional die for each model in that Unit whose base is partially covered. For each result of 5+, that Unit suffers an effect depending on the current Phase:\nMovement Phase: NON-LETHAL DAMAGE (1).\nAssault Phase: 1 Damage. \nIf multiple effects trigger at the End of the Assault Phase, resolve them in the order specified in Part 8.9.4.",
+          "cost": {
+            "resource": "PE",
+            "amount": 2
+          },
+          "upgradeCost": {
+            "small": 20,
+            "large": 30
+          }
+        },
+        {
+          "id": "high_templar:farsight:2",
+          "name": "Farsight",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Target one Friendly Unit Within 12\". Until the End of the Round, that Unit is eligible to make an Evade Roll against any attacks targeting it.",
+          "cost": {
+            "resource": "PE",
+            "amount": 1
+          },
+          "upgradeCost": {
+            "small": 20,
+            "large": 20
+          }
+        },
+        {
+          "id": "high_templar:feedback:3",
+          "name": "Feedback",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Target one Enemy Mechanical or Psionic Unit Within 8\". Until the End of the Round, after that Unit resolves an Active or Reaction Special Ability (excluding abilities granted by a Tactical Card or Faction Card), it suffers NON-LETHAL DAMAGE (3).",
+          "cost": {
+            "resource": "PE",
+            "amount": 1
+          }
+        }
+      ]
     },
     {
       "id": "immortal",
@@ -657,7 +799,7 @@
       "compositions": [
         {
           "label": "small",
-          "cost": 280,
+          "cost": 260,
           "models": 3,
           "supply": 2
         }
@@ -931,8 +1073,8 @@
             "amount": 1
           },
           "upgradeCost": {
-            "small": 20,
-            "large": 20
+            "small": 10,
+            "large": 10
           }
         },
         {
@@ -946,8 +1088,8 @@
             "amount": 0
           },
           "upgradeCost": {
-            "small": 30,
-            "large": 30
+            "small": 20,
+            "large": 20
           }
         }
       ]
@@ -980,7 +1122,7 @@
         {
           "label": "small",
           "supply": 1,
-          "cost": 170,
+          "cost": 160,
           "models": 1
         },
         {
@@ -1081,6 +1223,275 @@
       ]
     },
     {
+      "id": "tassadar",
+      "name": "Tassadar",
+      "faction": "Protoss",
+      "role": "Hero",
+      "tags": [
+        "Biological",
+        "Psionic",
+        "Ground",
+        "Unique"
+      ],
+      "unique": true,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          7,
+          7
+        ],
+        "armour": 5,
+        "hp": 6,
+        "size": 2,
+        "evade": 5,
+        "shields": 3,
+        "combatRange": 4
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "supply": 1,
+          "cost": 230,
+          "models": 1
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 1
+        }
+      ],
+      "weapons": [
+        {
+          "id": "tassadar:resonance-beam:6",
+          "name": "Resonance Beam",
+          "phase": "Assault",
+          "range": 12,
+          "target": "All",
+          "roa": 6,
+          "hit": 3,
+          "dmg": 1,
+          "surgeTypes": [
+            "Armoured"
+          ],
+          "keywords": [
+            {
+              "k": "INSTANT"
+            }
+          ],
+          "text": "RANGE: 12 | TARGET: All | RoA: 6 | HIT: 3+ | DMG: 1\nSURGE: Armoured (D3)\n\nINSTANT",
+          "surgeDie": "D3"
+        },
+        {
+          "id": "tassadar:strike:7",
+          "name": "Strike",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 6,
+          "hit": 4,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [],
+          "text": "RANGE: E | TARGET: Ground | RoA: 6 | HIT: 4+ | DMG: 1\nSURGE: -"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "tassadar:commander:0",
+          "name": "Commander",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "Treat this Unit’s Supply characteristic as increased by 1 for Controlling and Contesting Mission Markers, completing objectives, and resolving Disengage checks."
+        },
+        {
+          "id": "tassadar:force-wall:1",
+          "name": "Force Wall",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Set two Force Wall tokens Wholly Within 8\" in an unoccupied space. Units of Size 2 or lower cannot move across the Force Wall. Models of Size 3 or more can move over it, and it's then removed.",
+          "cost": {
+            "resource": "PE",
+            "amount": 1
+          }
+        },
+        {
+          "id": "tassadar:executors-will:2",
+          "name": "Executor's Will",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Target two Enemy Units on the battlefield (Line of Sight is not required) and place a Faction Indicator next to each of them.\nDuring the next Assault Phase, if either of these Units ends its Activation while its Faction Indicator remains on the battlefield, you may Activate two Friendly Units consecutively.\nRemove both Faction Indicators after any Enemy Unit completes its Activation in the following Assault Phase.",
+          "cost": {
+            "resource": "PE",
+            "amount": 1
+          }
+        },
+        {
+          "id": "tassadar:khalas-gift:3",
+          "name": "Khala's Gift",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Target another Friendly Biological Unit Within 12\". Until the End of the Round, that Unit resolves its first Special Ability with the cost reduced by 1 (to a minimum of 0).",
+          "cost": {
+            "resource": "PE",
+            "amount": 0
+          }
+        },
+        {
+          "id": "tassadar:telekinetic-push:4",
+          "name": "Telekinetic Push",
+          "phase": "Assault",
+          "kind": "Active",
+          "text": "Set each Friendly Force Wall token Wholly Within 6\" of its current position.",
+          "cost": {
+            "resource": "PE",
+            "amount": 1
+          }
+        },
+        {
+          "id": "tassadar:psi-lightning:5",
+          "name": "Psi Lightning",
+          "phase": "Assault",
+          "kind": "Active",
+          "text": "Each Unit Within 2\" of one or more Friendly Force Wall tokens suffers 1 Damage.",
+          "cost": {
+            "resource": "PE",
+            "amount": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "twilight_templar__high_templar_",
+      "name": "Twilight Templar (High Templar)",
+      "faction": "Protoss",
+      "role": "Support",
+      "tags": [
+        "Biological",
+        "Light",
+        "Psionic",
+        "Ground",
+        "Unique"
+      ],
+      "unique": true,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          4,
+          7
+        ],
+        "armour": 5,
+        "hp": 3,
+        "size": 2,
+        "evade": 6,
+        "shields": 3,
+        "combatRange": 4
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "cost": 230,
+          "supply": 1,
+          "models": 2
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 0
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "supply": 1
+        }
+      ],
+      "weapons": [
+        {
+          "id": "twilight_templar__high_templar_:psi-blast:4",
+          "name": "Psi Blast",
+          "phase": "Assault",
+          "range": 8,
+          "target": "All",
+          "roa": 2,
+          "hit": 3,
+          "dmg": 2,
+          "surgeTypes": [
+            "Light"
+          ],
+          "keywords": [
+            {
+              "k": "INSTANT"
+            }
+          ],
+          "text": "RANGE: 8 | TARGET: All | RoA: 2 | HIT: 3+ | DMG: 2\nSURGE: Light (D3)\n\nINSTANT",
+          "surgeDie": "D3"
+        },
+        {
+          "id": "twilight_templar__high_templar_:strike:5",
+          "name": "Strike",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 1,
+          "hit": 4,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [],
+          "text": "RANGE: E | TARGET: Ground | RoA: 1 | HIT: 4+ | DMG: 1\nSURGE: -"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "twilight_templar__high_templar_:bound-by-the-khala:0",
+          "name": "Bound by the Khala",
+          "phase": "Any",
+          "kind": "Reaction",
+          "text": "Use when the Current Supply Value of another Friendly Unit Within 8\" of this Unit is reduced. Return one Non-Unique Exhausted Tactical Card to the Ready state.",
+          "cost": {
+            "resource": "PE",
+            "amount": 0
+          }
+        },
+        {
+          "id": "twilight_templar__high_templar_:warp-in:1",
+          "name": "Warp-In",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Resolve the PLACE (6) effect.",
+          "cost": {
+            "resource": "PE",
+            "amount": 1
+          }
+        },
+        {
+          "id": "twilight_templar__high_templar_:psionic-gale:2",
+          "name": "Psionic Gale",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Set a Psionic Storm token Within 10\" and Line of Sight of this Unit. This token is not removed if this Unit is Destroyed. At the End of each Phase, set a Psionic Storm Blast Template on the centre of this token. For each Unit that has at least one model whose base is partially covered by the template, roll 3 dice, plus 1 additional die for each model in that Unit whose base is partially covered. For each result of 4+, that Unit suffers an effect depending on the current Phase:\nMovement Phase: NON-LETHAL DAMAGE (1).\nAssault Phase: 1 Damage. \nIf multiple effects trigger at the End of the Assault Phase, resolve them in the order specified in Part 8.9.4.",
+          "cost": {
+            "resource": "PE",
+            "amount": 2
+          }
+        },
+        {
+          "id": "twilight_templar__high_templar_:feedback:3",
+          "name": "Feedback",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Target one Enemy Mechanical or Psionic Unit Within 8\". Until the End of the Round, after that Unit resolves an Active or Reaction Special Ability (excluding abilities granted by a Tactical Card or Faction Card), it suffers NON-LETHAL DAMAGE (3).",
+          "cost": {
+            "resource": "PE",
+            "amount": 1
+          }
+        }
+      ],
+      "subFaction": "Templar Caste"
+    },
+    {
       "id": "zealot",
       "name": "Zealot",
       "faction": "Protoss",
@@ -1109,7 +1520,7 @@
           "label": "small",
           "supply": 2,
           "models": 3,
-          "cost": 160
+          "cost": 170
         }
       ],
       "squadProfile": [
@@ -1359,6 +1770,87 @@
       }
     },
     {
+      "id": "auto_turret",
+      "name": "Auto-Turret",
+      "faction": "Terran",
+      "role": "Other",
+      "tags": [
+        "Armoured",
+        "Mechanical",
+        "Ground"
+      ],
+      "unique": false,
+      "summoned": true,
+      "stats": {
+        "speed": null,
+        "armour": 5,
+        "hp": 3,
+        "size": 2,
+        "combatRange": 3
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "models": 1,
+          "cost": 0,
+          "supply": 0
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 0
+        }
+      ],
+      "weapons": [
+        {
+          "id": "auto_turret:gauss-cannon:2",
+          "name": "Gauss Cannon",
+          "phase": "Assault",
+          "range": 8,
+          "target": "All",
+          "roa": 6,
+          "hit": 3,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [
+            {
+              "k": "PINPOINT"
+            }
+          ],
+          "text": "RANGE: 8'' | TARGET: All | RoA: 6 | HIT: 3+ | DMG: 1\nSURGE: - (-)\n\nPINPOINT"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "auto_turret:timed-life:0",
+          "name": "Timed Life",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "Remove this Unit at the End of the Round."
+        },
+        {
+          "id": "auto_turret:structure:1",
+          "name": "Structure",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "This Unit cannot be Activated in any Phase and cannot perform actions. Additionally, its Current Supply Value is treated as 0, and it can never Control or Contest Mission Markers, ignoring the standard Zero Supply Exception. This Unit cannot be a target of an ability, unless stated otherwise."
+        },
+        {
+          "id": "auto_turret:overwatch:3",
+          "name": "Overwatch",
+          "phase": "Assault",
+          "kind": "Reaction",
+          "text": "Use when an Enemy Unit ends its Activation Within 8\" of this Unit. This Unit immediately performs a Ranged Attack against that Enemy Unit.",
+          "cost": {
+            "resource": "CP",
+            "amount": 0
+          }
+        }
+      ]
+    },
+    {
       "id": "goliath",
       "name": "Goliath",
       "faction": "Terran",
@@ -1385,7 +1877,7 @@
           "label": "small",
           "supply": 2,
           "models": 1,
-          "cost": 190
+          "cost": 180
         }
       ],
       "squadProfile": [
@@ -1585,6 +2077,75 @@
       }
     },
     {
+      "id": "holo_decoy",
+      "name": "Holo Decoy",
+      "faction": "Terran",
+      "role": "Other",
+      "tags": [
+        "Biological",
+        "Psionic",
+        "Ground"
+      ],
+      "unique": false,
+      "summoned": true,
+      "stats": {
+        "speed": [
+          7,
+          7
+        ],
+        "armour": 6,
+        "hp": 1,
+        "size": 2,
+        "evade": 6
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "cost": 0,
+          "models": 1,
+          "supply": 0
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 0
+        }
+      ],
+      "weapons": [],
+      "abilities": [
+        {
+          "id": "holo_decoy:lethal-hologram:0",
+          "name": "Lethal Hologram",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "All Weapons of Friendly Units targeting an Enemy Unit Within 4\" of this Unit gain PRECISION (1)."
+        },
+        {
+          "id": "holo_decoy:timed-life:1",
+          "name": "Timed Life",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "Remove this Unit at the End of the Round."
+        },
+        {
+          "id": "holo_decoy:decoy:2",
+          "name": "Decoy",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "This Unit is never Engaged. It cannot Engage Enemy Units, cannot be Engaged by Enemy Units and cannot perform a Charge Action. This Unit cannot be the target of an ability, unless stated otherwise. It can never Control or Contest Mission Markers."
+        },
+        {
+          "id": "holo_decoy:surprise:3",
+          "name": "Surprise!",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "At the End of the Round, you can set a Friendly Nova Stealth Mode or Nova Assault Mode in Coherency with this Unit."
+        }
+      ]
+    },
+    {
       "id": "jim_raynor",
       "name": "Jim Raynor",
       "faction": "Terran",
@@ -1610,8 +2171,8 @@
       "compositions": [
         {
           "label": "small",
+          "cost": 280,
           "models": 1,
-          "cost": 250,
           "supply": 1
         }
       ],
@@ -1650,7 +2211,7 @@
         },
         {
           "id": "jim_raynor:c-14-rifle:4",
-          "name": "C-14 rifle",
+          "name": "C-14 Rifle",
           "phase": "Assault",
           "range": 12,
           "target": "All",
@@ -1770,14 +2331,14 @@
       "compositions": [
         {
           "label": "small",
-          "cost": 150,
+          "cost": 160,
           "models": 2,
           "supply": 1
         },
         {
           "label": "large",
           "supply": 2,
-          "cost": 280,
+          "cost": 290,
           "models": 4
         }
       ],
@@ -1844,7 +2405,7 @@
           "text": "While this Unit is Within 3\" of a Mission Marker, its Armour characteristic is increased by 1.",
           "upgradeCost": {
             "small": 20,
-            "large": 30
+            "large": 40
           }
         },
         {
@@ -1920,14 +2481,14 @@
         {
           "label": "small",
           "models": 6,
-          "cost": 160,
+          "cost": 170,
           "supply": 1
         },
         {
           "label": "large",
           "supply": 2,
           "models": 9,
-          "cost": 210
+          "cost": 220
         }
       ],
       "squadProfile": [
@@ -2133,7 +2694,7 @@
         {
           "label": "small",
           "models": 3,
-          "cost": 110,
+          "cost": 120,
           "supply": 1
         }
       ],
@@ -2216,8 +2777,8 @@
           "kind": "Passive",
           "text": "When this Unit resolves a Life Support or Medpack ability, treat it as having 1 additional model Within Range for calculating that ability's effects.",
           "upgradeCost": {
-            "small": 30,
-            "large": 30
+            "small": 20,
+            "large": 20
           }
         },
         {
@@ -2240,6 +2801,295 @@
           "cost": {
             "resource": "CP",
             "amount": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "nova_assault_mode",
+      "name": "Nova Assault Mode",
+      "faction": "Terran",
+      "role": "Hero",
+      "tags": [
+        "Biological",
+        "Psionic",
+        "Ground",
+        "Unique"
+      ],
+      "unique": true,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          7,
+          7
+        ],
+        "armour": 5,
+        "hp": 8,
+        "size": 2,
+        "evade": 5,
+        "combatRange": 2
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "supply": 1,
+          "models": 1,
+          "cost": 260
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 1
+        }
+      ],
+      "weapons": [
+        {
+          "id": "nova_assault_mode:hellfire-shotgun:4",
+          "name": "Hellfire Shotgun",
+          "phase": "Assault",
+          "range": 8,
+          "target": "Ground",
+          "roa": 3,
+          "hit": 4,
+          "dmg": 2,
+          "surgeTypes": [
+            "Light"
+          ],
+          "keywords": [
+            {
+              "k": "ANTI-EVADE",
+              "v": 1
+            },
+            {
+              "k": "BURST FIRE",
+              "range": 4,
+              "v": 3
+            }
+          ],
+          "text": "RANGE: 8 | TARGET: Ground | RoA: 3 | HIT: 4+ | DMG: 2\nSURGE: Light (D3)\n\nANTI-EVADE (1), BURST FIRE 4\" (3)",
+          "surgeDie": "D3"
+        },
+        {
+          "id": "nova_assault_mode:monomolecular-blade:7",
+          "name": "Monomolecular Blade",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 8,
+          "hit": 3,
+          "dmg": 1,
+          "surgeTypes": [
+            "Light",
+            "Armoured"
+          ],
+          "keywords": [],
+          "text": "RANGE: E | TARGET: Ground | RoA: 8 | HIT: 3+ | DMG: 1\nSURGE: Light, Armoured (D6)",
+          "surgeDie": "D6"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "nova_assault_mode:battle-preparation:0",
+          "name": "Battle Preparation",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "During Army Building, your army cannot include both the Nova Assault Mode Unit and the Nova Stealth Mode Unit."
+        },
+        {
+          "id": "nova_assault_mode:ghost-visor:1",
+          "name": "Ghost Visor",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "While Enemy Units are Within 6\" of this Unit, they lose the HIDDEN Status."
+        },
+        {
+          "id": "nova_assault_mode:holo-decoy:2",
+          "name": "Holo Decoy",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Resolve the SUMMON (Holo Decoy) effect. Then, Holo Decoy may immediately perform a Move action.",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        },
+        {
+          "id": "nova_assault_mode:super-stimpack:3",
+          "name": "Super Stimpack",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "This Unit gains BUFF Speed (2). Additionally, all its Weapons gain PRECISION (2).",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        },
+        {
+          "id": "nova_assault_mode:phase-reactor-suit:5",
+          "name": "Phase Reactor Suit",
+          "phase": "Assault",
+          "kind": "Active",
+          "text": "If Unengaged, resolve the PLACE (6) effect.",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        },
+        {
+          "id": "nova_assault_mode:devastating-charge:6",
+          "name": "Devastating Charge",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "Immediately after this Unit completes a successful Charge, resolve the IMPACT (4) 4+ effect."
+        }
+      ],
+      "impact": {
+        "dice": 4,
+        "hit": 4
+      }
+    },
+    {
+      "id": "nova_stealth_mode",
+      "name": "Nova Stealth Mode",
+      "faction": "Terran",
+      "role": "Hero",
+      "tags": [
+        "Biological",
+        "Psionic",
+        "Ground",
+        "Unique"
+      ],
+      "unique": true,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          7,
+          7
+        ],
+        "armour": 5,
+        "hp": 8,
+        "size": 2,
+        "evade": 5,
+        "combatRange": 5
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "cost": 240,
+          "models": 1,
+          "supply": 1
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 1
+        }
+      ],
+      "weapons": [
+        {
+          "id": "nova_stealth_mode:c-20a-canister-rifle:5",
+          "name": "C-20A Canister Rifle",
+          "phase": "Assault",
+          "range": 12,
+          "target": "All",
+          "roa": 4,
+          "hit": 3,
+          "dmg": 2,
+          "surgeTypes": [],
+          "keywords": [
+            {
+              "k": "CRITICAL HIT",
+              "v": 2
+            },
+            {
+              "k": "LONG RANGE",
+              "v": 18
+            }
+          ],
+          "text": "RANGE: 12 | TARGET: All | RoA: 4 | HIT: 3+ | DMG: 2\nSURGE: - (-)\n\nCRITICAL HIT (2), LONG RANGE (18\")"
+        },
+        {
+          "id": "nova_stealth_mode:combat-knife:8",
+          "name": "Combat Knife",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 3,
+          "hit": 5,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [
+            {
+              "k": "-"
+            }
+          ],
+          "text": "RANGE: E | TARGET: Ground | RoA: 3 | HIT: 5+ | DMG: 1\nSURGE: -\n\n-"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "nova_stealth_mode:battle-preparation:0",
+          "name": "Battle Preparation",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "During Army Building, your army cannot include both the Nova Assault Mode Unit and the Nova Stealth Mode Unit."
+        },
+        {
+          "id": "nova_stealth_mode:tactical-stealth-suit:1",
+          "name": "Tactical Stealth Suit",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "After this Unit fully resolves an Action, it gains the HIDDEN Status."
+        },
+        {
+          "id": "nova_stealth_mode:ghost-visor:2",
+          "name": "Ghost Visor",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "While Enemy Units are Within 6\" of this Unit, they lose the HIDDEN Status."
+        },
+        {
+          "id": "nova_stealth_mode:super-stimpack:3",
+          "name": "Super Stimpack",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "This Unit gains BUFF Speed (2). Additionally, all its Weapons gain PRECISION (2).",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        },
+        {
+          "id": "nova_stealth_mode:holo-decoy:4",
+          "name": "Holo Decoy",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Resolve the SUMMON (Holo Decoy) effect. Then, Holo Decoy may immediately perform a Move action.",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        },
+        {
+          "id": "nova_stealth_mode:operational-efficiency:6",
+          "name": "Operational Efficiency",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "After this Unit fully resolves a Ranged Attack with its C-20A Canister Rifle, if the target Enemy Unit was Destroyed or its Current Supply Value was reduced, the active player may return one of their Exhausted non-Unique Tactical Cards to its Ready state."
+        },
+        {
+          "id": "nova_stealth_mode:head-shot:7",
+          "name": "Head Shot",
+          "phase": "Assault",
+          "kind": "Reaction",
+          "text": "Once Per Game. While this Unit is Unengaged and has the Stationary Status, when it makes a Ranged Attack with its C-20A Canister Rifle, treat that weapon's Damage characteristic as 3, and it gains CONCENTRATED FIRE (1).",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
           }
         }
       ]
@@ -2303,6 +3153,139 @@
         }
       ],
       "subFaction": "Raynor's Raiders"
+    },
+    {
+      "id": "raven",
+      "name": "Raven",
+      "faction": "Terran",
+      "role": "Air",
+      "tags": [
+        "Light",
+        "Mechanical",
+        "Flying"
+      ],
+      "unique": false,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          7,
+          7
+        ],
+        "armour": 5,
+        "hp": 8,
+        "size": 0,
+        "evade": 6,
+        "combatRange": 4
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "supply": 1,
+          "cost": 170,
+          "models": 1
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 1
+        }
+      ],
+      "weapons": [
+        {
+          "id": "raven:railguns:6",
+          "name": "Railguns",
+          "phase": "Assault",
+          "range": 12,
+          "target": "Ground",
+          "roa": 4,
+          "hit": 3,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [],
+          "text": "RANGE: 12'' | TARGET: Ground | RoA: 4 | HIT: 3+ | DMG: 1\nSURGE: -"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "raven:detection:0",
+          "name": "Detection",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "While Enemy Units are Within 6\" of this Unit, they lose the HIDDEN Status."
+        },
+        {
+          "id": "raven:corvid-reactor:1",
+          "name": "Corvid Reactor",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "This Unit may resolve its first Special Ability with the CP cost reduced by 1 if it targets the closest Enemy Unit.",
+          "upgradeCost": {
+            "small": 30,
+            "large": 30
+          }
+        },
+        {
+          "id": "raven:internal-tech-module:2",
+          "name": "Internal Tech Module",
+          "phase": "Movement",
+          "kind": "Passive",
+          "text": "When this Unit is nominated to deploy from Reserves, it may Deploy from any table edge that is not a player's Entry Edge. This Unit cannot be set Within 8\" of any Enemy model.",
+          "upgradeCost": {
+            "small": 20,
+            "large": 20
+          }
+        },
+        {
+          "id": "raven:deploy-auto-turret:3",
+          "name": "Deploy Auto-Turret",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Set a Friendly Auto-Turret Unit Within 6\", and not Within the Engagement Range of any Enemy Unit.",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        },
+        {
+          "id": "raven:anti-armour-missile:4",
+          "name": "Anti-Armour Missile",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Select one Enemy Unit Within 12\". Apply DEBUFF Armour (1).",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        },
+        {
+          "id": "raven:seeker-missile:5",
+          "name": "Seeker Missile",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Select one Enemy Unit Within 12\". At the End of the Assault Phase, if that Enemy Unit has the Stationary Status or it is Within 8'' of this Unit, it suffers HITS 4 (2). If that Unit is Engaged, it is eligible to make an Evade Roll against these hits.",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          },
+          "upgradeCost": {
+            "small": 20,
+            "large": 20
+          }
+        },
+        {
+          "id": "raven:explosive-shrapnel-shells:7",
+          "name": "Explosive Shrapnel Shells",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "The Gauss Cannon of the Auto-Turret set by this Unit gains Surge Type: Light and S-Dice: D3+1.",
+          "upgradeCost": {
+            "small": 10,
+            "large": 10
+          }
+        }
+      ]
     },
     {
       "id": "raynor_s_raider__marine_",
@@ -2415,6 +3398,58 @@
         }
       ],
       "subFaction": "Raynor's Raiders"
+    },
+    {
+      "id": "sabotage_drone",
+      "name": "Sabotage Drone",
+      "faction": "Terran",
+      "role": "Other",
+      "tags": [
+        "Armoured",
+        "Mechanical",
+        "Ground"
+      ],
+      "unique": false,
+      "summoned": true,
+      "stats": {
+        "speed": null,
+        "armour": 6,
+        "hp": 3,
+        "size": 1,
+        "evade": 6
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "supply": 0,
+          "cost": 0,
+          "models": 1
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 0
+        }
+      ],
+      "weapons": [],
+      "abilities": [
+        {
+          "id": "sabotage_drone:structure:0",
+          "name": "Structure",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "This Unit cannot be Activated in any Phase and cannot perform actions. Additionally, its Current Supply Value is treated as 0, and it can never Control or Contest Mission Markers, ignoring the standard Zero Supply Exception. This Unit cannot be a target of an ability, unless stated otherwise."
+        },
+        {
+          "id": "sabotage_drone:have-a-nice-day:1",
+          "name": "Have a Nice Day",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "At the End of the Assault Phase, target each Unit Within 3\" of this Unit (including Units with the Structure ability) suffers HITS 5 (1). If an affected Unit has the Structure ability, that Unit suffers an additional HITS 5 (1)."
+        }
+      ]
     },
     {
       "id": "siege_tank",
@@ -2619,6 +3654,246 @@
       }
     },
     {
+      "id": "spec_ops_marauder__marauder_",
+      "name": "Spec Ops Marauder (Marauder)",
+      "faction": "Terran",
+      "role": "Core",
+      "tags": [
+        "Armoured",
+        "Biological",
+        "Ground"
+      ],
+      "unique": false,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          4,
+          7
+        ],
+        "armour": 4,
+        "hp": 5,
+        "size": 2,
+        "evade": 6,
+        "combatRange": 5
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "supply": 1,
+          "cost": 240,
+          "models": 2
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 0
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "supply": 1
+        }
+      ],
+      "weapons": [
+        {
+          "id": "spec_ops_marauder__marauder_:quad-k12:2",
+          "name": "Quad K12",
+          "phase": "Assault",
+          "range": 12,
+          "target": "Ground",
+          "roa": 3,
+          "hit": 3,
+          "dmg": 1,
+          "surgeTypes": [
+            "Armoured"
+          ],
+          "keywords": [
+            {
+              "k": "LONG RANGE",
+              "v": 16
+            },
+            {
+              "k": "PIERCE",
+              "tag": "Armoured",
+              "v": 2
+            }
+          ],
+          "text": "RANGE: 12 | TARGET: Ground | RoA: 3 | HIT: 3+ | DMG: 1\nSURGE: Armoured (D3)\n\nLONG RANGE (16\"), PIERCE Armoured (2)",
+          "surgeDie": "D3"
+        },
+        {
+          "id": "spec_ops_marauder__marauder_:strike:5",
+          "name": "Strike",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 3,
+          "hit": 4,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [],
+          "text": "RANGE: E | TARGET: Ground | RoA: 3 | HIT: 4+ | DMG: 1\nSURGE: -"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "spec_ops_marauder__marauder_:spec-ops-armour:0",
+          "name": "Spec Ops Armour",
+          "phase": "Any",
+          "kind": "Active",
+          "text": "This Unit gains the HIDDEN Status until it performs another action.",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        },
+        {
+          "id": "spec_ops_marauder__marauder_:commando-stimpack:1",
+          "name": "Commando Stimpack",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "This Unit gains BUFF Speed (3). Additionally, its Quad K12 and all Close Combat Weapons gain PRECISION (2).",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        },
+        {
+          "id": "spec_ops_marauder__marauder_:magrail-munitions:3",
+          "name": "Magrail Munitions",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "This Unit's first Attack in the game with its Quad K12 gains PIERCE Armoured (3)."
+        },
+        {
+          "id": "spec_ops_marauder__marauder_:suppression-shells:4",
+          "name": "Suppression Shells",
+          "phase": "Assault",
+          "kind": "Reaction",
+          "text": "When an Enemy declares a Charge against a Friendly Unit Within 8\", that Enemy gains DEBUFF Speed (3).",
+          "cost": {
+            "resource": "CP",
+            "amount": 1
+          }
+        }
+      ],
+      "subFaction": "Nova Covert Ops"
+    },
+    {
+      "id": "bile_launcher",
+      "name": "Bile Launcher",
+      "faction": "Zerg",
+      "role": "Support",
+      "tags": [
+        "Armoured",
+        "Biological",
+        "Ground",
+        "Unique"
+      ],
+      "unique": true,
+      "summoned": false,
+      "stats": {
+        "speed": null,
+        "armour": 4,
+        "hp": 10,
+        "size": 3,
+        "combatRange": 5
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "models": 1,
+          "cost": 150,
+          "supply": 1
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 1
+        }
+      ],
+      "weapons": [
+        {
+          "id": "bile_launcher:bile-bomb:6",
+          "name": "Bile Bomb",
+          "phase": "Assault",
+          "range": 12,
+          "target": "Ground",
+          "roa": 6,
+          "hit": 3,
+          "dmg": 1,
+          "surgeTypes": [
+            "Light",
+            "Armoured"
+          ],
+          "keywords": [
+            {
+              "k": "PIERCE",
+              "tag": "Armoured",
+              "v": 2
+            },
+            {
+              "k": "PINPOINT"
+            }
+          ],
+          "text": "RANGE: 12 | TARGET: Ground | RoA: 6 | HIT: 3+ | DMG: 1\nSURGE: Light, Armoured (D3)\n\nPIERCE Armoured (2), PINPOINT",
+          "surgeDie": "D3"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "bile_launcher:biological-structure:0",
+          "name": "Biological Structure",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "This Unit cannot gain the BURROWED Status, cannot be returned to Reserves, and is immune to the IMPACT keyword."
+        },
+        {
+          "id": "bile_launcher:source-of-creep:1",
+          "name": "Source of Creep",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "A Friendly or Enemy Ground Zerg Unit Within 6\" of this Unit, counts as being ON CREEP."
+        },
+        {
+          "id": "bile_launcher:detection:2",
+          "name": "Detection",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "While Enemy Units are Within 6\" of this Unit, they lose the HIDDEN Status."
+        },
+        {
+          "id": "bile_launcher:burrow-ambush:3",
+          "name": "Burrow Ambush",
+          "phase": "Movement",
+          "kind": "Passive",
+          "text": "When this Unit is nominated to deploy from the Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be set Within 10\" of any Enemy model. This Unit's Activation ends."
+        },
+        {
+          "id": "bile_launcher:bombard:4",
+          "name": "Bombard",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Set a Bile Bomb token on the battlefield Within 24\" of this Unit. When this Unit resolves a Ranged Attack using the Bile Bomb weapon profile this Round, it may choose to ignore the weapon's standard Range characteristic. If it does, it may target an Enemy Unit that is Within 3\" of that token (Line of Sight is not required), ignoring the HIDDEN Status. After the attack is fully resolved, remove the Bile Bomb token from the battlefield. When the Bile Bomb token is about to be removed, set a Creep Tumor token in base-to-base contact with it. The Bile Bomb token has DISPLACEMENT.",
+          "cost": {
+            "resource": "BM",
+            "amount": 1
+          }
+        },
+        {
+          "id": "bile_launcher:indomitable:5",
+          "name": "Indomitable",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "While Engaged, this Unit may target and be targeted by Unengaged Enemy Units. In both cases, the defending Unit gains an Evade Roll against those attacks."
+        }
+      ]
+    },
+    {
       "id": "corpser__roach_",
       "name": "Corpser (Roach)",
       "faction": "Zerg",
@@ -2645,7 +3920,7 @@
         {
           "label": "small",
           "models": 3,
-          "cost": 240,
+          "cost": 220,
           "supply": 1
         }
       ],
@@ -2748,8 +4023,8 @@
             "amount": 1
           },
           "upgradeCost": {
-            "small": 20,
-            "large": 20
+            "small": 10,
+            "large": 10
           }
         },
         {
@@ -2780,6 +4055,154 @@
       ],
       "impact": {
         "dice": 3,
+        "hit": 4
+      }
+    },
+    {
+      "id": "defiler",
+      "name": "Defiler",
+      "faction": "Zerg",
+      "role": "Support",
+      "tags": [
+        "Biological",
+        "Light",
+        "Psionic",
+        "Ground"
+      ],
+      "unique": false,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          7,
+          7
+        ],
+        "armour": 5,
+        "hp": 8,
+        "size": 2,
+        "evade": 5,
+        "combatRange": 2
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "supply": 1,
+          "models": 1,
+          "cost": 160
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 1
+        }
+      ],
+      "weapons": [
+        {
+          "id": "defiler:claws:6",
+          "name": "Claws",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 4,
+          "hit": 3,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [],
+          "text": "RANGE: E | TARGET: Ground | RoA: 4 | HIT: 3+ | DMG: 1\nSURGE: - (-)"
+        },
+        {
+          "id": "defiler:cancerous-bite:7",
+          "name": "Cancerous Bite",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 2,
+          "hit": 3,
+          "dmg": 2,
+          "surgeTypes": [],
+          "keywords": [
+            {
+              "k": "CRITICAL HIT",
+              "v": 1
+            },
+            {
+              "k": "SIDEARM"
+            }
+          ],
+          "text": "RANGE: E | TARGET: Ground | RoA: 2 | HIT: 3+ | DMG: 2\nSURGE: - (-)\n\nCRITICAL HIT (1), SIDEARM",
+          "upgradeCost": {
+            "small": 20,
+            "large": 20
+          }
+        }
+      ],
+      "abilities": [
+        {
+          "id": "defiler:consume:0",
+          "name": "Consume",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "When this Unit resolves a Special Ability that costs BM, it can remove one model from a Friendly Unit Within 4\" to generate 1 BM to spend towards that ability’s cost."
+        },
+        {
+          "id": "defiler:gestate-dark-swarm:1",
+          "name": "Gestate Dark Swarm",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Set a Dark Swarm token in an unoccupied space Within 4\" and Line of Sight of this Unit. The Dark Swarm token has DISPLACEMENT.",
+          "cost": {
+            "resource": "BM",
+            "amount": 0
+          }
+        },
+        {
+          "id": "defiler:burrow-ambush:2",
+          "name": "Burrow Ambush",
+          "phase": "Movement",
+          "kind": "Passive",
+          "text": "When this Unit is nominated to deploy from Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be placed Within 10\" of any Enemy model. This Unit's Activation ends.",
+          "upgradeCost": {
+            "small": 20,
+            "large": 20
+          }
+        },
+        {
+          "id": "defiler:dark-swarm:3",
+          "name": "Dark Swarm",
+          "phase": "Assault",
+          "kind": "Reaction",
+          "text": "REPEATABLE. Use when a Friendly Unit Within 4\" of a Friendly Dark Swarm token is selected as the target of an attack. If this Unit is Within 4'' of the same token, the Targeted Friendly Unit is eligible to make an Evade Roll against that attack. If the targeted Unit is a Size 1, it gains a +1 Modifier to this Evade Roll.",
+          "cost": {
+            "resource": "BM",
+            "amount": 1
+          }
+        },
+        {
+          "id": "defiler:plague:4",
+          "name": "Plague",
+          "phase": "Assault",
+          "kind": "Active",
+          "text": "You may spend 1 to 3 BM to activate this ability. Set a Plague Blast Template Wholly Within 10\" and Line of Sight of this Unit. For each Unit that has at least one model whose base is partially covered by the template, roll 2 dice, plus 1 additional die for each model in that Unit whose base is partially covered. That Unit loses its HIDDEN Status, and, depending on the BM spent, it suffers NON-LETHAL DAMAGE (1) for:\n1 BM: each result of 5+.\n2 BM: each result of 4+.\n3 BM: each result of 3+.",
+          "cost": {
+            "resource": "BM",
+            "amount": "X"
+          },
+          "upgradeCost": {
+            "small": 20,
+            "large": 20
+          }
+        },
+        {
+          "id": "defiler:devastating-charge:5",
+          "name": "Devastating Charge",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "Immediately after this Unit completes a successful Charge, resolve the IMPACT (4) 4+ effect."
+        }
+      ],
+      "impact": {
+        "dice": 4,
         "hit": 4
       }
     },
@@ -2885,7 +4308,7 @@
           "text": "This Unit gains TOUGH (1) on the first Armour Roll of each Activation.",
           "upgradeCost": {
             "small": 20,
-            "large": 40
+            "large": 30
           }
         },
         {
@@ -2896,7 +4319,7 @@
           "text": "If this Unit has Stationary Status, it is eligible to make an Evade Roll against the first Ranged Attack targeting it this Round. If this Unit is ON CREEP, it gains +1 Modifier to this Evade Roll.",
           "upgradeCost": {
             "small": 10,
-            "large": 20
+            "large": 10
           }
         },
         {
@@ -2929,7 +4352,7 @@
           "text": "This Unit's Needle Spines ranged weapon gains LONG RANGE (16\").",
           "upgradeCost": {
             "small": 20,
-            "large": 40
+            "large": 30
           }
         }
       ]
@@ -3092,7 +4515,7 @@
         {
           "label": "small",
           "supply": 1,
-          "cost": 250,
+          "cost": 230,
           "models": 6
         }
       ],
@@ -3275,7 +4698,7 @@
         {
           "label": "small",
           "supply": 1,
-          "cost": 150,
+          "cost": 140,
           "models": 1
         }
       ],
@@ -3441,14 +4864,14 @@
         {
           "label": "small",
           "supply": 1,
-          "cost": 240,
+          "cost": 210,
           "models": 12
         },
         {
           "label": "large",
           "supply": 2,
           "models": 18,
-          "cost": 300
+          "cost": 260
         }
       ],
       "squadProfile": [
@@ -3852,8 +5275,8 @@
             "amount": 1
           },
           "upgradeCost": {
-            "small": 20,
-            "large": 20
+            "small": 10,
+            "large": 10
           }
         },
         {
@@ -3977,7 +5400,7 @@
         {
           "label": "small",
           "models": 18,
-          "cost": 260,
+          "cost": 210,
           "supply": 1
         }
       ],
@@ -4088,7 +5511,7 @@
       "compositions": [
         {
           "label": "small",
-          "cost": 200,
+          "cost": 190,
           "models": 3,
           "supply": 1
         }
@@ -4189,8 +5612,8 @@
             "amount": 1
           },
           "upgradeCost": {
-            "small": 20,
-            "large": 20
+            "small": 10,
+            "large": 10
           }
         },
         {
@@ -4225,6 +5648,274 @@
       }
     },
     {
+      "id": "vileling__zergling_",
+      "name": "Vileling (Zergling)",
+      "faction": "Zerg",
+      "role": "Core",
+      "tags": [
+        "Biological",
+        "Light",
+        "Ground"
+      ],
+      "unique": false,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          4,
+          8
+        ],
+        "armour": 6,
+        "hp": 1,
+        "size": 1,
+        "evade": 5,
+        "combatRange": 1
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "cost": 180,
+          "supply": 2,
+          "models": 18
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 6,
+          "supply": 1
+        },
+        {
+          "min": 7,
+          "max": 18,
+          "supply": 2
+        }
+      ],
+      "weapons": [
+        {
+          "id": "vileling__zergling_:claws:6",
+          "name": "Claws",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 2,
+          "hit": 5,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [],
+          "text": "RANGE: E | TARGET: Ground | RoA: 2 | HIT: 5+ | DMG: 1\nSURGE: -"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "vileling__zergling_:squadron:0",
+          "name": "Squadron",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "This Unit’s Horizontal Coherency is 4\"."
+        },
+        {
+          "id": "vileling__zergling_:burrow-ambush:1",
+          "name": "Burrow Ambush",
+          "phase": "Movement",
+          "kind": "Passive",
+          "text": "When this Unit is nominated to deploy from the Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be set Within 10\" of any Enemy model. This Unit's Activation ends."
+        },
+        {
+          "id": "vileling__zergling_:zergling-reconstitution:2",
+          "name": "Zergling Reconstitution",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Resolve the RESPAWN (2) effect, or RESPAWN (3) if the Unit is ON CREEP.",
+          "cost": {
+            "resource": "BM",
+            "amount": 1
+          }
+        },
+        {
+          "id": "vileling__zergling_:metabolic-boost:3",
+          "name": "Metabolic Boost",
+          "phase": "Assault",
+          "kind": "Active",
+          "text": "When determining Charge Distance for this Unit, roll 2D6 instead of D6 and use the higher result to add to the Unit’s Speed characteristic.",
+          "cost": {
+            "resource": "BM",
+            "amount": 1
+          }
+        },
+        {
+          "id": "vileling__zergling_:devastating-charge:4",
+          "name": "Devastating Charge",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "Immediately after this Unit completes a successful Charge, resolve the IMPACT (1) 5+ effect."
+        },
+        {
+          "id": "vileling__zergling_:debilitating-claws:5",
+          "name": "Debilitating Claws",
+          "phase": "Combat",
+          "kind": "Passive",
+          "text": "After an Enemy Unit suffers Damage from this Unit, apply DEBUFF Hit (1) to each of that Unit's Weapons."
+        }
+      ],
+      "subFaction": "Zagara's Swarm",
+      "impact": {
+        "dice": 1,
+        "hit": 5
+      }
+    },
+    {
+      "id": "zagara",
+      "name": "Zagara",
+      "faction": "Zerg",
+      "role": "Hero",
+      "tags": [
+        "Biological",
+        "Psionic",
+        "Ground",
+        "Unique"
+      ],
+      "unique": true,
+      "summoned": false,
+      "stats": {
+        "speed": [
+          7,
+          7
+        ],
+        "armour": 4,
+        "hp": 10,
+        "size": 3,
+        "evade": 6,
+        "combatRange": 3
+      },
+      "compositions": [
+        {
+          "label": "small",
+          "models": 1,
+          "supply": 1,
+          "cost": 250
+        }
+      ],
+      "squadProfile": [
+        {
+          "min": 1,
+          "max": 1,
+          "supply": 1
+        }
+      ],
+      "weapons": [
+        {
+          "id": "zagara:zagaras-talons:6",
+          "name": "Zagara's Talons",
+          "phase": "Assault",
+          "range": 8,
+          "target": "Ground",
+          "roa": 4,
+          "hit": 3,
+          "dmg": 2,
+          "surgeTypes": [
+            "Light",
+            "Armoured"
+          ],
+          "keywords": [],
+          "text": "RANGE: 8 | TARGET: Ground | RoA: 4 | HIT: 3+ | DMG: 2\nSURGE: Light, Armoured (D3)",
+          "surgeDie": "D3"
+        },
+        {
+          "id": "zagara:zagaras-acid-spines:7",
+          "name": "Zagara's Acid Spines",
+          "phase": "Assault",
+          "range": 14,
+          "target": "Flying",
+          "roa": 8,
+          "hit": 3,
+          "dmg": 1,
+          "surgeTypes": [
+            "Light",
+            "Armoured"
+          ],
+          "keywords": [],
+          "text": "RANGE: 14 | TARGET: Flying | RoA: 8 | HIT: 3+ | DMG: 1\nSURGE: Light, Armoured (D3)",
+          "surgeDie": "D3"
+        },
+        {
+          "id": "zagara:talons:9",
+          "name": "Talons",
+          "phase": "Combat",
+          "range": "E",
+          "target": "Ground",
+          "roa": 4,
+          "hit": 3,
+          "dmg": 1,
+          "surgeTypes": [],
+          "keywords": [],
+          "text": "RANGE: E | TARGET: Ground | RoA: 4 | HIT: 3+ | DMG: 1\nSURGE: -"
+        }
+      ],
+      "abilities": [
+        {
+          "id": "zagara:commander:0",
+          "name": "Commander",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "Treat this Unit’s Supply characteristic as increased by 1 for Controlling and Contesting Mission Markers, completing objectives, and resolving Disengage checks."
+        },
+        {
+          "id": "zagara:transfusion:1",
+          "name": "Transfusion",
+          "phase": "Any",
+          "kind": "Reaction",
+          "text": "Use when another Friendly Biological Unit (including a Structure) suffers Damage Within 4\". Reduce the Total Damage before allocation by 2.",
+          "cost": {
+            "resource": "BM",
+            "amount": 1
+          }
+        },
+        {
+          "id": "zagara:psionic-link:2",
+          "name": "Psionic Link",
+          "phase": "Any",
+          "kind": "Passive",
+          "text": "Once per Round, if there are at least 7 Friendly models Within 6\" of this Unit, it may resolve its Special Ability with the BM cost reduced by 1."
+        },
+        {
+          "id": "zagara:broodmother:3",
+          "name": "Broodmother",
+          "phase": "Movement",
+          "kind": "Active",
+          "text": "Apply one of the following effects to all Friendly units (Line of Sight is not required). You cannot apply the effect chosen in the previous Game Round:\n\nUnits of Size 1 gain a +1 Modifier to all IMPACT Rolls.\n\nAll weapons of Size 2 Units gain CRITICAL HIT (1).\n\nUnits of Size 3 or more gain TOUGH (1).",
+          "cost": {
+            "resource": "BM",
+            "amount": 1
+          }
+        },
+        {
+          "id": "zagara:infested-drop:4",
+          "name": "Infested Drop",
+          "phase": "Movement",
+          "kind": "Passive",
+          "text": "The base of the Zagara counts as an Entry Edge. Each Round, Friendly Units with a combined Supply cost of 1 may be Deployed via this Entry Edge."
+        },
+        {
+          "id": "zagara:indomitable:5",
+          "name": "Indomitable",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "While Engaged, this Unit may target and be targeted by Unengaged Enemy Units. In both cases, the defending Unit gains an Evade Roll against those attacks."
+        },
+        {
+          "id": "zagara:devastating-charge:8",
+          "name": "Devastating Charge",
+          "phase": "Assault",
+          "kind": "Passive",
+          "text": "Immediately after this Unit completes a successful Charge, resolve the IMPACT (6) 3+ effect."
+        }
+      ],
+      "impact": {
+        "dice": 6,
+        "hit": 3
+      }
+    },
+    {
       "id": "zergling",
       "name": "Zergling",
       "faction": "Zerg",
@@ -4251,12 +5942,12 @@
         {
           "label": "small",
           "supply": 1,
-          "cost": 180,
+          "cost": 150,
           "models": 12
         },
         {
           "label": "large",
-          "cost": 220,
+          "cost": 210,
           "supply": 2,
           "models": 18
         }

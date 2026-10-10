@@ -82,6 +82,12 @@ export interface AiDebuff {
   sentenced?: boolean;
   /** Void Prison and the like: the unit's Speed is reduced while it stays where it is. */
   speedMod?: number;
+  /** Seeker Missile: the Raven that fired it. At the End of the Assault Phase it hits if the unit is Stationary or Within 8" of that Raven. */
+  seekerFrom?: string;
+  /** Mark for Death: the first weapon each Friendly Unit uses against it gains CRITICAL HIT (1) and PRECISION (1). */
+  markedForDeath?: boolean;
+  /** Feedback: NON-LETHAL DAMAGE (3) after each Active or Reaction ability it resolves this Round. */
+  feedback?: boolean;
 }
 
 export interface AiArmy {

@@ -22,7 +22,7 @@ describe('collection', () => {
     expect(ids).toContain('marine');
     expect(ids).not.toContain('raynor_s_raider__marine_');
     expect(ids).not.toContain('vile__roach_');
-    expect(unitsFromModel('zergling').map((u) => u.id).sort()).toEqual(['kerrigan_swarm_raptor__zergling_', 'raptor__zergling_', 'swarmling__zergling_', 'zergling']);
+    expect(unitsFromModel('zergling').map((u) => u.id).sort()).toEqual(['kerrigan_swarm_raptor__zergling_', 'raptor__zergling_', 'swarmling__zergling_', 'vileling__zergling_', 'zergling']);
   });
 
   it('owning a model lets you field every unit built from it', () => {

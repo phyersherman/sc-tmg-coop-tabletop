@@ -542,12 +542,9 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 
 /* The table itself: everything under the strips scrolls as one. */
 .tt-map { position: absolute; top: 108px; left: 0; right: 0; bottom: 0; overflow-y: auto; padding: 22px 28px 40px; display: flex; flex-direction: column; gap: 26px; }
-.tt-stage { display: flex; flex-direction: column; gap: 14px; min-width: 0; max-width: 1100px; }
-.tt-stage:not(:has(> .tt-tray, > .combat-tray, > .rewards, .tt-now > *, .tt-rolls > *)) { display: none; }
-/* The AI's dice, rolled in the tray above the cards: one plate, its red edge the AI's. */
-.tt-rolls:empty { display: none; }
-.tt-rolls { display: grid; gap: 8px; padding: 12px 16px; background: rgba(20, 26, 39, 0.9); border: 1px solid var(--line-2); border-left: 2px solid var(--red-edge); }
-.tt-rolls > .panel { margin: 0; }
+.tt-stage { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.tt-stage > :not(.tt-staged) { max-width: 1100px; }
+.tt-stage:not(:has(> .tt-tray, > .combat-tray, > .rewards, > .tt-staged, .tt-now > *)) { display: none; }
 .tt-now { display: flex; flex-direction: column; gap: 14px; }
 .tt-now:empty { display: none; }
 .tt-now > * { animation: tt-in 0.2s ease-out; }
@@ -586,26 +583,38 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .tt-more { background: none; border: none; padding: 0; margin: 10px 0 2px; color: var(--cyan-2); font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .tt-more:hover { color: #fff; }
 
-/* The deal: the AI's order lands on the acting Unit's card, which spans two slots while it carries it. The order is
-   the Unit's own card grown: its name, the action card, the roll, the one light button. */
-.eb-tile.dealing { order: -1; opacity: 1; transform: translateY(-6px); border-color: rgba(226, 59, 59, 0.75); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); }
-.eb-tile.dealing .eb-tile-top { border-bottom: 1px solid rgba(226, 59, 59, 0.35); }
-.eb-deal > * { animation: deal-land 0.32s cubic-bezier(0.2, 0.9, 0.2, 1) both; }
-@keyframes deal-land { from { opacity: 0; transform: translateY(-18px) rotate(-1.2deg) scale(1.02); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .eb-deal > * { animation-duration: 0.01s; } }
-.eb-deal .panel.cmd { padding: 0; margin: 0; border: 0; background: none; --bracket: transparent; }
-.eb-deal .panel.cmd::before, .eb-deal .panel.cmd::after { display: none; }
-/* The Unit's card already names it: the order's own heading stays for screen readers only. */
-.eb-deal .cmd .cmd-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.cmd-face { display: none; }
-.eb-deal .cmd > :not(.cmd-head):first-of-type, .eb-deal .cmd > .ac-full:first-of-type { margin-top: 12px; }
-.eb-deal .cmd > .stack, .eb-deal .cmd > .row, .eb-deal .cmd > .panel, .eb-deal .cmd > .charge-roll, .eb-deal .cmd > .order-lines { margin-left: 16px; margin-right: 16px; }
-.eb-deal .cmd > .row:last-child, .eb-deal .cmd > .order-lines:last-child, .eb-deal .cmd > .cmd-more { margin-bottom: 16px; }
-.eb-deal .cmd .cmd-sub { padding: 0 16px; font-size: 17px; }
-.eb-deal .cmd .ask { font-size: 17px; max-width: 64ch; }
-.eb-deal .cmd .ac-full { margin: 8px 16px 12px; padding: 14px 16px 16px; border: 1px solid rgba(226, 59, 59, 0.45); background: linear-gradient(180deg, rgba(226, 59, 59, 0.08), rgba(226, 59, 59, 0.02)), rgba(9, 9, 24, 0.6); }
-.eb-deal .btn-lg, .tt-now .btn-lg { min-height: 58px; font-size: 15px; padding: 12px 26px; }
-.eb-deal .tt-takeback { margin: 0 16px 14px; }
+/* The acting Unit: its whole card up on the stage, across the table's width. Its face runs along the top, its order
+   under it, and the dice tray under that, every die and every answer to them in one plate. */
+.tt-staged { width: 100%; min-width: 0; border-color: rgba(226, 59, 59, 0.75); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); will-change: transform; }
+.tt-staged:hover, .tt-staged:focus-within { border-color: rgba(226, 59, 59, 0.75); }
+.eb-face-row.wide { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; border-bottom: 1px solid rgba(226, 59, 59, 0.35); }
+.eb-face-row.wide .eb-tile-top { flex: 1 1 640px; grid-template-columns: 96px minmax(180px, 1fr) auto; grid-template-rows: auto auto; align-items: start; gap: 8px 24px; padding: 16px 20px 14px; }
+.eb-face-row.wide .eb-face.photo { grid-row: 1 / span 2; width: 96px; height: 124px; border-color: var(--red-edge); }
+.eb-face-row.wide .eb-face:not(.photo) { grid-row: 1 / span 2; }
+.eb-face-row.wide .eb-name b { font-size: 18px; }
+.eb-face-row.wide .eb-name span { font-size: 14px; }
+.eb-face-row.wide .eb-models { grid-column: 2; grid-row: 2; align-self: start; }
+.eb-face-row.wide .eb-stats { grid-column: 3; grid-row: 1; margin: 0; column-gap: 28px; }
+.eb-face-row.wide .eb-stats dd { font-size: 26px; }
+.eb-face-row.wide .eb-flags { grid-column: 3; grid-row: 2; }
+.eb-face-row.wide .eb-quick { padding: 16px 20px 12px; }
+.cmd-order { padding: 14px 20px 6px; animation: tt-in 0.25s ease-out both; }
+.cmd-order .ac-full { margin: 0 0 12px; padding: 14px 18px 16px; border: 1px solid rgba(226, 59, 59, 0.45); background: linear-gradient(180deg, rgba(226, 59, 59, 0.08), rgba(226, 59, 59, 0.02)), rgba(9, 9, 24, 0.6); }
+.cmd-order .ask { font-size: 18px; margin: 6px 0 8px; line-height: 1.45; max-width: 80ch; }
+.cmd-order .cmd-verb { margin: 0 0 4px; font-size: 20px; letter-spacing: 0.06em; }
+.cmd-order .cmd-sub { font-size: 18px; margin: 0 0 6px; }
+.cmd-order .cmd-more { margin: 4px 0 8px; }
+.cmd-tray { display: flex; flex-direction: column; gap: 10px; margin: 6px 20px 18px; padding: 14px 18px; background: rgba(20, 26, 39, 0.9); border: 1px solid var(--line-2); border-left: 2px solid var(--red-edge); animation: tt-in 0.25s ease-out both; }
+.cmd-tray > .panel { margin: 0 !important; }
+.cmd-tray .ask { font-size: 17px; margin: 0; }
+.cmd-tray .charge-roll { margin: 0; }
+.cmd-actions { gap: 10px; }
+.cmd-actions:empty { display: none; }
+.tt-staged .btn-lg, .tt-now .btn-lg { min-height: 58px; font-size: 15px; padding: 12px 26px; }
+.tt-staged > .tt-card, .tt-staged > .tt-takeback { margin: 0 20px 16px; }
+.tt-staged > .tt-card { padding: 14px 0 0; background: none; border: 0; }
+.tt-staged > .tt-card::before, .tt-staged > .tt-card::after { display: none; }
+@media (prefers-reduced-motion: reduce) { .cmd-order, .cmd-tray { animation-duration: 0.01s; } }
 
 /* ---------------------------------------------------------------- Action cards: numbered steps, one mark */
 .ac { border-top: 1px solid var(--line); background: linear-gradient(180deg, rgba(226, 59, 59, 0.07), rgba(226, 59, 59, 0.02)); padding: 10px 14px 12px; }
@@ -642,7 +651,6 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 .eb-head h2 { margin: 0; font-size: 13px; letter-spacing: 0.16em; color: var(--red-side); }
 .eb-reserves, .eb-hint { color: var(--muted); font-size: 14px; }
 .eb-empty { color: var(--muted); font-size: 17px; }
-/* The acting card leads the row, and the rest pack in behind it with no hole. */
 .eb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); grid-auto-flow: row dense; gap: 16px; align-items: start; }
 /* Every card one size, as tall as the tallest (EnemyBoard measures it); only a card opened to enter damage grows. */
 .eb-tile:not(.selected) { min-height: var(--eb-h, 0px); }
@@ -654,7 +662,6 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 /* Under the pointer a card comes up to full strength and takes the cyan edge: this is the one a click opens. */
 .eb-tile:hover, .eb-tile:focus-within { opacity: 1; border-color: rgba(95, 211, 245, 0.6); }
 .eb-tile:hover .eb-tile-top { background: rgba(95, 211, 245, 0.05); }
-.eb-tile.active { opacity: 1; transform: translateY(-6px); border-color: rgba(226, 59, 59, 0.75); box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55); }
 .eb-tile.last { opacity: 1; border-color: rgba(226, 59, 59, 0.55); }
 .eb-tile.selected { opacity: 1; --bracket: var(--cyan); border-color: rgba(95, 211, 245, 0.6); }
 .eb-tile-top { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 68px 1fr; gap: 6px 14px; padding: 14px 16px 12px; cursor: pointer; }
@@ -664,7 +671,6 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
 /* The painted model: a portrait crop of the card's photo, framed like the site's product shots. */
 .eb-face.photo { width: 68px; height: 88px; overflow: hidden; border-color: var(--line-2); }
 .eb-face.photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; image-rendering: auto; }
-.eb-tile.active .eb-face.photo, .eb-tile.dealing .eb-face.photo { border-color: var(--red-edge); }
 .eb-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .eb-name b { font-family: var(--font-head); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; line-height: 1.3; text-wrap: balance; }
 .eb-name span { color: var(--muted); font-size: 12px; }
@@ -716,10 +722,13 @@ kbd { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; text-tr
   .tt-map { top: 96px; padding: 12px 12px 24px; gap: 20px; }
   .tt-card h2 { font-size: 18px; }
   .ac-full .ac-step { font-size: 17px; grid-template-columns: 28px 24px 1fr; }
-  .ac-full .ac-detail, .tt-card > p, .eb-deal .cmd .ask { font-size: 15px; }
-  .eb-deal .ac-full .ac-reminders { display: none; }
-  .eb-deal .cmd .cmd-head, .eb-deal .cmd .cmd-sub { padding-left: 12px; padding-right: 12px; }
-  .eb-deal .cmd > .stack, .eb-deal .cmd > .row, .eb-deal .cmd > .panel, .eb-deal .cmd > .charge-roll, .eb-deal .cmd > .order-lines, .eb-deal .cmd .ac-full { margin-left: 12px; margin-right: 12px; }
+  .ac-full .ac-detail, .tt-card > p, .cmd-order .ask { font-size: 15px; }
+  .cmd-order .ac-full .ac-reminders { display: none; }
+  .cmd-order { padding: 12px 12px 4px; }
+  .cmd-tray { margin: 4px 12px 12px; padding: 12px; }
+  .eb-face-row.wide .eb-tile-top { grid-template-columns: 68px 1fr; padding: 12px; }
+  .eb-face-row.wide .eb-face.photo { width: 68px; height: 88px; }
+  .eb-face-row.wide .eb-stats, .eb-face-row.wide .eb-flags { grid-column: 1 / -1; grid-row: auto; }
 }
 
 /* ---------------------------------------------------------------- Tokens to print */

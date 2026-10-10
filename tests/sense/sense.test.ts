@@ -6,7 +6,8 @@ import { buildRegistry } from '@engine/sense/registry';
 import { makePlayerUnit } from '@engine/sense/playerUnits';
 import { suggestedMarkerControl, visibleEnemies, nearestEnemyByPath, engagedWith } from '@engine/sense/query';
 import { apply, createGame } from '@engine/director/reducer';
-import { deploymentById } from '@data/index';
+import { deploymentById, unitById } from '@data/index';
+import { makeInstance } from '@engine/army/builder';
 import { mapLayout, remixId } from '@engine/terrain/remix';
 import { makeConfig } from '../engine/helpers';
 import type { TerrainPiece } from '@engine/types/terrain';
@@ -58,6 +59,8 @@ describe('2D geometry', () => {
 
 describe('pipeline and queries', () => {
   const cfg = makeConfig({ modeId: 'frontlines' });
+  // Hydralisks in the AI's force, whatever else the builder drew.
+  cfg.army = { ...cfg.army, units: [makeInstance(unitById('hydralisk'), 'small', 'Hydralisks A', 1), ...cfg.army.units] };
   const dep = deploymentById(cfg.deploymentId);
   const terrain = mapLayout(remixId(dep.scale, 1), dep);
   const pus: PlayerUnit[] = [makePlayerUnit('p1', 'marine', 'small', [], 'Marines', 100), makePlayerUnit('p2', 'goliath', 'small', [], 'Goliath', 101)];

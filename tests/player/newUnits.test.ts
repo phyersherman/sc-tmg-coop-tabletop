@@ -143,6 +143,7 @@ describe('the Ravager', () => {
     let after = spat;
     after.phase = 'assault';
     after.passed = { ai: true, players: true };
+    after.activeUnitId = null;
     after = apply(after, { t: 'playersPass' });
     const hit = after.army.units.find((u) => u.id === aiId)!;
     expect((after.tokens ?? []).some((t) => t.kind === 'bile')).toBe(false);
@@ -170,8 +171,12 @@ describe('the AI with a Siege Tank', () => {
     // A tank in the AI force, bought with the upgrade that lets it dig in.
     const def = unitById('siege_tank');
     const mode = def.abilities.find((a) => a.name === 'Mode Transformation')!;
+    // Under Raynor's Raiders, whose Ready for Pickup? the tank's dropship rides on.
     cfg.army = {
       ...cfg.army,
+      factionCardId: 'raynor_s_raiders',
+      factionCards: { Terran: 'raynor_s_raiders' },
+      tacticalCards: [],
       units: [{
         id: 'ai-tank', defId: 'siege_tank', label: 'Siege Tank A', composition: 'small', upgrades: [mode.id],
         maxModels: 1, models: 1, damageMarker: 0, shieldsLeft: 0, location: 'table',

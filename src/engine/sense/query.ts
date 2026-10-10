@@ -6,7 +6,7 @@ import { currentSupply } from '../units/supply';
 import { dist } from '../terrain/geometry';
 import { alongPath, bestEffortToward, losBetweenBases, losBlocked, shortestPath, type PathOptions } from './geometry2d';
 import { centroid } from './homography';
-import { aiUnitSize, playerUnitFlying, playerUnitSize, playerUnitSupply } from './playerUnits';
+import { aiUnitSize, neverEngaged, playerUnitFlying, playerUnitSize, playerUnitSupply } from './playerUnits';
 import { pathOptionsFor, closestBases, edgeDistance, edgeToPoint, ENGAGEMENT_IN, moveReach, sameElevationAsMarker, shapeAt, unitGap, unitsEngaged, unitShapes } from './placement';
 import { MARKER_RADIUS_IN } from '@data/bases';
 import { isStructure } from '../director/selectors';
@@ -102,7 +102,7 @@ export function nearestEnemyByPath(state: GameState, unit: AiUnitInstance, groun
   let best: EnemyView | null = null;
   for (const pu of state.playerUnits) {
     if (pu.destroyed) continue;
-    if (groundOnly && playerUnitFlying(pu)) continue;
+    if (groundOnly && neverEngaged(pu)) continue;
     const theirs = playerModels(state, pu);
     if (!theirs.length) continue;
     const tc = centroid(theirs);

@@ -28,8 +28,8 @@ const codes = (army: Parameters<typeof validatePlayerArmy>[0]) => validatePlayer
 
 describe('Army Slots (Parts 5.2, 9.1.5, 9.1.6)', () => {
   it('the Faction card gives the first slots and every Tactical card copy adds its own', () => {
-    expect(armySlots([card('terran_armed_forces')])).toEqual({ Core: 3, Elite: 1, Support: 1, Hero: 0, Air: 0 });
-    expect(armySlots([card('terran_armed_forces'), card('barracks'), card('barracks'), card('factory')])).toEqual({ Core: 5, Elite: 3, Support: 1, Hero: 0, Air: 0 });
+    expect(armySlots([card('terran_armed_forces')])).toEqual({ Core: 3, Elite: 1, Support: 1, Hero: 0, Air: 1 });
+    expect(armySlots([card('terran_armed_forces'), card('barracks'), card('barracks'), card('factory')])).toEqual({ Core: 5, Elite: 3, Support: 1, Hero: 0, Air: 1 });
     expect(armySlots([])).toEqual(noSlots());
   });
 
@@ -97,8 +97,8 @@ describe('Faction Tag Eligibility (9.1.2)', () => {
     expect(cardEligible(card('barracks'), null)).toBe(false);
   });
 
-  it('the Creep cards are the two the book lists, and the Zerg Faction cards ask for one', () => {
-    expect(CARDS.filter(isCreepCard).map((c) => c.id).sort()).toEqual(['accelerating_creep', 'malignant_creep']);
+  it('the Creep cards are the two the book lists and Wave 3\'s Reactive Creep, and the Zerg Faction cards ask for one', () => {
+    expect(CARDS.filter(isCreepCard).map((c) => c.id).sort()).toEqual(['accelerating_creep', 'malignant_creep', 'reactive_creep']);
     for (const fc of CARDS.filter((c) => c.isFactionCard)) expect(needsCreepCard(fc), fc.id).toBe(fc.faction === 'Zerg');
     expect(needsCreepCard(undefined)).toBe(false);
   });
@@ -267,7 +267,7 @@ describe('the cheapest Tactical cards for the slots needed', () => {
     expect(cover.gas).toBeLessThanOrEqual(3 * card('barracks').cost + card('factory').cost + card('supply_depot').cost);
   });
   it('is null when no card on offer gives the slot', () => {
-    expect(cheapestCards(card('terran_armed_forces'), { ...noSlots(), Air: 1 }, terran)).toBeNull();
+    expect(cheapestCards(card('terran_armed_forces'), { ...noSlots(), Air: 2 }, terran)).toBeNull();
     expect(cheapestCards(card('terran_armed_forces'), { ...noSlots(), Hero: 1 }, [card('barracks')])).toBeNull();
   });
 });
@@ -285,86 +285,77 @@ describe('a weapon is replaced once in the Unit builder', () => {
 
 /**
  * The example armies of Part 12.12, at Skirmish scale (1,000 Minerals, 100 Vespene Gas). The data snapshot is the
- * authority on prices; where it differs from the printed book the difference is written down here, not corrected.
+ * authority on prices; where it differs from the printed book (Archon's patches, the latest of 9 October 2026) the
+ * line carries both, [unit, book, snapshot], and `gas` is what the cards cost now. The difference is written down
+ * here, not corrected.
  */
 describe('the example armies (Part 12.12)', () => {
-  type Line = [UnitChoice, number];
-  const examples: { name: string; cards: string[]; units: Line[]; bookGas: number }[] = [
+  type Line = [UnitChoice, number, number?];
+  const examples: { name: string; cards: string[]; units: Line[]; bookGas: number; gas: number }[] = [
     {
-      name: 'Terran Starter', cards: ['terran_armed_forces', 'barracks', 'factory', 'orbital_command'], bookGas: 85,
+      name: 'Terran Starter', cards: ['terran_armed_forces', 'barracks', 'factory', 'orbital_command'], bookGas: 85, gas: 90,
       units: [
-        [unit('marine', 'large', 'Combat Shield', 'Grenades - Frag', 'Bayonet'), 280],
-        [unit('marauder', 'small', 'Laser Targeting Systems'), 170],
-        [unit('marauder', 'small', 'Veteran of Tarsonis', 'Kinetic Foam'), 190],
+        [unit('marine', 'large', 'Combat Shield', 'Grenades - Frag', 'Bayonet'), 280, 290],
+        [unit('marauder', 'small', 'Laser Targeting Systems'), 170, 180],
+        [unit('marauder', 'small', 'Veteran of Tarsonis', 'Kinetic Foam'), 190, 200],
         [unit('medic', 'small', 'Stabilizer Medpacks'), 140],
-        [unit('goliath', 'small', 'Scatter Missiles'), 220],
+        [unit('goliath', 'small', 'Scatter Missiles'), 220, 210],
       ],
     },
     {
-      name: 'Terran Founders Edition Starter', cards: ['raynor_s_raiders', 'barracks', 'academy', 'orbital_command'], bookGas: 85,
+      name: 'Terran Founders Edition Starter', cards: ['raynor_s_raiders', 'barracks', 'academy', 'orbital_command'], bookGas: 85, gas: 95,
       units: [
-        [unit('marine', 'small', 'AGG-12', 'Rocket Launcher'), 210],
+        [unit('marine', 'small', 'AGG-12', 'Rocket Launcher'), 210, 220],
         [unit('raynor_s_raider__marine_'), 230],
-        [unit('marauder', 'small', 'Veteran of Tarsonis', 'Kinetic Foam'), 190],
+        [unit('marauder', 'small', 'Veteran of Tarsonis', 'Kinetic Foam'), 190, 200],
         [unit('medic', 'small', 'Stabilizer Medpacks'), 140],
-        [unit('jim_raynor'), 230],
+        [unit('jim_raynor'), 230, 280],
       ],
     },
     {
-      name: 'Zerg Starter', cards: ['zerg_swarm', 'accelerating_creep', 'evolution_chamber', 'overseer', 'hydralisk_den'], bookGas: 90,
+      name: 'Zerg Starter', cards: ['zerg_swarm', 'accelerating_creep', 'evolution_chamber', 'overseer', 'hydralisk_den'], bookGas: 90, gas: 80,
       units: [
-        [unit('swarmling__zergling_'), 260],
-        [unit('corpser__roach_', 'small', 'Burrow Ambush', 'Tunneling Claws'), 280],
-        [unit('hydralisk', 'large', 'Ancillary Carapace'), 300],
-        [unit('queen', 'small', 'Creep Speed'), 160],
+        [unit('swarmling__zergling_'), 260, 210],
+        [unit('corpser__roach_', 'small', 'Burrow Ambush', 'Tunneling Claws'), 280, 250],
+        [unit('hydralisk', 'large', 'Ancillary Carapace'), 300, 290],
+        [unit('queen', 'small', 'Creep Speed'), 160, 150],
       ],
     },
     {
-      name: 'Zerg Founders Edition Starter', cards: ['kerrigan_s_swarm', 'malignant_creep', 'evolution_chamber', 'overseer', 'spawning_pool'], bookGas: 90,
-      units: [[unit('zergling'), 180], [unit('kerrigan_swarm_raptor__zergling_'), 250], [unit('roach'), 170], [unit('queen'), 150], [unit('kerrigan'), 250]],
+      name: 'Zerg Founders Edition Starter', cards: ['kerrigan_s_swarm', 'malignant_creep', 'evolution_chamber', 'overseer', 'spawning_pool'], bookGas: 90, gas: 85,
+      units: [[unit('zergling'), 180, 150], [unit('kerrigan_swarm_raptor__zergling_'), 250, 230], [unit('roach'), 170], [unit('queen'), 150, 140], [unit('kerrigan'), 250]],
     },
     {
-      name: 'Protoss Starter', cards: ['daelaam', 'forge', 'twilight_council', 'observer'], bookGas: 100,
+      name: 'Protoss Starter', cards: ['daelaam', 'forge', 'twilight_council', 'observer'], bookGas: 100, gas: 95,
       units: [
-        [unit('zealot', 'small', 'My Life for Aiur', 'Leg Enhancements', 'We Stand as One'), 210],
-        [unit('adept', 'small', 'Resonating Glaives', 'Glaive Strike'), 190],
-        [unit('sentry', 'small', 'Solid-Field Projectors', 'Hallucination'), 180],
-        [unit('stalker', 'small', 'Path of Shadows', 'Fury of the Nerazim'), 210],
-        [unit('stalker', 'small', 'Path of Shadows', 'Fury of the Nerazim'), 210],
+        [unit('zealot', 'small', 'My Life for Aiur', 'Leg Enhancements', 'We Stand as One'), 210, 220],
+        [unit('adept', 'small', 'Resonating Glaives', 'Glaive Strike'), 190, 200],
+        [unit('sentry', 'small', 'Solid-Field Projectors', 'Hallucination'), 180, 160],
+        [unit('stalker', 'small', 'Path of Shadows', 'Fury of the Nerazim'), 210, 200],
+        [unit('stalker', 'small', 'Path of Shadows', 'Fury of the Nerazim'), 210, 200],
       ],
     },
     {
-      name: 'Protoss Founders Edition Starter', cards: ['khalai', 'gateway', 'warp_prism', 'observer'], bookGas: 95,
+      name: 'Protoss Founders Edition Starter', cards: ['khalai', 'gateway', 'warp_prism', 'observer'], bookGas: 95, gas: 85,
       units: [
-        [unit('zealot', 'small', 'My Life for Aiur'), 170],
-        [unit('praetor_guard__zealot_'), 280],
-        [unit('adept', 'small', 'Glaive Strike'), 170],
+        [unit('zealot', 'small', 'My Life for Aiur'), 170, 180],
+        [unit('praetor_guard__zealot_'), 280, 260],
+        [unit('adept', 'small', 'Glaive Strike'), 170, 180],
         [unit('sentry'), 130],
-        [unit('artanis'), 250],
+        [unit('artanis'), 250, 270],
       ],
     },
   ];
-  /**
-   * Where the snapshot and the printed example disagree, [book, snapshot]. Jim Raynor is 250 in the data (the
-   * example prints 230), and the Corpser with Burrow Ambush and Tunneling Claws comes to 270 (the example prints
-   * 280). Either price is accepted here, so a corrected snapshot does not fail the test.
-   */
-  const differs: Record<string, [number, number]> = { jim_raynor: [230, 250], corpser__roach_: [280, 270] };
-
   for (const ex of examples) {
     it(`${ex.name}: every Unit costs what the book prints, and the army is legal`, () => {
-      for (const [u, book] of ex.units) {
-        const known = differs[u.defId];
-        if (known) expect(known, `${u.defId}`).toContain(configCostOf(u));
-        else expect(configCostOf(u), `${u.defId} ${u.upgrades.join(' ')}`).toBe(book);
-      }
+      for (const [u, book, now = book] of ex.units) expect(configCostOf(u), `${u.defId} ${u.upgrades.join(' ')}`).toBe(now);
       expect(ex.units.reduce((n, [, book]) => n + book, 0)).toBe(1000);
-      // Four Tactical cards cost less in the snapshot than in Part 12.11, so an example never costs more gas than printed.
-      expect(vespeneSpent(ex.cards.map(card))).toBeLessThanOrEqual(ex.bookGas);
+      expect(vespeneSpent(ex.cards.map(card))).toBe(ex.gas);
       const units = ex.units.map(([u]) => u);
       const cost = units.reduce((n, u) => n + configCostOf(u), 0);
       // Slots, tags, gas, Unique Units and the Creep card all hold. Minerals: the army is legal at its own price,
-      // and at 1,000 unless the snapshot prices a Unit above the book (Terran Founders: Jim Raynor, 1,020).
+      // and at 1,000 unless the snapshot prices it above the book (Terran Starter 1,020, Terran Founders 1,070,
+      // Protoss Founders 1,020).
       expect(validatePlayerArmy({ cards: ex.cards, units, minerals: Math.max(1000, cost) })).toEqual([]);
       expect(validatePlayerArmy({ cards: ex.cards, units, minerals: 1000 }).map((p) => p.code)).toEqual(cost > 1000 ? ['minerals'] : []);
     });

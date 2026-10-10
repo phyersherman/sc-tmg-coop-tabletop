@@ -104,7 +104,11 @@ export interface PlayerCard {
 /** Something set on the battlefield by an ability (Creep Tumor, Force Field, Shade, Faction Indicator). */
 export interface BoardToken {
   id: string;
-  kind: 'creepTumor' | 'forceField' | 'shade' | 'indicator' | 'dropPoint' | 'bile';
+  kind: 'creepTumor' | 'forceField' | 'shade' | 'indicator' | 'dropPoint' | 'bile' | 'darkSwarm' | 'bileBomb' | 'psiStorm' | 'forceWall';
+  /** Psionic Storm: the result each die needs. */
+  need?: number;
+  /** A Force Wall's turn, in degrees. */
+  rot?: number;
   /** How far the token's effect reaches (Corrosive Bile: 1", or 2" with Bloated Bile Ducts). */
   radius?: number;
   x: number;
@@ -172,6 +176,8 @@ export interface AiOrder {
   intentTarget?: string;
   /** The action card this order comes from (tabletop decks). */
   card?: import('../ai/actionDecks').ActionCard;
+  /** Lightning Dash: the second Charge after a successful one, against a different Enemy Unit, with no IMPACT. */
+  dash?: boolean;
 }
 
 export type OrderReportOption =
@@ -281,7 +287,9 @@ export interface GameState {
   /** Tokens set by abilities. */
   tokens?: BoardToken[];
   /** HITS X (Y) waiting to be resolved against AI units (Corrosive Bile, Shadow Strike). */
-  pendingHits?: { targetId: string; hits: number; dmgPer: number; source: string; armourMod?: number }[];
+  /** Damage an ability deals straight out, with no Armour Roll (Psi Lightning), resolved as the ability is used. */
+  pendingDamage?: { side: 'ai' | 'players'; id: string; amount: number; source: string }[];
+  pendingHits?: { targetId: string; hits: number; dmgPer: number; source: string; armourMod?: number; /** An Engaged target may make an Evade Roll against them (Seeker Missile). */ evadeIfEngaged?: boolean }[];
   /**
    * A moment one of your Reactions can answer, held until you use it or decline. `kind` absent (or 'damage'):
    * Damage a unit of yours has just suffered outside an attack (Stimpack). The other kinds hold the game at an
@@ -290,6 +298,8 @@ export interface GameState {
   pendingReaction?: PendingReaction;
   /** Round in which a Pylon's Warp Conduit was used for a deploy. */
   conduitUsedRound?: number;
+  /** Infested Drop: the Supply deployed through Zagara this Round (1 at most). */
+  infestedUsed?: { round: number; supply: number };
   /** Omega Network: the Supply deployed through the Omega Worm this Round (2 at most). */
   omegaUsed?: { round: number; supply: number };
   /** Players who have resolved a Reaction in the current Activation: each may resolve only one (Part 10.4). */
@@ -303,7 +313,7 @@ export interface GameState {
 }
 
 /** When a Reaction is offered (see engine/player/reactions). */
-export type ReactionTrigger = 'damage' | 'aiRanged' | 'afterAiRanged' | 'aiCharge' | 'afterCharge' | 'afterPlace';
+export type ReactionTrigger = 'damage' | 'aiRanged' | 'afterAiRanged' | 'aiCharge' | 'afterCharge' | 'afterPlace' | 'aiActivationEnd' | 'aiMelee';
 
 export interface PendingReaction {
   kind?: ReactionTrigger;

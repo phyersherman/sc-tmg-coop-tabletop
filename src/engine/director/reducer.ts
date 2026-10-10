@@ -10,7 +10,7 @@ import { deckFor } from '@data/orderDecks';
 import { initDeck, drawCard, currentCard } from '../ai/orderDeck';
 import { assignObjectives } from '../ai/objectives';
 import { aiDebuff, aiHasBoost, aiMayTarget, aiWeapon, decideAi, inPlayerZoi, orderChargeBonus, shouldPassEarly, speedModFor, deployable } from '../ai/decide';
-import { blastTemplate, type BlastHit, hiddenFrom, evadeFor, hasAbility, isBurrowed, isHidden, ownerOf, unitAbilities, pendingEndOfRound, CARD_BOOSTS, SAVE_BOOSTS, UNIT_ABILITIES, autoPay, cardDef, chargeMods, defensiveDiceRemoval, effectiveSpeed, passiveToughFor, payValue, pushHits, refreshPlayerSide, removeToken, SELF_REACTIONS, PROMPTED_REACTIONS, sparePayCard, spendEffects, weaponWithEffects, abilityCost, activationKey, activeEffects, aiRevealed, boostPhaseProblem, disengageSupply, inEnemyZoi, isStationary, unitInEnemyZoi, type AbilityContext, type AbilitySpec } from '../abilities/index';
+import { blastTemplate, type BlastHit, hiddenFrom, evadeFor, hasAbility, isBurrowed, isHidden, ownerOf, unitAbilities, pendingEndOfRound, CARD_BOOSTS, SAVE_BOOSTS, UNIT_ABILITIES, autoPay, cardDef, chargeMods, defensiveDiceRemoval, effectiveSpeed, passiveToughFor, payValue, pushHits, refreshPlayerSide, removeToken, SELF_REACTIONS, PROMPTED_REACTIONS, sparePayCard, spendEffects, weaponWithEffects, abilityCost, activationKey, activeEffects, aiRevealed, boostPhaseProblem, disengageSupply, inEnemyZoi, isStationary, unitInEnemyZoi, type AbilityContext, type AbilitySpec, passiveDodge, BLAST_RADIUS_IN } from '../abilities/index';
 import { armourBonus, firedWeapon, impactDice, ownsAbility, raiseKeyword, unitHp } from '../units/firing';
 import { MARKER_RADIUS_IN } from '@data/bases';
 import { applyDamage } from '../units/damage';
@@ -22,20 +22,20 @@ import { aiAlive, aiSupplyInReserves, aiSupplyOnTable, availableNow, findUnit, o
 import { defaultSupply } from '../missions/framework';
 import type { PlayerUnit, Pt, SenseSnapshot } from '../sense/types';
 import { applySense } from '../ai/senseDecide';
-import { cardOrder, withCardText } from '../ai/cardOrders';
+import { cardOrder, lightningDashOrder, withCardText } from '../ai/cardOrders';
 import { aiBurrowed, aiHas, setAiBurrowed } from '../ai/burrow';
 import { noMap } from '../ai/actionDecks';
 import { aiModels, engagedWith } from '../sense/query';
 import { aiSegments, closestOnSegment, dist, segmentMidpoint, settleRamps } from '../terrain/geometry';
 import { clearMarkerSpot } from '../terrain/markers';
 import { destinationToward, leadingModel, leadingModelByPath, nearestEnemyByPath } from '../sense/query';
-import { aiUnitSize, normalizePlayerUnit, playerUnitDef, playerUnitFlying, playerUnitSize, playerUnitSupply } from '../sense/playerUnits';
+import { aiUnitSize, neverEngaged, normalizePlayerUnit, playerUnitDef, playerUnitFlying, playerUnitSize, playerUnitSupply } from '../sense/playerUnits';
 import { completeSaves, resolveAttack, rollCharge, targetNumber, type AttackParams } from '../combat/resolve';
 import { suggestedMarkerControl } from '../sense/query';
 import { missionOutcome } from '../missions/stakes';
 import { useReward } from '../missions/sideMarkers';
 import { adjustModelDisplacing, baseFits, closeRanksPositions, shapeAt, combatRanks, pathOptionsFor, placeUnit, standingPieces, unitShapes, edgeDistance, edgeToPoint, contactPointAlong, syncModelPositions, unitGap, unitsEngaged, chargeEndProblem, coherencyProblem, refreshCoherency, ENGAGEMENT_IN, type PlaceOptions, type Shape } from '../sense/placement';
-import { abilityGap, abilityGapToPoint, aiEvadeReason, aiPos, checkAttack, checkCharge, checkCloseRanks, checkDeploy, checkMove, chargeOptions, playerMoveReach, damageHelpers, playerAvailable, playerPos, playerWeapons } from '../player/rules';
+import { abilityGap, abilityGapToPoint, aiEvadeReason, aiPos, checkAttack, checkCharge, checkCloseRanks, checkDeploy, checkMove, chargeOptions, playerMoveReach, damageHelpers, playerAvailable, playerPos, playerWeapons, validTargets } from '../player/rules';
 import { visibleEnemies, engagedWith as aiEngagedWith } from '../sense/query';
 import { availableWeapons, weaponModels } from '../units/weapons';
 import { alongPath, shortestPath, passable, losBetweenBases } from '../sense/geometry2d';
@@ -418,7 +418,8 @@ function advanceTurn(state: GameState, mode: MissionMode): void {
 
 function endPhase(state: GameState, mode: MissionMode): void {
   state.activeUnitId = null;
-  if (state.phase === 'assault') burstBile(state, mode);
+  if (state.phase === 'movement' || state.phase === 'assault') psionicStorms(state, mode);
+  if (state.phase === 'assault') { burstBile(state, mode); sabotageDrones(state, mode); seekerMissiles(state, mode); poisonousEssence(state); }
   if (state.nextFirstPlayer) state.firstPlayer = state.nextFirstPlayer;
   const next = NEXT_PHASE[state.phase];
   if (next) startPhase(state, mode, next);
@@ -472,6 +473,150 @@ function burstBile(state: GameState, mode: MissionMode): void {
 }
 
 /**
+ * Psionic Storm and Psionic Gale break at the End of each Phase: a Blast Template on the token, and each Unit with a
+ * model under it rolls 3 dice, plus 1 for each model covered. Each result that makes the token's number is
+ * NON-LETHAL DAMAGE (1) in the Movement Phase and 1 Damage in the Assault Phase, Friendly or Enemy alike.
+ */
+function psionicStorms(state: GameState, mode: MissionMode): void {
+  const storms = (state.tokens ?? []).filter((t) => t.kind === 'psiStorm');
+  if (!storms.length) return;
+  const ctx = ctxFor(state);
+  const lethal = state.phase === 'assault';
+  for (const t of storms) {
+    const need = t.need ?? 5;
+    const covered = (shapes: Shape[]) => shapes.filter((sh) => edgeToPoint(sh, t) <= (t.radius ?? BLAST_RADIUS_IN) + 0.01).length;
+    const roll = (n: number) => Array.from({ length: 3 + n }, () => ctx.rng.d6()).filter((r) => r >= need).length;
+    for (const u of state.army.units) {
+      if (u.location !== 'table') continue;
+      const n = covered(unitShapes(state, 'ai', u.id));
+      if (!n) continue;
+      const x = roll(n);
+      if (!x) continue;
+      if (lethal) applyDamageToAi(state, mode, u, x, currentSupply(unitById(u.defId), u.models));
+      else u.damageMarker += x;
+      pushLog(state, 'players', `${t.label}: ${u.label} suffers ${lethal ? `${x} Damage` : `NON-LETHAL DAMAGE (${x})`}.`);
+    }
+    for (const pu of state.playerUnits) {
+      if (pu.location !== 'table' || pu.destroyed) continue;
+      const n = covered(unitShapes(state, 'players', pu.id));
+      if (!n) continue;
+      const x = roll(n);
+      if (!x) continue;
+      if (lethal) { const pdef = playerUnitDef(pu); applyToPlayer(state, pu, applyDamage(pdef, { models: pu.models, damageMarker: pu.damageMarker, shieldsLeft: pu.shieldsLeft }, x, { hp: unitHp(pdef, pu.upgrades) }), null); }
+      else pu.damageMarker += x;
+      pushLog(state, 'players', `${t.label}: ${pu.name} suffers ${lethal ? `${x} Damage` : `NON-LETHAL DAMAGE (${x})`}.`);
+    }
+  }
+  commitRng(state, ctx.rng);
+}
+
+/** Damage an ability deals outright, with no Armour Roll: Psi Lightning. */
+function resolvePendingDamage(state: GameState, mode: MissionMode): void {
+  const queued = state.pendingDamage ?? [];
+  state.pendingDamage = [];
+  for (const q of queued) {
+    if (q.side === 'ai') {
+      const u = state.army.units.find((x) => x.id === q.id);
+      if (u && u.location === 'table') applyDamageToAi(state, mode, u, q.amount, currentSupply(unitById(u.defId), u.models));
+    } else {
+      const pu = state.playerUnits.find((x) => x.id === q.id);
+      if (!pu || pu.destroyed) continue;
+      const pdef = playerUnitDef(pu);
+      applyToPlayer(state, pu, applyDamage(pdef, { models: pu.models, damageMarker: pu.damageMarker, shieldsLeft: pu.shieldsLeft }, q.amount, { hp: unitHp(pdef, pu.upgrades) }), null);
+    }
+  }
+}
+
+/** Poisonous Essence: every Biological Enemy Unit Engaged with the marked Unit suffers NON-LETHAL DAMAGE (2). */
+function poisonousEssence(state: GameState): void {
+  for (const pu of state.playerUnits) {
+    const x = Math.max(0, ...activeEffects(pu).map((e) => e.mods.poison ?? 0));
+    if (!x || pu.location !== 'table' || pu.destroyed) continue;
+    for (const u of state.army.units) {
+      if (u.location !== 'table' || !pu.engagedWith.includes(u.id) || !unitById(u.defId).tags.includes('Biological')) continue;
+      u.damageMarker += x;
+      pushLog(state, 'players', `Poisonous Essence: ${u.label} suffers NON-LETHAL DAMAGE (${x}).`);
+    }
+  }
+}
+
+/**
+ * What one of your units does to an enemy it has just damaged: the Vileling's Debilitating Claws put DEBUFF Hit (1)
+ * on every weapon of that Unit.
+ */
+function afterPlayerDamage(state: GameState, pu: PlayerUnit, target: AiUnitInstance, damage: number): void {
+  if (damage <= 0 || !hasAbility(pu, 'Debilitating Claws') || (target.statDebuffs ?? []).some((d) => d.stat === 'hit')) return;
+  target.statDebuffs = [...(target.statDebuffs ?? []), { stat: 'hit', amount: 1 }];
+  pushLog(state, 'players', `Debilitating Claws: ${target.label} gains DEBUFF Hit (1).`);
+}
+
+/**
+ * Have a Nice Day: at the End of the Assault Phase every Unit Within 3" of a Sabotage Drone, Friendly or Enemy,
+ * suffers HITS 5 (1), and a Unit with the Structure ability HITS 5 (1) more.
+ */
+function sabotageDrones(state: GameState, mode: MissionMode): void {
+  const drones = state.playerUnits.filter((p) => p.location === 'table' && !p.destroyed && hasAbility(p, 'Have a Nice Day'));
+  if (!drones.length) return;
+  const within = (shapes: Shape[]) => drones.filter((d) => unitShapes(state, 'players', d.id).some((m) => shapes.some((sh) => edgeDistance(m, sh) <= 3.05))).length;
+  for (const u of state.army.units) {
+    if (u.location !== 'table') continue;
+    const n = within(unitShapes(state, 'ai', u.id));
+    if (!n) continue;
+    const structure = ownsAbility(unitById(u.defId), u.upgrades, 'Structure');
+    pushHits(state, u, 5 * n * (structure ? 2 : 1), 1, 'Have a Nice Day');
+  }
+  for (const pu of state.playerUnits) {
+    if (pu.location !== 'table' || pu.destroyed || hasAbility(pu, 'Have a Nice Day')) continue;
+    const n = within(unitShapes(state, 'players', pu.id));
+    if (n) hitsOnPlayer(state, pu, 5 * n * (hasAbility(pu, 'Structure') ? 2 : 1), 1, 'Have a Nice Day');
+  }
+  resolvePendingHits(state, mode);
+}
+
+/** HITS X (Y) on one of your units from something that is no one's attack (Corrosive Bile, a Sabotage Drone): you do not roll it, the app does. */
+function hitsOnPlayer(state: GameState, pu: PlayerUnit, hits: number, dmgPer: number, source: string): void {
+  const ctx = ctxFor(state);
+  const pdef = playerUnitDef(pu);
+  const weapon = { id: 'hits', name: source, phase: 'Assault' as const, range: 'E' as const, target: 'All' as const, roa: hits, hit: 2, dmg: dmgPer, surgeTypes: [], keywords: [], text: '' };
+  const a = resolveAttack(ctx.rng, {
+    attacker: { side: 'ai', unitId: source, label: source },
+    defender: { side: 'players', unitId: pu.id, label: pu.name },
+    weapon, models: 1, phase: 'Assault', presetRolls: Array(hits).fill(6),
+    defenderDef: pdef, defenderHp: unitHp(pdef, pu.upgrades),
+    defenderState: { models: pu.models, damageMarker: pu.damageMarker, shieldsLeft: pu.shieldsLeft },
+    evadeReason: isHidden(pu) ? 'Hidden' : hasAbility(pu, 'Precognition') ? 'Precognition' : activeEffects(pu).some((e) => e.mods.evadeMelee) ? 'Combat Shield' : null,
+    tough: passiveToughFor(pu).tough,
+  });
+  const r = applyDamage(pdef, { models: pu.models, damageMarker: pu.damageMarker, shieldsLeft: pu.shieldsLeft }, a.damage, { hp: unitHp(pdef, pu.upgrades) });
+  applyToPlayer(state, pu, r, null);
+  commitRng(state, ctx.rng);
+  state.lastAttack = a;
+  state.attackLog.push(a);
+  emit(state, { kind: 'attack', attack: a });
+  pushLog(state, 'players', `${source}: ${pu.name} takes ${hits} hits, ${a.damage} damage${r.removed ? `, ${r.removed} model(s) lost` : ''}.`);
+}
+
+/**
+ * Seeker Missile strikes at the End of the Assault Phase: HITS 4 (2) on its target if that Unit has the Stationary
+ * Status or stands Within 8" of the Raven that fired it. An Engaged target may make an Evade Roll against them.
+ */
+function seekerMissiles(state: GameState, mode: MissionMode): void {
+  for (const u of state.army.units) {
+    const locks = (u.debuffs ?? []).filter((d) => d.seekerFrom);
+    if (!locks.length) continue;
+    u.debuffs = (u.debuffs ?? []).filter((d) => !d.seekerFrom);
+    if (u.location !== 'table') continue;
+    for (const d of locks) {
+      const raven = state.playerUnits.find((p) => p.id === d.seekerFrom);
+      const gap = raven && raven.location === 'table' && !raven.destroyed ? unitGap(state, 'players', raven.id, 'ai', u.id) : Infinity;
+      if (isStationary(state, u) || gap <= 8.05) state.pendingHits = [...(state.pendingHits ?? []), { targetId: u.id, hits: 4, dmgPer: 2, source: 'Seeker Missile', evadeIfEngaged: true }];
+      else pushLog(state, 'players', `Seeker Missile: ${u.label} moved and stands beyond 8" of ${raven?.name ?? 'the Raven'}. The missile misses.`);
+    }
+  }
+  resolvePendingHits(state, mode);
+}
+
+/**
  * HITS X (Y) queued by an ability: X dice straight into the target's Armour Pool at Y damage each, no Surge.
  * The AI rolls its own armour here, as it does for anything it is not asked to confirm.
  */
@@ -495,7 +640,7 @@ function resolvePendingHits(state: GameState, mode: MissionMode): void {
       defenderState: { models: u.models, damageMarker: u.damageMarker, shieldsLeft: u.shieldsLeft },
       armourMod: (q.armourMod ?? 0) + aiDebuff(u, 'armour') - aiArmourBonus(state, u),
       evadeMod: aiDebuff(u, 'evade'),
-      evadeReason: aiEvadeReason(state, u, 'Combat'),
+      evadeReason: aiEvadeReason(state, u, 'Combat') ?? (q.evadeIfEngaged && u.engaged && tdef.stats.evade ? 'engaged target' : null),
     });
     applyDamageToAi(state, mode, u, a.damage, before);
     state.lastAttack = a;
@@ -612,7 +757,7 @@ function advanceEstimate(state: GameState, u: AiUnitInstance, order: AiOrder, re
  * itself when that is clear, else back along the line from `to` toward `from`, and `from` if nowhere is.
  */
 function stopShortOfEnemies(state: GameState, u: AiUnitInstance, from: Pt, to: Pt): Pt {
-  const foes = state.playerUnits.filter((p) => p.location === 'table' && !p.destroyed && !playerUnitFlying(p)).flatMap((p) => unitShapes(state, 'players', p.id));
+  const foes = state.playerUnits.filter((p) => p.location === 'table' && !p.destroyed && !neverEngaged(p)).flatMap((p) => unitShapes(state, 'players', p.id));
   if (!foes.length) return to;
   const clear = (p: Pt) => { const me = shapeAt(u.defId, p); return foes.every((f) => edgeDistance(me, f) > ENGAGEMENT_IN + 0.05); };
   if (clear(to)) return to;
@@ -670,7 +815,8 @@ function applyOrderReport(state: GameState, mode: MissionMode, report: string, e
   }
   if (report === 'charged') {
     u.engaged = true;
-    u.engagedEnemySupply = extra.enemySupply ?? 1;
+    // Lightning Dash's second Charge: it fights both Units now.
+    u.engagedEnemySupply = (order.dash ? u.engagedEnemySupply : 0) + (extra.enemySupply ?? 1);
     u.atObjective = false;
   }
   if (report === 'exited') {
@@ -1007,7 +1153,7 @@ function refreshEngagement(state: GameState, decide = true): void {
   for (const pu of state.playerUnits) {
     // Camera-tracked units count as on the table wherever they are seen.
     const present = pu.location === 'table' || (!!state.sense?.players[pu.id]?.length && !state.sense.manual);
-    if (!present || pu.destroyed || playerUnitFlying(pu)) { pu.engaged = false; pu.engagedWith = []; continue; }
+    if (!present || pu.destroyed || neverEngaged(pu)) { pu.engaged = false; pu.engagedWith = []; continue; }
     // Engaged: Within 1", with no Size 2+ terrain between the models and not on HIGH GROUND against GROUND LEVEL (Part 7.2.1).
     const eng = liveAi.filter((u) => unitsEngaged(state, 'players', pu.id, 'ai', u.id));
     pu.engagedWith = eng.map((u) => u.id);
@@ -1123,6 +1269,8 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
         // Heavy Plating and the like: TOUGH the unit has without being asked for. Keywords do not stack: the highest counts.
         const passive = passiveToughFor(pu, state, activationKey(state, ps.attack.attacker.unitId));
         tough = Math.max(tough, passive.tough);
+        // Reactive Tissue: DODGE (1) while ON CREEP. Keywords do not stack.
+        dodge = Math.max(dodge, passiveDodge(state, pu));
         const base = { ...ps.attack };
         // Improved Barrier: the attacking weapon's Damage characteristic is capped for this attack.
         if (capDmg !== undefined && base.dmgPer > capDmg) base.dmgPer = capDmg;
@@ -1206,6 +1354,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       pu.deployedRound = state.round;
       // Warp Conduit is one Ground Unit a Round; the Omega Network takes Units up to 2 Supply in all each Round.
       if (chk.via === 'Warp Conduit') state.conduitUsedRound = state.round;
+      if (chk.via === 'Infested Drop') state.infestedUsed = { round: state.round, supply: (state.infestedUsed?.round === state.round ? state.infestedUsed.supply : 0) + playerUnitSupply(pu) };
       if (chk.via === 'Omega Network') state.omegaUsed = { round: state.round, supply: (state.omegaUsed?.round === state.round ? state.omegaUsed.supply : 0) + playerUnitSupply(pu) };
       pu.deployAnyEdge = false;
       setPlayerPosition(state, pu, point);
@@ -1236,9 +1385,9 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       // A Reaction used from the card counts as the player's one Reaction of this Activation.
       if (ab.kind === 'Reaction' && (state.reacted ?? []).includes(ownerOf(pu))) return reject(state, 'Each player may resolve only one Reaction per Activation.');
       const optCost = spec.options && cmd.option !== undefined ? spec.options[cmd.option]?.cost : undefined;
-      const price = more ? { cost: 0, notes: [] as string[], commit: () => {} } : abilityCost(state, pu, ab, optCost);
       const res = resolveAbilityTargets(state, pu, spec, cmd);
       if (typeof res === 'string') return reject(state, res);
+      const price = more ? { cost: 0, notes: [] as string[], commit: () => {} } : abilityCost(state, pu, ab, optCost, res.enemy);
       const pay = payFor(state, price.cost, price.cost > 0 ? cmd.payWith : undefined, ownerOf(pu));
       if (typeof pay === 'string') return reject(state, pay);
       const hurtBefore = pu.damageMarker;
@@ -1251,10 +1400,14 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       if (ab.kind === 'Reaction') state.reacted = [...(state.reacted ?? []), ownerOf(pu)];
       pu.used = [...(pu.used ?? []), ab.name];
       if (spec.once === 'game') pu.usedGame = [...(pu.usedGame ?? []), ab.name];
+      // An Active ability needs the Unit Activated (Part 2.7.1): using one activates it, and it still takes its one
+      // action (Part 8.2). Until it has, no other Unit activates and the player cannot Pass.
+      if (ab.kind === 'Active' && state.step.kind === 'PLAYERS_TURN' && state.phase !== 'scoring') state.activeUnitId = pu.id;
       pushLog(state, 'players', `${line}${pay.length ? ` (paid with ${pay.map((c) => cardDef(c.defId)?.name).join(', ')})` : ''}`);
       emitFxChanges(state, fxBefore);
-      // An ability that deals automatic hits (Shadow Strike) resolves them as it is used.
+      // An ability that deals automatic hits (Shadow Strike) resolves them as it is used, and so does outright Damage.
       resolvePendingHits(state, mode);
+      resolvePendingDamage(state, mode);
       // Damage a unit does to itself (Stimpack) is Damage suffered: a Medic beside it may still reduce it.
       offerDamageReaction(state, pu, pu.damageMarker - hurtBefore, ab.name);
       return state;
@@ -1265,7 +1418,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       if (cmd.key) {
         const o = reactionOffers(state, pr).find((x) => x.key === cmd.key);
         if (!o) return reject(state, 'That Reaction is no longer available.');
-        const err = useReaction(state, pr, o);
+        const err = useReaction(state, mode, pr, o);
         if (err) return reject(state, err);
         // Each player may resolve only one Reaction per Activation: what the other player could still use stays on offer.
         if (reactionOffers(state, pr).length) { state.pendingReaction = pr; return state; }
@@ -1417,6 +1570,20 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       emit(state, { kind: 'attack', attack: a });
       pushLog(state, 'players', `${pu.name} fires ${weapon.name} at ${target.label}${mod.notes.length ? ` (${mod.notes.join(', ')})` : ''}: ${a.hits} hits, ${a.damage} damage${a.removed ? `, ${a.removed} model(s) removed` : ''}${a.destroyed ? '. Destroyed' : ''}.`);
       if (template?.spill.length) resolveSpillover(state, mode, { side: 'players', unitId: pu.id, label: pu.name }, setup.params.weapon, template.spill, pu.statuses ?? [], playerUnitDef(pu), pu.upgrades);
+      if (mod.notes.includes('Magrail Munitions')) pu.usedGame = [...(pu.usedGame ?? []), 'Magrail Munitions'];
+      afterPlayerDamage(state, pu, target, a.damage);
+      // Bombard: once the Bile Bomb has fallen through its token, the token is gone and a Creep Tumor takes its place.
+      const bomb = /bile bomb/i.test(weapon.name) ? (state.tokens ?? []).find((t) => t.kind === 'bileBomb' && t.ownerId === pu.id) : undefined;
+      if (bomb) {
+        removeToken(state, bomb.id);
+        state.tokens = [...(state.tokens ?? []), { id: `${bomb.id}-tumor`, kind: 'creepTumor', x: bomb.x + 0.9, y: bomb.y, label: 'Creep Tumor', round: state.round }];
+        pushLog(state, 'players', 'Bombard: the Bile Bomb token is removed and a Creep Tumor is set in its place.');
+      }
+      // Operational Efficiency: a C-20A shot that destroyed its target or cut its Supply readies one Exhausted Tactical card.
+      if (hasAbility(pu, 'Operational Efficiency') && /C-20A/i.test(weapon.name) && (a.destroyed || currentSupply(tdef, target.models) < before)) {
+        const card = (state.playerCards ?? []).filter((c) => c.exhausted && ownerOf(c) === ownerOf(pu) && !cardDef(c.defId)?.isFactionCard && !cardDef(c.defId)?.unique).sort((x, y) => (cardDef(y.defId)?.resource ?? 0) - (cardDef(x.defId)?.resource ?? 0))[0];
+        if (card) { card.exhausted = false; pushLog(state, 'players', `Operational Efficiency: ${cardDef(card.defId)?.name} is Ready again.`); }
+      }
       pu.firedThisActivation = [...(pu.firedThisActivation ?? []), weapon.id];
       finishPlayerAction(state, mode, pu, weapon.phase === 'Combat' ? 'combat' : 'assault', 'attack');
       return state;
@@ -1469,6 +1636,7 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
           const a = resolveAttack(ctx.rng, ip);
           if (a.hits > 0) aiPassiveTough(state, target, activationKey(state, pu.id)).mark();
           applyDamageToAi(state, mode, target, a.damage, before, playerPos(state, pu));
+          afterPlayerDamage(state, pu, target, a.damage);
           state.lastAttack = a;
           state.attackLog.push(a);
           emit(state, { kind: 'attack', attack: a });
@@ -1483,6 +1651,10 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
     }
     case 'playersDone': {
       if (state.step.kind !== 'PLAYERS_TURN') return state;
+      // Done at the table ends the activation of whichever Unit the app had Activated.
+      const au = state.activeUnitId ? state.playerUnits.find((p) => p.id === state.activeUnitId) : undefined;
+      if (au) { au.mayAdjust = false; au.firedThisActivation = []; au.dashFrom = undefined; }
+      state.activeUnitId = null;
       pushLog(state, 'players', 'Players activated a unit.');
       state.turn = 'ai';
       advanceTurn(state, mode);
@@ -1494,6 +1666,19 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
       if (!pending) return state;
       const t = pending.token;
       t.resolved = true;
+      if (pending.kind === 'surprise') {
+        const decoy = pending.owner!;
+        decoy.used = [...(decoy.used ?? []), 'Surprise!'];
+        if (!cmd.accept) { pushLog(state, 'players', 'Surprise!: not used.'); return state; }
+        const nova = pending.candidates.find((p) => p.id === cmd.unitId) ?? pending.candidates[0]!;
+        // Set in Coherency with the Holo Decoy: beside it, clear of every enemy.
+        const from = playerPos(state, nova);
+        nova.location = 'table';
+        setPlayerPosition(state, nova, { x: t.x, y: t.y + 1.7 });
+        if (from) nova.movedRound = state.round + 1;
+        pushLog(state, 'players', `Surprise!: ${nova.name} steps out beside the Holo Decoy.`);
+        return state;
+      }
       if (!cmd.accept) {
         pushLog(state, 'players', `${t.label}: not used.`);
         return state;
@@ -1564,16 +1749,26 @@ function applyCommand(prev: GameState, cmd: Command): GameState {
     case 'endActivation': {
       if (state.step.kind !== 'PLAYERS_TURN' || !state.activeUnitId) return state;
       const pu = state.playerUnits.find((x) => x.id === state.activeUnitId);
+      // Activated for an ability and no action taken: its action is a Hold (Part 8.5.1, 8.7.2).
+      const held = !!pu && state.phase !== 'scoring' && !pu.activated[state.phase];
+      if (pu && held) finishPlayerAction(state, mode, pu, state.phase as 'movement' | 'assault' | 'combat', 'hold');
       state.activeUnitId = null;
       if (pu) { pu.mayAdjust = false; pu.firedThisActivation = []; pu.dashFrom = undefined; }
       if (state.pendingReaction?.kind === 'afterCharge') state.pendingReaction = undefined;
-      pushLog(state, 'players', `${pu?.name ?? 'Your unit'} ends its activation.`);
+      pushLog(state, 'players', held ? `${pu!.name} holds.` : `${pu?.name ?? 'Your unit'} ends its activation.`);
       state.turn = 'ai';
       advanceTurn(state, mode);
       return state;
     }
     case 'playersPass': {
       if (state.step.kind !== 'PLAYERS_TURN') return state;
+      // A Pass is made instead of activating a Unit (Part 8.2.1), on a turn of its own: while a Unit is Activated the
+      // player finishes it (a Unit activated for an ability still owes its action), and may Pass on their next turn.
+      const active = state.activeUnitId ? state.playerUnits.find((p) => p.id === state.activeUnitId) : undefined;
+      if (active) {
+        const owes = state.phase !== 'scoring' && !active.activated[state.phase as 'movement' | 'assault' | 'combat'];
+        return reject(state, owes ? `${active.name} is Activated: it must take its action, or Hold, before you can Pass.` : `End ${active.name}'s activation first. You may Pass on your next turn.`);
+      }
       // Combat Phase: a player Passes only when none of their Engaged Units is left to activate (Part 8.8).
       if (state.phase === 'combat' && autoEngagement(state)) {
         const left = state.playerUnits.find((p) => p.location === 'table' && !p.destroyed && !p.summoned && p.engaged && !p.activated.combat);
@@ -1831,6 +2026,7 @@ function resolveAbilityTargets(state: GameState, pu: PlayerUnit | null, spec: Ab
     const f = state.playerUnits.find((x) => x.id === cmd.friendlyId);
     if (!f || f.destroyed || f.location !== 'table') return `Pick ${spec.targetHint ?? 'a friendly unit on the battlefield'}.`;
     if (spec.friendlyFilter && !spec.friendlyFilter(f)) return `${f.name} is not a valid target (${spec.targetHint ?? 'wrong type'}).`;
+    if (hasAbility(f, 'Decoy') || hasAbility(f, 'Structure')) return `${f.name} cannot be the target of an ability.`;
     if (beyond(gap('players', f.id))) return `${f.name} is out of range (${range}").`;
     return { friendly: f };
   }
@@ -1909,7 +2105,7 @@ function offerReaction(state: GameState, pr: PendingReaction): boolean {
 }
 
 /** Use one offered Reaction: pay it, spend it for the round and resolve it. Returns an error, or null. */
-function useReaction(state: GameState, pr: PendingReaction, o: ReactionOffer): string | null {
+function useReaction(state: GameState, mode: MissionMode, pr: PendingReaction, o: ReactionOffer): string | null {
   const ru = state.playerUnits.find((x) => x.id === o.unitId);
   if (!ru) return 'That Reaction is no longer available.';
   const who = o.cardId ? ownerOf((state.playerCards ?? []).find((c) => c.id === o.cardId) ?? {}) : ownerOf(ru);
@@ -1975,15 +2171,29 @@ function useReaction(state: GameState, pr: PendingReaction, o: ReactionOffer): s
       say(`Debilitating Saliva: ${ai.label} gains DEBUFF Hit (1) on its Ranged Weapons.`, ai.id, 'ai', 'bad');
       return null;
     }
-    case 'Concussive Shells': {
+    case 'Concussive Shells':
+    case 'Suppression Shells': {
       if (!ai) return null;
-      ai.statDebuffs = [...(ai.statDebuffs ?? []).filter((d) => d.stat !== 'speed'), { stat: 'speed', amount: 2 }];
-      say(`Concussive Shells: ${ai.label} gains DEBUFF Speed (2).`, ai.id, 'ai', 'bad');
+      const n = o.name === 'Suppression Shells' ? 3 : 2;
+      ai.statDebuffs = [...(ai.statDebuffs ?? []).filter((d) => d.stat !== 'speed'), { stat: 'speed', amount: n }];
+      say(`${o.name}: ${ai.label} gains DEBUFF Speed (${n}).`, ai.id, 'ai', 'bad');
       return null;
     }
     case 'Lunge': {
       const moved = lungeToward(state, ru, ai);
       say(moved > 0 ? `Lunge: ${ru.name} moves ${moved.toFixed(1)}" towards ${ai?.label ?? 'the attacker'}.` : `Lunge: ${ru.name} has no room to move towards ${ai?.label ?? 'the attacker'}.`);
+      return null;
+    }
+    case 'Dark Swarm': {
+      if (!target) return null;
+      const small = playerUnitDef(target).stats.size === 1;
+      target.effects = [...(target.effects ?? []), { id: `swarm-${state.round}-${state.log.length}`, source: 'Dark Swarm', text: `May make an Evade Roll against this attack${small ? ', with a +1 Modifier' : ''}.`, mods: { mayEvade: true, ...(small ? { evadeBonus: 1 } : {}) }, until: 'round' }];
+      say(`Dark Swarm: ${target.name} may make an Evade Roll against ${ai?.label ?? 'the attack'}${small ? ', with a +1 Modifier' : ''}.`, target.id);
+      return null;
+    }
+    case 'Overwatch': {
+      if (!ai || ai.location !== 'table') return null;
+      pushLog(state, 'players', `${reactionAttack(state, mode, ru, ai, 'Overwatch')}${paid}`);
       return null;
     }
     case 'Lightning Dash': {
@@ -2035,6 +2245,19 @@ function continueAfterReaction(state: GameState, mode: MissionMode, pr: PendingR
   }
   if (kind === 'afterAiRanged') {
     if (state.step.kind === 'AI_ORDER') finishAiOrder(state, mode, pr.report ?? 'attacked', pr.enemySupply);
+    return;
+  }
+  if (kind === 'aiMelee') {
+    const t = state.playerUnits.find((p) => p.id === pr.unitId);
+    if (!order || !u) return;
+    if (t && !t.destroyed && t.location === 'table' && aiAttackPlayer(state, mode, u, order, 0, t, 'Combat', 'done')) return;
+    finishAiOrder(state, mode, 'done');
+    return;
+  }
+  if (kind === 'aiActivationEnd') {
+    // The enemy's Activation is over: the turn passes as it would have.
+    state.turn = 'players';
+    advanceTurn(state, mode);
     return;
   }
   if (kind === 'aiCharge') {
@@ -2116,7 +2339,7 @@ function finishPlayerAction(state: GameState, mode: MissionMode, pu: PlayerUnit,
   // Path of Shadows lasts until the unit performs another action; Darkness Descends until the End of the Round.
   if (pu.hiddenThroughRound !== state.round) pu.statuses = (pu.statuses ?? []).filter((x) => x !== 'Hidden');
   // One With the Shadows: after it fully resolves an Action, the unit gains HIDDEN.
-  if (hasAbility(pu, 'One With the Shadows') && pu.location === 'table' && !pu.destroyed) pu.statuses = [...new Set([...(pu.statuses ?? []), 'Hidden' as const])];
+  if ((hasAbility(pu, 'One With the Shadows') || hasAbility(pu, 'Tactical Stealth Suit')) && pu.location === 'table' && !pu.destroyed) pu.statuses = [...new Set([...(pu.statuses ?? []), 'Hidden' as const])];
   pu.effects = (pu.effects ?? []).filter((e) => e.until !== 'action');
   // After moving or holding, the unit stays active so you can adjust its models into coherency before ending it.
   for (const other of state.playerUnits) if (other.id !== pu.id) other.mayAdjust = false;
@@ -2150,9 +2373,58 @@ function finishAiOrder(state: GameState, mode: MissionMode, report: string, enem
   for (const pu of state.playerUnits) if (pu.effects?.some((e) => e.mods.mayEvade)) pu.effects = pu.effects.filter((e) => !e.mods.mayEvade);
   const held = state.pendingReaction?.kind;
   if (held === 'aiRanged' || held === 'afterAiRanged' || held === 'aiCharge') state.pendingReaction = undefined;
+  const order = state.step.kind === 'AI_ORDER' ? state.step.order : null;
   applyOrderReport(state, mode, report, { enemySupply });
+  // Lightning Dash: a successful Charge earns a second one in the same Activation, against a different Enemy Unit.
+  if (order && report === 'charged') {
+    const ctx = ctxFor(state);
+    const dash = lightningDashOrder(state, order, ctx.rng);
+    commitRng(state, ctx.rng);
+    if (dash) {
+      state.step = { kind: 'AI_ORDER', order: dash };
+      pushLog(state, 'ai', dash.title);
+      return;
+    }
+  }
+  // Creep Removal (Reactive Creep): an Enemy Unit ending its action Within 1" of a Friendly Creep Tumor clears it.
+  if (order) creepRemoval(state, order.unitId);
+  // Overwatch: an Auto-Turret may fire on the Enemy Unit that has just ended its Activation Within 8".
+  const turret = order ? state.playerUnits.find((p) => p.location === 'table' && !p.destroyed && hasAbility(p, 'Overwatch')) : undefined;
+  if (order && turret && offerReaction(state, { kind: 'aiActivationEnd', unitId: turret.id, aiUnitId: order.unitId, amount: 0, source: 'Overwatch' })) return;
   state.turn = 'players';
   advanceTurn(state, mode);
+}
+
+function creepRemoval(state: GameState, aiUnitId: string): void {
+  if (!(state.playerCards ?? []).some((c) => c.defId === 'reactive_creep')) return;
+  const shapes = unitShapes(state, 'ai', aiUnitId);
+  const u = state.army.units.find((x) => x.id === aiUnitId);
+  for (const t of (state.tokens ?? []).filter((x) => x.kind === 'creepTumor' && shapes.some((sh) => edgeToPoint(sh, x) <= 1.05))) {
+    removeToken(state, t.id);
+    pushLog(state, 'players', `Creep Removal: ${u?.label ?? 'An Enemy Unit'} ends Within 1" of a Creep Tumor, which is removed.`);
+  }
+}
+
+/**
+ * A Ranged Attack a Reaction makes outside its unit's own Activation (the Auto-Turret's Overwatch): fired as an
+ * ordinary attack, but it takes no action and leaves the turn where it is.
+ */
+function reactionAttack(state: GameState, mode: MissionMode, pu: PlayerUnit, target: AiUnitInstance, source: string): string {
+  const weapon = playerWeapons(state, pu).find((w) => w.phase === 'Assault' && validTargets(state, pu, w).some((t) => t.unit.id === target.id));
+  if (!weapon) return `${source}: ${pu.name} has no shot at ${target.label}.`;
+  const setup = playerAttackSetup(state, { t: 'playerAttack', unitId: pu.id, targetId: target.id, weaponId: weapon.id });
+  if (!setup) return `${source}: ${pu.name} has no shot at ${target.label}.`;
+  const ctx = ctxFor(state);
+  const tdef = unitById(target.defId);
+  spendEffects(pu, setup.mod.spent);
+  const a = resolveAttack(ctx.rng, setup.params);
+  commitRng(state, ctx.rng);
+  const before = currentSupply(tdef, target.models);
+  applyDamageToAi(state, mode, target, a.damage, before, playerPos(state, pu), a.maxRemovable);
+  state.lastAttack = a;
+  state.attackLog.push(a);
+  emit(state, { kind: 'attack', attack: a });
+  return `${source}: ${pu.name} fires ${weapon.name} at ${target.label}${setup.mod.notes.length ? ` (${setup.mod.notes.join(', ')})` : ''}: ${a.hits} hits, ${a.damage} damage${a.removed ? `, ${a.removed} model(s) removed` : ''}${a.destroyed ? '. Destroyed' : ''}.`;
 }
 
 /**
@@ -2291,6 +2563,27 @@ function trackPlayerSupply(state: GameState, pu: PlayerUnit, fn: () => void): vo
   fn();
   const after = pu.destroyed ? 0 : playerUnitSupply(pu);
   state.playerSupplyLostThisRound = (state.playerSupplyLostThisRound ?? 0) + Math.max(0, before - after);
+  if (after < before) boundByTheKhala(state, pu);
+}
+
+/**
+ * Bound by the Khala (the Twilight Templar's Reaction, 0 PE): when another Friendly Unit Within 8" loses Supply, one
+ * Exhausted non-Unique Tactical card is Ready again. It costs nothing and only helps, so the app uses it, within
+ * the one Reaction a player may resolve each Activation.
+ */
+function boundByTheKhala(state: GameState, hurt: PlayerUnit): void {
+  const owner = ownerOf(hurt);
+  if ((state.reacted ?? []).includes(owner)) return;
+  const near = unitShapes(state, 'players', hurt.id);
+  const templar = state.playerUnits.find((p) => p.id !== hurt.id && p.location === 'table' && !p.destroyed && ownerOf(p) === owner && hasAbility(p, 'Bound by the Khala') && !(p.used ?? []).includes('Bound by the Khala')
+    && (!near.length || unitShapes(state, 'players', p.id).some((m) => near.some((q) => edgeDistance(m, q) <= 8.05))));
+  if (!templar) return;
+  const card = (state.playerCards ?? []).filter((c) => c.exhausted && ownerOf(c) === owner && !cardDef(c.defId)?.isFactionCard && !cardDef(c.defId)?.unique).sort((a, b) => (cardDef(b.defId)?.resource ?? 0) - (cardDef(a.defId)?.resource ?? 0))[0];
+  if (!card) return;
+  card.exhausted = false;
+  templar.used = [...(templar.used ?? []), 'Bound by the Khala'];
+  state.reacted = [...(state.reacted ?? []), owner];
+  pushLog(state, 'players', `Bound by the Khala: ${hurt.name} falls back, and ${cardDef(card.defId)?.name} is Ready again.`);
 }
 
 function applyToPlayer(state: GameState, pu: PlayerUnit, r: ReturnType<typeof applyDamage>, from?: { x: number; y: number } | null): void {
@@ -2328,6 +2621,11 @@ function aiAttackPlayer(state: GameState, mode: MissionMode, u: AiUnitInstance, 
   void fxImpact;
   const tdef = playerUnitDef(target);
   // HIDDEN (and BURROWED) units are immune to IMPACT.
+  // Biological Structure: immune to the IMPACT keyword.
+  if (weaponPhase === 'Impact' && hasAbility(target, 'Biological Structure')) {
+    pushLog(state, 'players', `${target.name} is a Biological Structure: immune to IMPACT.`);
+    return false;
+  }
   if (weaponPhase === 'Impact' && isHidden(target)) {
     pushLog(state, 'players', `${target.name} is ${isBurrowed(target) ? 'Burrowed' : 'Hidden'}: immune to IMPACT.`);
     return false;
@@ -2732,6 +3030,8 @@ function aiResolve(state: GameState, mode: MissionMode): void {
       if (ranks > 0 && order.batches[0]) order.batches[0] = { ...order.batches[0], models: Math.min(u.models, ranks) };
       pushLog(state, 'ai', `${u.label} close ranks: ${ranks} model${ranks === 1 ? '' : 's'} fight ${target.name}.`);
       emit(state, { kind: 'closeRanks', side: 'ai', unitId: u.id, fighting: ranks, supporting: 0 });
+      // Instinctive Reaction and Dark Swarm answer the Close Combat Attack as it is declared.
+      if (offerReaction(state, { kind: 'aiMelee', unitId: target.id, aiUnitId: u.id, amount: 0, source: u.label })) { commitRng(state, ctx.rng); return; }
       if (aiAttackPlayer(state, mode, u, order, 0, target, 'Combat', 'done')) return;
     }
     commitRng(state, ctx.rng);

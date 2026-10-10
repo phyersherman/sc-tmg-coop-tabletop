@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deploymentById } from '@data/index';
+import { deploymentById, unitById } from '@data/index';
+import { makeInstance } from '@engine/army/builder';
 import { apply, createGame } from '@engine/director/reducer';
 import { makePlayerUnit } from '@engine/sense/playerUnits';
 import { makeConfig } from '../engine/helpers';
@@ -25,7 +26,7 @@ describe('SIDEARM in the simulation', () => {
     for (let i = 0; i < 80 && !(s.phase === 'assault' && s.step.kind === 'PLAYERS_TURN'); i++) {
       if (s.step.kind === 'PLAYERS_TURN' && s.phase === 'movement') {
         const g = s.playerUnits[0]!;
-        s = g.location === 'reserves' ? apply(s, { t: 'playerDeploy', unitId: 'g1', point: { x: 18, y: 3 } }) : apply(s, { t: 'playersPass' });
+        s = g.location === 'reserves' ? apply(s, { t: 'playerDeploy', unitId: 'g1', point: { x: 18, y: 3 } }) : apply(s, s.activeUnitId ? { t: 'endActivation' } : { t: 'playersPass' });
         continue;
       }
       s = step(s);
@@ -64,10 +65,12 @@ describe('coherency in the simulation', () => {
 describe('casualties leave the table', () => {
   it('range is never measured to a dead model: a sidearm the target was out of reach of stays out of reach', () => {
     const cfg = makeConfig({ modeId: 'frontlines', playMode: 'video' });
+    // A pack of Zerglings is what the AI fields here.
+    cfg.army = { ...cfg.army, units: [makeInstance(unitById('zergling'), 'large', 'Zerglings A', 1)] };
     cfg.playerUnits = [makePlayerUnit('g1', 'goliath', 'small', [], 'Goliath', 100)];
     let s = createGame(cfg, dep, flat);
     for (let i = 0; i < 80 && !(s.phase === 'assault' && s.step.kind === 'PLAYERS_TURN'); i++) {
-      if (s.step.kind === 'PLAYERS_TURN' && s.phase === 'movement') { s = s.playerUnits[0]!.location === 'reserves' ? apply(s, { t: 'playerDeploy', unitId: 'g1', point: { x: 18, y: 3 } }) : apply(s, { t: 'playersPass' }); continue; }
+      if (s.step.kind === 'PLAYERS_TURN' && s.phase === 'movement') { s = s.playerUnits[0]!.location === 'reserves' ? apply(s, { t: 'playerDeploy', unitId: 'g1', point: { x: 18, y: 3 } }) : apply(s, s.activeUnitId ? { t: 'endActivation' } : { t: 'playersPass' }); continue; }
       s = step(s);
     }
     const target = s.army.units.find((u) => u.location === 'table') ?? s.army.units[0]!;

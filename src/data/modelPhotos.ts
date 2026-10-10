@@ -1,12 +1,17 @@
 /**
  * The painted models from the official unit cards (the P2P card sheets at starcraft-tmg.com/downloads), one photo
- * per Unit, in public/models. A Unit without one (the mission objects) shows its race's die instead.
+ * per Unit, in public/models. Wave 3's come from the cut-outs in the 10.2026 Cost Table, set on a dark backdrop of
+ * their race's colour. A Unit without one (the mission objects, the Bile Launcher and the summoned Wave 3 Units)
+ * shows its race's die instead.
  */
 const WITH_PHOTO = new Set([
   'adept', 'artanis', 'immortal', 'nerazim_watchers__adept_', 'praetor_guard__zealot_', 'pylon', 'sentry', 'stalker', 'zealot', 'zeratul',
   'goliath', 'jim_raynor', 'marauder', 'marine', 'medic', 'point_defense_drone', 'raynor_s_raider__marine_', 'siege_tank',
   'corpser__roach_', 'hydralisk', 'kerrigan', 'kerrigan_swarm_raptor__zergling_', 'omega_worm', 'queen', 'raptor__zergling_', 'ravager', 'roach',
   'roachling', 'swarmling__zergling_', 'vile__roach_', 'zergling',
+  // Wave 3.
+  'raven', 'nova_assault_mode', 'nova_stealth_mode', 'spec_ops_marauder__marauder_', 'zagara', 'vileling__zergling_', 'defiler',
+  'tassadar', 'high_templar', 'twilight_templar__high_templar_',
 ]);
 
 export function modelPhoto(defId: string): string | null {

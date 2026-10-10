@@ -3,7 +3,7 @@ import type { AiArmy, AiUnitInstance } from '../types/army';
 import { Rng } from '../rng';
 import { currentSupply } from '../units/supply';
 import type { AbilityDef, WeaponProfile } from '../types/units';
-import { SLOT_TYPES, armySlots, cardEligible, cardFactionTags, cheapestCards, isCreepCard, needsCreepCard, noSlots, sameTag, slotOf, slotsUsed, startingSupply, unitFactionTags, unitNeeds, vespeneLimit, vespeneSpent, type SlotCount } from './rules';
+import { SLOT_TYPES, armySlots, cardEligible, cardFactionTags, cheapestCards, excludedBy, isCreepCard, needsCreepCard, noSlots, sameTag, slotOf, slotsUsed, startingSupply, unitFactionTags, unitNeeds, vespeneLimit, vespeneSpent, type SlotCount } from './rules';
 
 type Opp = { def: UnitDef; models: number };
 const TAGS = ['Light', 'Armoured', 'Biological', 'Mechanical', 'Flying', 'Ground', 'Massive', 'Psionic'];
@@ -239,6 +239,7 @@ export function buildAiArmy(opts: BuildOptions): AiArmy {
   const candidates = () =>
     pool.filter((u) => {
       if (u.unique && uniqueUsed.has(u.id)) return false;
+      if (excludedBy(u, units)) return false;
       if (u.role === 'Hero' && (!opts.heroAllowed || heroes >= 1)) return false;
       if (u.role === 'Support' && support >= 2) return false;
       const small = u.compositions.find((c) => c.label === 'small');

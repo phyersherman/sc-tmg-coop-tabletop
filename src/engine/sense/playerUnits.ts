@@ -16,6 +16,11 @@ export function playerUnitFlying(pu: PlayerUnit): boolean {
   return playerUnitDef(pu).tags.includes('Flying');
 }
 
+/** A unit nothing can Engage: a Flying Unit, or a Holo Decoy ("This Unit is never Engaged"). */
+export function neverEngaged(pu: PlayerUnit): boolean {
+  return playerUnitFlying(pu) || playerUnitDef(pu).abilities.some((a) => a.name === 'Decoy');
+}
+
 export function playerUnitSize(pu: PlayerUnit): number {
   // BURROWED units count as Size 0 for all purposes.
   if ((pu.statuses ?? []).includes('Burrowed')) return 0;

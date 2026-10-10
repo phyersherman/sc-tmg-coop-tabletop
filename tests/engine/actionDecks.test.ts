@@ -5,7 +5,7 @@ import { cardWeight } from '@engine/ai/cardChoice';
 import { COOP_MODES } from '@engine/missions/coop';
 import { makeConfig, playGame } from './helpers';
 import { deploymentById, unitById } from '@data/index';
-import { createGame } from '@engine/director/reducer';
+import { apply, createGame } from '@engine/director/reducer';
 import { mapLayout, remixId } from '@engine/terrain/remix';
 import { makeInstance } from '@engine/army/builder';
 import { cardOrder } from '@engine/ai/cardOrders';
@@ -269,5 +269,45 @@ describe('no map in play', () => {
         onOrder: (_s, o) => { expect(o.lines.some((l) => l.startsWith('Camera:')), `${mode.id}: ${o.title}`).toBe(false); },
       });
     }
+  });
+});
+
+describe('Lightning Dash on the AI', () => {
+  // Artanis on the table, carrying Lightning Dash as a buff from his card, with a charge order in front of the table.
+  function artanisCharging(noMap: boolean) {
+    const cfg = makeConfig({ modeId: 'frontlines', aiFaction: 'Protoss', playMode: 'tabletop' });
+    cfg.options = { ...cfg.options, actionDecks: true, noMap };
+    const dep = deploymentById(cfg.deploymentId);
+    const s = createGame(cfg, dep, mapLayout(remixId(dep.scale, cfg.terrainSeed), dep));
+    const artanis = makeInstance(unitById('artanis'), 'small', 'Artanis', 1);
+    artanis.location = 'table';
+    const dash = unitById('artanis').abilities.find((a) => a.name === 'Lightning Dash')!;
+    artanis.buffs = [{ name: dash.name, text: dash.text, source: 'reaction' }];
+    s.army.units = [artanis];
+    s.phase = 'assault';
+    s.step = { kind: 'AI_ORDER', order: { type: 'charge', unitId: artanis.id, title: 'Artanis: Charge', lines: ['x'], batches: [], charge: { speed: 7, min: 8, max: 13, dice: '1d6' }, reports: [{ id: 'charged', label: 'Charge succeeded' }] } };
+    return s;
+  }
+
+  it('declares a second Charge after a successful one, with no IMPACT, and only one', () => {
+    let s = artanisCharging(true);
+    s = apply(s, { t: 'orderReport', report: 'charged', enemySupply: 1 });
+    expect(s.step.kind).toBe('AI_ORDER');
+    const dash = s.step.kind === 'AI_ORDER' ? s.step.order : null;
+    expect(dash?.type).toBe('charge');
+    expect(dash?.dash).toBe(true);
+    expect(dash?.impact).toBeUndefined();
+    expect(dash?.reports.map((r) => r.id)).toEqual(['charged', 'chargeFailed', 'noTarget']);
+    // The second Charge lands too: it fights both Units, and its Activation ends there.
+    s = apply(s, { t: 'orderReport', report: 'charged', enemySupply: 2 });
+    expect(s.step.kind === 'AI_ORDER' && s.step.order.dash).toBeFalsy();
+    expect(s.army.units[0]!.engagedEnemySupply).toBe(3);
+  });
+
+  it('makes no second Charge after a failed one, nor with a map in play', () => {
+    let s = apply(artanisCharging(true), { t: 'orderReport', report: 'chargeFailed' });
+    expect(s.step.kind === 'AI_ORDER' && s.step.order.dash).toBeFalsy();
+    s = apply(artanisCharging(false), { t: 'orderReport', report: 'charged', enemySupply: 1 });
+    expect(s.step.kind === 'AI_ORDER' && s.step.order.dash).toBeFalsy();
   });
 });

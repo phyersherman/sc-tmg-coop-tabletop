@@ -11,7 +11,7 @@ import { DIFFICULTIES } from '@engine/difficulty';
 import { aiDebuff } from '@engine/ai/decide';
 import { useGame } from '@tt/store/gameStore';
 import { useUi } from '@tt/store/uiStore';
-import { EnemyBoard } from './EnemyBoard';
+import { EnemyBoard, StagedUnit } from './EnemyBoard';
 import { TableSetup } from '../hud/TableSetup';
 import { CombatTray, Side } from '../hud/CombatTray';
 import { autoSaves } from '../hud/combatPools';
@@ -55,8 +55,13 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
   useStageKeys(undoLast);
 
   const inspected = g.army.units.find((u) => u.id === ui.inspectId && u.location === 'table');
+  const inspectedId = inspected?.id ?? null;
   const cfg = modeById(g.config.modeId);
   const inOrder = g.step.kind === 'AI_ORDER';
+  // The Unit the AI is activating: its card goes up to the stage with the order (a deploying Unit comes from Reserves).
+  const staged = g.step.kind === 'AI_ORDER' && now ? g.step.order.unitId : null;
+  const pick = (id: string) => ui.inspect(id === ui.inspectId ? null : id);
+  const engage = (id: string, on: boolean) => { const x = g.army.units.find((a) => a.id === id); dispatch({ t: 'setEngaged', unitId: id, engaged: on, enemySupply: x?.engagedEnemySupply || 1 }); };
   return (
     <div className="tt-root tt-mode-aiOnly">
       <header className="tt-top">
@@ -90,8 +95,9 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
       <Stakes g={g} className="tt-stakes" />
 
       <div className="tt-map">
-        {/* The stage: rewards waiting for a choice, the dice, and your turn. The AI's order is not here: it is dealt
-            onto the acting Unit's card below, and what the AI did last stays on that Unit's card until its next. */}
+        {/* The stage: rewards waiting for a choice, your hits on an AI Unit, the Unit the AI is activating, and your
+            turn. The acting Unit's whole card comes up here with its order and its dice under it; what the AI did
+            last stays on that Unit's card in the grid until its next. */}
         <section className="tt-stage" aria-label="Now">
           <p className="sr-only" aria-live="polite">{announce(g)}</p>
           {/* A side marker's reward waits here for its one choice (which unit, which player) until it is used or lost. */}
@@ -99,15 +105,17 @@ export function TabletopLayout({ g, dispatch, now, overlays, pendingEvent }: {
           <CombatTray g={g} dispatch={dispatch} pendingEvent={pendingEvent} className="inline tt-tray" />
           {/* Your hits on an AI Unit roll here, above the cards, where every result is read: entered on the card, rolled on the stage. */}
           {battleUnit && <HitsBattle g={g} dispatch={dispatch} />}
-          {/* The AI's dice: its order is on its Unit's card below, its rolls land here (see InTray). */}
-          <div id="tt-roll-slot" className="tt-rolls" />
-          <div className="tt-now">{inOrder ? null : now ?? (pendingEvent ? <p className="tt-hint muted">Apply the result on the table, then Continue.</p> : null)}</div>
+          {staged && (
+            <StagedUnit g={g} unitId={staged} selected={inspectedId === staged} onPick={() => pick(staged)} onEngaged={(on) => engage(staged, on)}
+              extra={inspectedId === staged ? <EnemyCard g={g} unitId={staged} dispatch={dispatch} onClose={() => ui.inspect(null)} /> : null}>
+              {now}
+            </StagedUnit>
+          )}
+          {!staged && <div className="tt-now">{inOrder ? null : now ?? (pendingEvent ? <p className="tt-hint muted">Apply the result on the table, then Continue.</p> : null)}</div>}
         </section>
         {/* Damage entry opens on the Unit's own card, the way you would mark the card on the table. */}
-        <EnemyBoard g={g} selected={inspected?.id ?? null} lastId={inOrder ? null : last?.unitId ?? null} onPick={(id) => ui.inspect(id === ui.inspectId ? null : id)}
-          dealt={g.step.kind === 'AI_ORDER' && now ? { unitId: g.step.order.unitId, node: now } : null}
-          onEngaged={(id, on) => { const x = g.army.units.find((a) => a.id === id); dispatch({ t: 'setEngaged', unitId: id, engaged: on, enemySupply: x?.engagedEnemySupply || 1 }); }}
-          extra={(id) => inspected?.id === id ? <EnemyCard g={g} unitId={id} dispatch={dispatch} onClose={() => ui.inspect(null)} /> : null} />
+        <EnemyBoard g={g} selected={inspectedId} stagedId={staged} lastId={inOrder ? null : last?.unitId ?? null} onPick={pick} onEngaged={engage}
+          extra={(id) => inspectedId === id ? <EnemyCard g={g} unitId={id} dispatch={dispatch} onClose={() => ui.inspect(null)} /> : null} />
       </div>
 
       {overlays}
@@ -170,7 +178,7 @@ function useStageKeys(undoLast: () => void): void {
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoLast(); return; }
       if (e.key !== ' ' || document.querySelector('.combat-tray')) return;
-      const primary = document.querySelector<HTMLButtonElement>('.tt-rolls .tt-primary:not(:disabled), .eb-deal .tt-primary:not(:disabled), .tt-now .tt-primary:not(:disabled)');
+      const primary = document.querySelector<HTMLButtonElement>('.tt-staged .tt-primary:not(:disabled), .tt-now .tt-primary:not(:disabled)');
       if (!primary) return;
       e.preventDefault();
       primary.click();

@@ -21,7 +21,7 @@ import { firedWeapon, impactDice } from '../units/firing';
 import type { PlayerUnit } from '../sense/types';
 import type { WeaponProfile } from '../types/units';
 import { passable } from '../sense/geometry2d';
-import { playerUnitFlying } from '../sense/playerUnits';
+import { neverEngaged, playerUnitFlying } from '../sense/playerUnits';
 import { playerSegments } from '../terrain/geometry';
 import { hasAbility, hiddenFrom } from '../abilities/index';
 import type { Rng } from '../rng';
@@ -371,7 +371,7 @@ function pickupOrder(state: GameState, unit: AiUnitInstance): AiOrder | null {
   if (!aiHasBoost(state, 'Ready for Pickup?') || ((state.modeState['pickupUsed'] as string[] | undefined) ?? []).length) return null;
   const from = state.sense?.ai[unit.id]?.[0] ?? unit.est;
   if (!from) return null;
-  const foes = state.playerUnits.filter((p) => p.location === 'table' && !p.destroyed && !playerUnitFlying(p)).flatMap((p) => playerModels(state, p));
+  const foes = state.playerUnits.filter((p) => p.location === 'table' && !p.destroyed && !neverEngaged(p)).flatMap((p) => playerModels(state, p));
   if (!foes.length) return null;
   const range = maxRange(w) + rangeModFor(state);
   const t = state.deployment.table;

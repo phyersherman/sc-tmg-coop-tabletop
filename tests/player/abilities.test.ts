@@ -75,6 +75,8 @@ describe('cards and resources', () => {
   it('refreshes cards and clears round effects at the next round', () => {
     let s = terranGame();
     s = apply(s, { t: 'useAbility', unitId: 'm1', name: 'Stimpack' });
+    // Activated for its Stimpack, the unit still takes its action before anyone may Pass: it Holds.
+    s = apply(s, { t: 'endActivation' });
     for (let i = 0; i < 200 && s.round < 2; i++) {
       if (s.step.kind === 'PLAYERS_TURN') s = apply(s, { t: 'playersPass' });
       else if (s.step.kind === 'AI_ORDER') s = apply(s, { t: 'aiResolve' });
@@ -529,7 +531,8 @@ describe('reactions to damage a unit does to itself', () => {
     s = apply(s, { t: 'useAbility', unitId: 'md', name: 'Medpack', friendlyId: 'm1' });
     const heal = (s.events ?? []).filter((e) => e.kind === 'effect');
     expect(heal.some((e) => e.kind === 'effect' && e.unitId === 'm1' && /HEALED/.test(e.label) && e.tone === 'good')).toBe(true);
-    // A buff shows up the same way.
+    // A buff shows up the same way (the Medics' activation set aside: only the events matter here).
+    s.activeUnitId = null;
     s = apply(s, { t: 'useAbility', unitId: 'm1', name: 'Stimpack' });
     expect((s.events ?? []).some((e) => e.kind === 'effect' && /STIMPACK/.test(e.label))).toBe(true);
   });

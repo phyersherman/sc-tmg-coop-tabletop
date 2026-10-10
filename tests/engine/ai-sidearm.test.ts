@@ -31,7 +31,7 @@ describe('the AI\'s sidearms', () => {
       }
       if (s.step.kind === 'PLAYERS_TURN') {
         const m = s.playerUnits[0]!;
-        s = s.phase === 'movement' && m.location === 'reserves' ? apply(s, { t: 'playerDeploy', unitId: 'm1', point: { x: 18, y: 4 } }) : apply(s, { t: 'playersPass' });
+        s = s.phase === 'movement' && m.location === 'reserves' ? apply(s, { t: 'playerDeploy', unitId: 'm1', point: { x: 18, y: 4 } }) : apply(s, s.activeUnitId ? { t: 'endActivation' } : { t: 'playersPass' });
         continue;
       }
       if (s.step.kind === 'AI_ORDER') {

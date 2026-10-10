@@ -99,7 +99,8 @@ function parseWeapon(u: Raw, up: Raw, idx: number) {
   // RoA "BT+4": the Blast Template's dice, plus a fixed number.
   const roaRaw = String(stat['ROA'] ?? '1').trim();
   const btM = /^BT\s*(?:\+\s*(\d+))?$/i.exec(roaRaw);
-  const rangeRaw = stat['RANGE'] ?? 'E';
+  // Inches are written 8" or 8'' (Wave 3): the number is what counts.
+  const rangeRaw = String(stat['RANGE'] ?? 'E').replace(/["'″]+$/, '').trim();
   const range = rangeRaw === 'E' ? 'E' : Number(rangeRaw);
   const w: any = {
     id: `${u.id}:${slug(up.name)}:${idx}`,
@@ -153,6 +154,7 @@ function parseAbility(u: Raw, up: Raw, idx: number) {
 const units: any[] = [];
 const cards: any[] = [];
 
+
 for (const x of raw) {
   if (x.type === 'unit') {
     const tags = String(x.tags)
@@ -194,7 +196,9 @@ for (const x of raw) {
       id: x.id,
       name: x.name,
       faction: x.faction,
-      role: x.unitType,
+      // The Raven is a Flying Unit and fills the Air slot the Faction cards gained in October 2026; the Command
+      // Center lists it as Support.
+      role: x.id === 'raven' ? 'Air' : x.unitType,
       tags,
       unique: tags.includes('Unique'),
       summoned: maxCost === 0,
@@ -249,16 +253,17 @@ for (const u of units) {
   for (let m = 1; m <= maxModels; m++) if (!covered.has(m)) errors.push(`${u.name}: squad profile does not cover ${m} models`);
 }
 // Jim Raynor carries one rifle: the C-14 is chosen when the army is built, for nothing, in place of the Commando Rifle.
-for (const u of units as any[]) if (u.id === 'jim_raynor') for (const w of u.weapons) if (w.name === 'C-14 rifle') { w.upgradeCost = { small: 0, large: 0 }; w.replaces = 'Commando Rifle'; }
+for (const u of units as any[]) if (u.id === 'jim_raynor') for (const w of u.weapons) if (w.name.toLowerCase() === 'c-14 rifle') { w.upgradeCost = { small: 0, large: 0 }; w.replaces = 'Commando Rifle'; }
 
+for (const u of units) for (const w of u.weapons) if (w.range !== 'E' && !Number.isFinite(w.range)) errors.push(`${u.name}: ${w.name} has no Range`);
 if (errors.length) {
   console.error('VALIDATION ERRORS:\n' + errors.join('\n'));
   process.exit(1);
 }
 
 const meta = {
-  version: '2026-09-16',
-  takenAt: '2026-09-16',
+  version: '2026-10-09',
+  takenAt: '2026-10-09',
   source: 'https://sc.starcraft-tmg.com (Command Center beta v1.4, guest access)',
 };
 writeFileSync('src/data/units.json', JSON.stringify({ ...meta, units }, null, 2) + '\n');

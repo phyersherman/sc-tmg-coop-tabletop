@@ -105,8 +105,10 @@ describe('weapons', () => {
     expect(h.dice).toBe(6);
     expect(h.hits).toBe(a.rolls!.slice(0, 6).filter((r) => r >= 3).length);
   });
-  it('every non-summoned unit has a combat weapon', () => {
-    for (const u of UNITS.filter((u) => !u.summoned)) {
+  it('every non-summoned Ground unit has a combat weapon', () => {
+    // A Flying Unit is never Charged (the Raven carries no close combat weapon), and the Bile Launcher is a
+    // Biological Structure that only bombards.
+    for (const u of UNITS.filter((u) => !u.summoned && !u.tags.includes('Flying') && !u.abilities.some((a) => a.name === 'Biological Structure'))) {
       expect(bestWeapon(u, [], 'Combat'), u.name).toBeDefined();
     }
   });

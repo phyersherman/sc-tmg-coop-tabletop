@@ -52,6 +52,18 @@ const BASES: Record<string, BaseSize> = {
   pylon: round(80),
   queen: round(80),
   stalker: round(80),
+  // Wave 3 (Archon, 9 October 2026). Twilight Templar, Spec Ops Marauder and Vileling take their base Unit's.
+  nova_assault_mode: round(40),
+  nova_stealth_mode: round(40),
+  sabotage_drone: round(40),
+  holo_decoy: round(40),
+  auto_turret: round(40),
+  raven: round(100), // a 100×100mm cross, held here by its 100mm span
+  zagara: round(100),
+  bile_launcher: round(100),
+  defiler: round(80),
+  tassadar: round(40),
+  high_templar: round(40),
 };
 
 const MM_PER_IN = 25.4;
@@ -63,6 +75,18 @@ export function baseOf(defId: string): { r: number; half: number; oval: boolean 
   const half = Math.max(0, (b.hMm - b.wMm) / 2 / MM_PER_IN);
   return { r, half, oval: half > 0 };
 }
+
+/**
+ * Wave 3 tokens and templates (Archon, 9 October 2026), for the abilities that place them. Templates are 5" across;
+ * the Force Wall is a 40×100mm piece.
+ */
+export const WAVE3_PIECES: Record<string, BaseSize> = {
+  force_wall: { wMm: 40, hMm: 100 },
+  dark_swarm: round(32),
+  psi_storm: round(32),
+  plague_template: round(5 * 25.4),
+  psi_blast_template: round(5 * 25.4),
+};
 
 /** Mission markers are 32mm across. */
 export const MARKER_RADIUS_IN = 16 / MM_PER_IN;

@@ -8,7 +8,7 @@ import { Rng } from '@engine/rng';
 import { unitById } from '@data/index';
 import { abilityGap, aiPos, chargeOptions, damageHelpers, modelsWithin, playerPos, playerWeapons } from '@engine/player/rules';
 import { playerUnitDef } from '@engine/sense/playerUnits';
-import { SAVE_BOOSTS, abilityCost, activationKey, cardDef, chargeMods, effectiveSpeed, evadeFor, ownerOf, passiveToughFor, selfReactionsFor } from '@engine/abilities/index';
+import { SAVE_BOOSTS, abilityCost, activationKey, cardDef, chargeMods, effectiveSpeed, evadeFor, ownerOf, passiveDodge, passiveToughFor, selfReactionsFor } from '@engine/abilities/index';
 import { targetNumber } from '@engine/combat/resolve';
 import { impactDice } from '@engine/units/firing';
 
@@ -269,7 +269,7 @@ function savesMath(g: GameState, a: AttackResult, input: CombatInput) {
   const reacting = opts.reactions.filter((r) => input.reactions.includes(r.key));
   // DODGE sends Surge and CRITICAL HIT dice back to the Armour pool; TOUGH turns failed saves into successes.
   // Keywords do not stack: the highest value of each counts (Part 2.6.1).
-  const dodge = Math.max(0, ...chosen.map((b) => b.dodge ?? 0));
+  const dodge = Math.max(opts.pu ? passiveDodge(g, opts.pu) : 0, ...chosen.map((b) => b.dodge ?? 0));
   const surgeBack = Math.min(a.surge?.applied ?? 0, dodge);
   const back = surgeBack + Math.min(a.critical, dodge - surgeBack);
   const passive = opts.pu ? passiveToughFor(opts.pu, g, activationKey(g, a.attacker.unitId)).tough : 0;
