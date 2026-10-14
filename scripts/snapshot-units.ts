@@ -196,9 +196,7 @@ for (const x of raw) {
       id: x.id,
       name: x.name,
       faction: x.faction,
-      // The Raven is a Flying Unit and fills the Air slot the Faction cards gained in October 2026; the Command
-      // Center lists it as Support.
-      role: x.id === 'raven' ? 'Air' : x.unitType,
+      role: x.unitType,
       tags,
       unique: tags.includes('Unique'),
       summoned: maxCost === 0,

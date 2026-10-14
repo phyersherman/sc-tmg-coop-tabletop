@@ -50,9 +50,9 @@ export function field(defId: string, gap: number, cards: string[], upgrades: str
 const TERRAN = ['terran_armed_forces', 'barracks', 'factory', 'engineering_bay'];
 
 describe('the Raven', () => {
-  it('flies in the Air slot and carries no close combat weapon', () => {
+  it('takes a Support slot, as the official card says, and carries no close combat weapon', () => {
     const def = unitById('raven');
-    expect(slotOf(def)).toBe('Air');
+    expect(slotOf(def)).toBe('Support');
     expect(def.tags).toContain('Flying');
     expect(def.weapons.map((w) => w.name)).toEqual(['Railguns']);
   });

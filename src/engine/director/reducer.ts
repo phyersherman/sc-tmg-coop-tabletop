@@ -26,6 +26,7 @@ import { cardOrder, lightningDashOrder, withCardText } from '../ai/cardOrders';
 import { aiBurrowed, aiHas, setAiBurrowed } from '../ai/burrow';
 import { noMap } from '../ai/actionDecks';
 import { aiModels, engagedWith } from '../sense/query';
+import { classify, preferredRange } from '../ai/profiles';
 import { aiSegments, closestOnSegment, dist, segmentMidpoint, settleRamps } from '../terrain/geometry';
 import { clearMarkerSpot } from '../terrain/markers';
 import { destinationToward, leadingModel, leadingModelByPath, nearestEnemyByPath } from '../sense/query';
@@ -342,10 +343,21 @@ function advanceTurn(state: GameState, mode: MissionMode): void {
       let order: AiOrder | null = null;
       // Passing early is for when nothing is waiting to come on: with anything deployable, the AI deploys instead.
       if (!(state.phase === 'movement' && shouldPassEarly(state) && !deployable(state, mode, ctx).length)) order = decideAi(state, mode, ctx, ctx.rng);
-      if (order) order = cardOrder(state, order, ctx.rng);
+      const idle = (o: AiOrder) => idleMove(state, o);
+      // The card plays first, so an ability it carries is still used by a unit that has nowhere worth moving to.
+      if (order) order = cardOrder(state, order, ctx.rng, idle);
+      // A move that would gain no ground is not made: the unit holds where it is.
+      if (order && idle(order)) order = { type: 'hold', unitId: order.unitId, title: '', lines: [], batches: [], reports: [], idle: true };
       // With no map in play there is nothing seen to read positions from: the order stays as the table will run it.
       if (order) order = withCardText(state, noMap(state) ? order : applySense(state, order, ctx.rng));
       commitRng(state, ctx.rng);
+      if (order?.idle && !order.card?.steps.some((st) => st.k === 'ability')) {
+        // Nothing to gain by moving and no ability to use: it stays put, and the AI's turn goes to another unit.
+        const u = state.army.units.find((x) => x.id === order!.unitId);
+        if (u) u.activated.movement = true;
+        pushLog(state, 'ai', `${u?.label ?? 'AI unit'} holds its position.`);
+        continue;
+      }
       if (order && (order.type === 'ranged' || order.type === 'charge' || order.type === 'closeCombat')) {
         // Check now whether the attack can happen, so the player is never asked to resolve an attack that cannot.
         const intent = aiIntent(state, order);
@@ -750,6 +762,43 @@ function advanceEstimate(state: GameState, u: AiUnitInstance, order: AiOrder, re
     const dest = moving ? stopShortOfEnemies(state, u, lead, d.point) : d.point;
     u.est = held && heldLeft <= d.remaining + 0.05 ? held : dest;
   }
+}
+
+/**
+ * Whether a Move would gain the unit nothing: on the map, its Leading Model would end less than 1" nearer its goal
+ * than the nearest model already stands (it is as close as it may legally get, short of Engagement Range), a gun
+ * line already has an enemy within range and in Line of Sight, or a fighter already has an enemy within a sure
+ * Charge. Such a move is not made.
+ */
+function idleMove(state: GameState, order: AiOrder): boolean {
+  if (order.type !== 'move' || noMap(state)) return false;
+  const u = state.army.units.find((x) => x.id === order.unitId);
+  const pts = u && state.sense?.ai[u.id];
+  if (!u || !pts?.length || u.objective.kind === 'lane') return false;
+  const d = unitById(u.defId);
+  const p = classify(d);
+  if (p === 'rangedLine') {
+    const range = preferredRange(d, u.upgrades) + (hasMutator(state, 'longRange') ? 2 : 0);
+    if (range > 0 && visibleEnemies(state, u, range).some((v) => aiMayTarget(state, u, v.unit))) return true;
+  }
+  if ((p === 'meleeRusher' || p === 'brawler') && u.objective.kind === 'enemy') {
+    // A fighter with an enemy already within a sure Charge (Speed + 4": any roll makes it) waits for the Assault phase.
+    const reach = speedFor(d, u.models) + speedModFor(state, u) + 4;
+    if (state.playerUnits.some((pu) => pu.location === 'table' && !pu.destroyed && !neverEngaged(pu) && unitGap(state, 'ai', u.id, 'players', pu.id) <= reach)) return true;
+  }
+  // Where the move would end, worked out without keeping it.
+  const savedEst = u.est;
+  const savedPts = pts.slice();
+  advanceEstimate(state, u, order, 'done');
+  const to = u.est;
+  u.est = savedEst;
+  state.sense!.ai[u.id] = savedPts;
+  if (!to) return false;
+  const target = headingPointFor(state, u, to);
+  const opts = pathOptionsFor(state, 'ai', u.id);
+  const left = (p: Pt) => shortestPath(p, target, state.terrain.pieces, state.terrain.table, opts).length;
+  const now = Math.min(...savedPts.map(left));
+  return left(to) > now - 1;
 }
 
 /**

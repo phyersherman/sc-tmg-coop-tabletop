@@ -172,6 +172,8 @@ export interface AiOrder {
   held?: boolean;
   /** Its card says to hold when the attack or charge finds no target: the unit stays where it is instead of running. */
   noRun?: boolean;
+  /** A Move that would have gained no ground, held instead: with no ability on its card, the AI does not show it. */
+  idle?: boolean;
   /** Checked when the order was issued: who the AI will attack. */
   intentTarget?: string;
   /** The action card this order comes from (tabletop decks). */

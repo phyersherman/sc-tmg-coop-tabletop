@@ -5,6 +5,10 @@
  *   npm run desktop                          both platforms, the full app
  *   node scripts/build-desktop.mjs mac|win   one platform
  *   --edition tabletop                       the tabletop edition alone (what is published): only its own files
+ *   --no-install                             leave /Applications alone
+ *
+ * On a Mac (not CI), the full app's Mac build is installed to /Applications, replacing the copy there: if it is
+ * running it is asked to quit first. Saves live in the user's Library, not in the app, so they carry over.
  *
  * Where the full app is not there (the published tabletop branch) the tabletop edition is built either way.
  */
@@ -61,4 +65,20 @@ for (const t of targets) {
   else if (process.platform === 'win32') execSync(`powershell -NoProfile -Command "Compress-Archive -Path '${dir}' -DestinationPath '${zip}' -Force"`, { stdio: 'inherit' });
   else execSync(`cd "${out}" && zip -qr "${zip}" "${base}"`, { stdio: 'inherit' });
   console.log(`Done: ${dir}\n      ${zip}`);
+  if (t.platform === 'darwin' && !tabletop && process.platform === 'darwin' && !process.env.CI && !args.includes('--no-install')) install(path.join(dir, `${common.name}.app`));
+}
+
+/** Puts the Mac app in /Applications, replacing the one there. */
+function install(app) {
+  const dest = path.join('/Applications', path.basename(app));
+  try { execSync(`osascript -e 'if application "${common.name}" is running then tell application "${common.name}" to quit'`, { stdio: 'ignore' }); } catch {}
+  for (let i = 0; i < 20 && running(); i++) execSync('sleep 0.5');
+  if (running()) { console.log(`${common.name} is still running: quit it and run the build again to install. Not installed.`); return; }
+  rmSync(dest, { recursive: true, force: true, maxRetries: 5 });
+  execSync(`ditto "${app}" "${dest}"`, { stdio: 'inherit' });
+  console.log(`Installed: ${dest}`);
+}
+
+function running() {
+  try { execSync(`pgrep -f "/${common.name}.app/Contents/MacOS/"`, { stdio: 'ignore' }); return true; } catch { return false; }
 }

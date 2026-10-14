@@ -268,6 +268,8 @@ function abilityCard(profile: Profile, phase: DeckPhase, a: AbilityDef, ranged: 
     const to: MoveTo = profile === 'support' ? 'friend' : profile === 'rangedLine' ? 'objective' : 'focus';
     return { name: a.name, steps: [step, { k: 'move', mod: m.speed, to }] };
   }
+  // A support unit uses its ability for the others and stays with them: it fires if it has a gun, and never charges.
+  if (profile === 'support') return { name: a.name, steps: [step, ranged ? { k: 'attack', roa: m.roa || undefined, otherwise: 'hold' } : { k: 'run', mod: 0, to: 'friend' }] };
   if (m.twoDice || m.chargeBonus) return { name: a.name, steps: [step, { k: 'charge', twoDice: m.twoDice, bonus: m.chargeBonus || undefined, orFire: ranged && profile !== 'meleeRusher', otherwise: 'run' }] };
   if (/IMPACT/.test(a.text)) return { name: a.name, steps: [step, { k: 'charge', otherwise: 'run' }] };
   if (/\bPLACE\b/.test(a.text)) return { name: a.name, steps: [step, ...(ranged ? [{ k: 'attack', otherwise: 'hold' } as CardStep] : [{ k: 'charge', otherwise: 'hold' } as CardStep])] };

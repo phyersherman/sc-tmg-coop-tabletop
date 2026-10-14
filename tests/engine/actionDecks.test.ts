@@ -11,6 +11,7 @@ import { makeInstance } from '@engine/army/builder';
 import { cardOrder } from '@engine/ai/cardOrders';
 import { aiBurrowed, setAiBurrowed } from '@engine/ai/burrow';
 import { Rng } from '@engine/rng';
+import { makePlayerUnit } from '@engine/sense/playerUnits';
 import type { AiOrder } from '@engine/types/game';
 
 const fielded = UNITS.filter((u) => !u.summoned);
@@ -137,6 +138,39 @@ describe('choosing a card by situation', () => {
     const fresh = cardWeight(s, u, stim);
     u.models = 1;
     expect(cardWeight(s, u, stim)).toBeLessThan(fresh);
+  });
+});
+
+describe('removing enemy models comes first', () => {
+  it('never has a support unit charge: its abilities are followed by its gun or by staying close', () => {
+    for (const id of ['medic', 'sentry']) {
+      const def = UNITS.find((u) => u.id === id);
+      if (!def) continue;
+      for (const c of buildDeck(def, allUpgrades(id), 'assault')) expect(c.steps.some((x) => x.k === 'charge'), `${id} ${c.name}`).toBe(false);
+    }
+  });
+
+  it('fires at an enemy in range instead of running off', () => {
+    const def = UNITS.find((u) => u.id === 'marine')!;
+    const cfg = makeConfig({ modeId: 'frontlines', aiFaction: 'Terran', playMode: 'video' });
+    cfg.playerUnits = [makePlayerUnit('p1', 'zergling', 'small', [], 'Zerglings', 100)];
+    const dep = deploymentById(cfg.deploymentId);
+    const s = createGame(cfg, dep, { seed: 3, table: dep.table, pieces: [], fireLanes: [], violations: [] });
+    const u = makeInstance(def, 'small', 'Marines', 1);
+    u.location = 'table';
+    s.army.units = [u];
+    s.phase = 'assault';
+    s.sense!.ai[u.id] = [{ x: 18, y: 24 }];
+    const deck = buildDeck(def, [], 'assault');
+    const fire = deck.find((c) => c.name === 'Open Fire')!;
+    const run = deck.find((c) => c.name === 'Reposition')!;
+    // Nothing to shoot: running is a fair choice.
+    const idle = cardWeight(s, u, run) / cardWeight(s, u, fire);
+    // An enemy 6" away in the open: it shoots.
+    const pu = s.playerUnits[0]!;
+    pu.location = 'table';
+    s.sense!.players[pu.id] = Array.from({ length: pu.models }, (_, i) => ({ x: 16 + i, y: 18 }));
+    expect(cardWeight(s, u, run) / cardWeight(s, u, fire)).toBeLessThan(idle / 20);
   });
 });
 

@@ -55,7 +55,7 @@ function holdInstead(order: AiOrder): AiOrder {
   };
 }
 
-function orderFor(state: GameState, u: AiUnitInstance, base: AiOrder, card: ActionCard, step: Exclude<CardStep, { k: 'ability' }> | null, rng: Rng): AiOrder {
+function orderFor(state: GameState, u: AiUnitInstance, base: AiOrder, card: ActionCard, step: Exclude<CardStep, { k: 'ability' }> | null, rng: Rng, idleMove?: (o: AiOrder) => boolean): AiOrder {
   const profile = classify(unitById(u.defId));
   // A unit coming on from Reserves always enters and moves: the card sets how far and where it heads.
   if (base.type === 'deploy') {
@@ -65,8 +65,11 @@ function orderFor(state: GameState, u: AiUnitInstance, base: AiOrder, card: Acti
   // A card that is only an ability (a Burrow, a placement, a hide) is the whole activation: the unit stays put.
   if (!step) return holdOrder(u);
   switch (step.k) {
-    case 'move':
-      return moveOrder(state, aimed(u, aim(state, u, step.to)), profile);
+    case 'move': {
+      // A move that would gain no ground (already as close as it may stand) is not made: the unit holds.
+      const o = moveOrder(state, aimed(u, aim(state, u, step.to)), profile);
+      return idleMove?.(o) ? { ...holdOrder(u), idle: true } : o;
+    }
     case 'run':
       return runOrder(state, u, step.to);
     case 'hold':
@@ -91,7 +94,7 @@ function orderFor(state: GameState, u: AiUnitInstance, base: AiOrder, card: Acti
  * Only tabletop without a map shows the card as a card (its name as the title, its abilities first). Everywhere
  * else the order reads as it always has, and what the card adds follows it (see `withCardText`).
  */
-export function cardOrder(state: GameState, base: AiOrder, rng: Rng): AiOrder {
+export function cardOrder(state: GameState, base: AiOrder, rng: Rng, idleMove?: (o: AiOrder) => boolean): AiOrder {
   if (!usesDecks(state)) return base;
   if (state.phase !== 'movement' && state.phase !== 'assault') return base;
   const u = findUnit(state, base.unitId);
@@ -109,7 +112,7 @@ export function cardOrder(state: GameState, base: AiOrder, rng: Rng): AiOrder {
   const paid = abilityEffects(state, u, card);
   // The card's buffs (the unit's reactions, as the AI never reacts) last until the End of the Round.
   for (const b of card.buffs) if (!(u.buffs ?? []).some((x) => x.name === b.name)) u.buffs = [...(u.buffs ?? []), b];
-  const built = burrowing(u, card, orderFor(state, u, base, card, primaryStep(card), rng));
+  const built = burrowing(u, card, orderFor(state, u, base, card, primaryStep(card), rng, idleMove));
   const order = paid.length ? { ...built, lines: [...built.lines, ...paid] } : built;
   // With a map, the order reads as it always has; the card's own text follows it once the camera has had its say.
   if (!noMap(state)) return { ...order, card };

@@ -41,6 +41,23 @@ function tabletopEdition(): Plugin {
   };
 }
 
+/**
+ * js-aruco2 (the camera's tag detector and the printed tag sheets) is old CommonJS that exports by writing to the
+ * module's top-level `this`. The dev server's pre-bundling allows that; the production bundle does not, and the
+ * built app (the desktop app included) found no `AR` and broke the Tags screen. Its exports are written to
+ * `module.exports` instead, which is what that `this` was.
+ */
+function arucoExports(): Plugin {
+  return {
+    name: 'js-aruco2-exports',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!/[\\/]js-aruco2[\\/]/.test(id)) return null;
+      return { code: code.replace(/\bthis\.([A-Z][A-Z0-9_]*)\b/g, 'module.exports.$1'), map: null };
+    },
+  };
+}
+
 export default defineConfig(({ mode, command }) => {
   const tabletop = mode === 'tabletop' || !existsSync(path.resolve('src/main.tsx'));
   const src = (p: string) => path.resolve(process.cwd(), 'src', p);
@@ -49,6 +66,7 @@ export default defineConfig(({ mode, command }) => {
     // The tabletop build copies only its own public files (see tabletopEdition); in dev everything is served.
     publicDir: tabletop && command === 'build' ? false : 'public',
     plugins: [
+      arucoExports(),
       react(),
       ...(tabletop ? [tabletopEdition()] : []),
       VitePWA({

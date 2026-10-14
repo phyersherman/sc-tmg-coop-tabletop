@@ -4,7 +4,14 @@ import { unitById } from '@data/index';
 import { onTable } from '../director/selectors';
 import type { Rng } from '../rng';
 import { aiBurrowed, aiHas } from './burrow';
-import type { ActionCard, CardStep } from './actionDecks';
+import { noMap, type ActionCard, type CardStep } from './actionDecks';
+import { classify, type Profile } from './profiles';
+import { availableWeapons } from '../units/weapons';
+import { speedFor } from '../units/speed';
+import { visibleEnemies } from '../sense/query';
+import { unitGap } from '../sense/placement';
+import { neverEngaged } from '../sense/playerUnits';
+import { aiMayTarget, speedModFor } from './decide';
 
 /**
  * How an AI unit chooses its action card. Its deck is a pool of the actions it has, not a shuffled pile: every time
@@ -34,6 +41,11 @@ export interface Situation {
   /** The AI trails on Victory Points (or leads). */
   behind: boolean;
   ahead: boolean;
+  profile: Profile;
+  /** With a map in play: an enemy is in range and Line of Sight of one of its guns now. Unknown without a map. */
+  canShoot?: boolean;
+  /** With a map in play: an enemy Ground Unit is within a likely Charge (Speed + 4"). Unknown without a map. */
+  canCharge?: boolean;
 }
 
 function hurtOf(u: AiUnitInstance): number {
@@ -43,9 +55,25 @@ function hurtOf(u: AiUnitInstance): number {
   return full > 0 ? 1 - now / full : 0;
 }
 
+/** What the map shows a unit can attack right now, when there is a map and the unit is on it. */
+function reachOf(state: GameState, u: AiUnitInstance): { canShoot?: boolean; canCharge?: boolean } {
+  if (noMap(state) || u.location !== 'table' || !state.sense?.ai[u.id]?.length) return {};
+  const def = unitById(u.defId);
+  const guns = availableWeapons(def, u.upgrades, 'Assault').filter((w) => !w.requiresStatus);
+  const canShoot = guns.some((w) => {
+    const r = typeof w.range === 'number' ? w.range : 0;
+    return r > 0 && visibleEnemies(state, u, r).some((v) => aiMayTarget(state, u, v.unit, w));
+  });
+  const reach = speedFor(def, u.models) + speedModFor(state, u) + 4;
+  const canCharge = state.playerUnits.some((p) => p.location === 'table' && !p.destroyed && !neverEngaged(p) && unitGap(state, 'ai', u.id, 'players', p.id) <= reach);
+  return { canShoot, canCharge };
+}
+
 export function situationOf(state: GameState, u: AiUnitInstance): Situation {
   const phase = state.phase === 'assault' ? 'assault' : 'movement';
   return {
+    profile: classify(unitById(u.defId)),
+    ...(phase === 'assault' ? reachOf(state, u) : {}),
     phase,
     deploying: u.location === 'reserves',
     burrowed: aiBurrowed(u),
@@ -64,8 +92,27 @@ export function situationOf(state: GameState, u: AiUnitInstance): Situation {
 type Lead = Exclude<CardStep, { k: 'ability' }>;
 const leadOf = (c: ActionCard) => c.steps.find((s): s is Lead => s.k !== 'ability') ?? null;
 
-/** What the card's action is worth to a unit in this situation (before its abilities). */
+/**
+ * What the card's action is worth (before its abilities). First of all the AI removes enemy models: with a map
+ * showing a target in range, or in reach of a likely Charge, the card that attacks it is played and running or
+ * holding is all but ruled out. A support unit never charges: its abilities help the others do the killing.
+ */
 function actionWeight(lead: Lead | null, s: Situation): number {
+  const w = baseWeight(lead, s);
+  if (s.phase !== 'assault' || !lead) return w;
+  if (lead.k === 'charge' && s.profile === 'support') return 0;
+  const fighter = s.profile === 'meleeRusher' || s.profile === 'brawler';
+  const target = !!s.canShoot || (fighter && !!s.canCharge);
+  if (lead.k === 'attack') return s.canShoot ? Math.max(w, 1) * 4 : s.canShoot === false && lead.otherwise === 'hold' ? w * 0.3 : w;
+  if (lead.k === 'charge') {
+    if (s.canCharge || (lead.orFire && s.canShoot)) return Math.max(w, 1) * 4;
+    return s.canCharge === false ? w * 0.4 : w;
+  }
+  // Running off or standing still with something to kill in reach.
+  return target ? w * 0.05 : w;
+}
+
+function baseWeight(lead: Lead | null, s: Situation): number {
   const hurt = s.hurt >= 0.5 || s.lastModel;
   const fresh = s.hurt < 0.15;
   if (!lead) return 1;
@@ -131,6 +178,8 @@ function abilityWeight(state: GameState, u: AiUnitInstance, card: ActionCard, s:
     else if (/BUFF|roll 2D6|Charge Distance/i.test(t)) w *= hurt ? 0.6 : 1.4;
     else w *= 1.2;
   }
+  // A support unit is there to help the others remove models: its abilities come first.
+  if (s.profile === 'support' && card.steps.some((st) => st.k === 'ability')) w *= 2;
   return w;
 }
 
