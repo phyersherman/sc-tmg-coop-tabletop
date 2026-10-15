@@ -621,7 +621,7 @@ function seekerMissiles(state: GameState, mode: MissionMode): void {
     for (const d of locks) {
       const raven = state.playerUnits.find((p) => p.id === d.seekerFrom);
       const gap = raven && raven.location === 'table' && !raven.destroyed ? unitGap(state, 'players', raven.id, 'ai', u.id) : Infinity;
-      if (isStationary(state, u) || gap <= 8.05) state.pendingHits = [...(state.pendingHits ?? []), { targetId: u.id, hits: 4, dmgPer: 2, source: 'Seeker Missile', evadeIfEngaged: true }];
+      if (isStationary(state, u) || gap <= 8.05) state.pendingHits = [...(state.pendingHits ?? []), { targetId: u.id, hits: 4, dmgPer: 2, source: 'Seeker Missile', evadeIfEngaged: true, fromId: d.seekerFrom }];
       else pushLog(state, 'players', `Seeker Missile: ${u.label} moved and stands beyond 8" of ${raven?.name ?? 'the Raven'}. The missile misses.`);
     }
   }
@@ -645,7 +645,7 @@ function resolvePendingHits(state: GameState, mode: MissionMode): void {
     // HITS X (Y): X automatic hits, set straight into the Armour Pool (no Hit roll, no Surge), then Armour and Evade.
     const weapon = { id: 'hits', name: q.source, phase: 'Assault' as const, range: 'E' as const, target: 'All' as const, roa: q.hits, hit: 2, dmg: q.dmgPer, surgeTypes: [], keywords: [], text: '' };
     const a = resolveAttack(ctx.rng, {
-      attacker: { side: 'players', unitId: q.source, label: q.source },
+      attacker: { side: 'players', unitId: q.fromId ?? q.source, label: q.source },
       defender: { side: 'ai', unitId: u.id, label: u.label },
       weapon, models: 1, phase: 'Assault', presetRolls: Array(q.hits).fill(6),
       defenderDef: tdef, defenderHp: unitHp(tdef, u.upgrades),
@@ -2064,6 +2064,15 @@ function setPlayerPosition(state: GameState, pu: PlayerUnit, pt: { x: number; y:
 }
 
 /** Check and resolve the target of an ability or boost. Returns a context or an error message. */
+/** Why a unit's point ability may not be used at `point`, or null when it may: the map's ghost and the click share it. */
+export function abilityPointProblem(state: GameState, unitId: string, name: string, point: { x: number; y: number }): string | null {
+  const pu = state.playerUnits.find((p) => p.id === unitId) ?? null;
+  const spec = UNIT_ABILITIES[name];
+  if (!spec || spec.target !== 'point') return null;
+  const res = resolveAbilityTargets(state, pu, spec, { point });
+  return typeof res === 'string' ? res : null;
+}
+
 function resolveAbilityTargets(state: GameState, pu: PlayerUnit | null, spec: AbilitySpec, cmd: { friendlyId?: string; enemyId?: string; point?: { x: number; y: number } }): Omit<AbilityContext, 'state' | 'unit'> | string {
   const from = pu ? playerPos(state, pu) : null;
   // An ability's range is measured as every range is: base edge to base edge, between the closest models of the
@@ -2087,9 +2096,12 @@ function resolveAbilityTargets(state: GameState, pu: PlayerUnit | null, spec: Ab
   }
   if (spec.target === 'point') {
     if (!cmd.point) return 'Click a spot on the map.';
-    if (beyond(pu ? abilityGapToPoint(state, pu, cmd.point) : null)) return `That spot is out of range (${range}").`;
+    const d = pu ? abilityGapToPoint(state, pu, cmd.point) : null;
+    if (beyond(d)) return `Too far: ${d!.toFixed(1)}" from ${pu!.name}. It must be within ${range}".`;
     const t = state.terrain.table;
     if (cmd.point.x < 0 || cmd.point.y < 0 || cmd.point.x > t.width || cmd.point.y > t.height) return 'Pick a spot on the table.';
+    const problem = pu && spec.pointCheck ? spec.pointCheck(state, pu, cmd.point) : null;
+    if (problem) return problem;
     return { point: cmd.point };
   }
   return {};

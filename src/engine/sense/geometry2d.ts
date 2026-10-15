@@ -437,6 +437,92 @@ export function reachOutline(from: Pt, pieces: TerrainPiece[], table: { width: n
   return out;
 }
 
+/**
+ * Where a mover can get to within `speed` of walking, as the outlines of that ground (table inches): one loop round
+ * each patch it reaches, and one round each hole in it (a wall's footprint, the cliff under a plateau it can only
+ * reach by the ramp). Fill them even-odd. Traced from the same walk the moves use, so the drawn reach and the move
+ * agree: a spot in a clear straight line is measured exactly, anything else as walked round the terrain.
+ */
+export function reachRegion(from: Pt, pieces: TerrainPiece[], table: { width: number; height: number }, speed: number, opts?: PathOptions): Pt[][] {
+  const cell = 0.25;
+  const f = walkField(from, pieces, table, speed, cell, opts, from);
+  // Only the box the reach can fill, one node of margin all round, so every loop closes inside it.
+  const x0 = Math.max(0, Math.floor((from.x - speed) / cell) - 1), x1 = Math.min(f.W, Math.ceil((from.x + speed) / cell) + 1);
+  const y0 = Math.max(0, Math.floor((from.y - speed) / cell) - 1), y1 = Math.min(f.H, Math.ceil((from.y + speed) / cell) + 1);
+  const nx = x1 - x0 + 3, ny = y1 - y0 + 3;
+  // How much distance is left at each node (clamped, so a contour never wanders far into a wall or past the table).
+  const val = new Float64Array(nx * ny).fill(-cell);
+  for (let j = 1; j < ny - 1; j++)
+    for (let i = 1; i < nx - 1; i++) {
+      const x = x0 + i - 1, y = y0 + j - 1;
+      const p = { x: x * cell, y: y * cell };
+      let d = f.g[f.key(x, y)]!;
+      const straight = dist(from, p);
+      if (straight < d && straight <= speed + cell && f.free(p) && clearWith(from, p, f.free)) d = straight;
+      val[j * nx + i] = Math.max(-cell, Math.min(cell, speed - d));
+    }
+  const pt = (i: number, j: number) => ({ x: (x0 + i - 1) * cell, y: (y0 + j - 1) * cell });
+  const v = (i: number, j: number) => val[j * nx + i]!;
+  // Edges: horizontal (i,j)-(i+1,j) and vertical (i,j)-(i,j+1), each crossed at most once by the contour.
+  const H = (i: number, j: number) => j * nx + i;
+  const V = (i: number, j: number) => nx * ny + j * nx + i;
+  const cross = new Map<number, Pt>();
+  const at = (e: number): Pt => {
+    let p = cross.get(e);
+    if (p) return p;
+    const vert = e >= nx * ny;
+    const k = vert ? e - nx * ny : e;
+    const i = k % nx, j = Math.floor(k / nx);
+    const [a, b] = vert ? [[i, j], [i, j + 1]] : [[i, j], [i + 1, j]];
+    const va = v(a[0]!, a[1]!), vb = v(b[0]!, b[1]!);
+    const t = va === vb ? 0.5 : va / (va - vb);
+    const pa = pt(a[0]!, a[1]!), pb = pt(b[0]!, b[1]!);
+    p = { x: pa.x + (pb.x - pa.x) * t, y: pa.y + (pb.y - pa.y) * t };
+    cross.set(e, p);
+    return p;
+  };
+  const links = new Map<number, number[]>();
+  const link = (a: number, b: number) => {
+    (links.get(a) ?? links.set(a, []).get(a)!).push(b);
+    (links.get(b) ?? links.set(b, []).get(b)!).push(a);
+  };
+  for (let j = 0; j < ny - 1; j++)
+    for (let i = 0; i < nx - 1; i++) {
+      const c = (v(i, j) > 0 ? 1 : 0) | (v(i + 1, j) > 0 ? 2 : 0) | (v(i + 1, j + 1) > 0 ? 4 : 0) | (v(i, j + 1) > 0 ? 8 : 0);
+      if (c === 0 || c === 15) continue;
+      const top = H(i, j), right = V(i + 1, j), bottom = H(i, j + 1), left = V(i, j);
+      const centre = (v(i, j) + v(i + 1, j) + v(i + 1, j + 1) + v(i, j + 1)) / 4 > 0;
+      switch (c) {
+        case 1: case 14: link(left, top); break;
+        case 2: case 13: link(top, right); break;
+        case 3: case 12: link(left, right); break;
+        case 4: case 11: link(right, bottom); break;
+        case 6: case 9: link(top, bottom); break;
+        case 7: case 8: link(left, bottom); break;
+        // A saddle: the corners across from each other agree; the middle decides which pair is joined.
+        case 5: if (centre) { link(left, bottom); link(top, right); } else { link(left, top); link(right, bottom); } break;
+        case 10: if (centre) { link(left, top); link(right, bottom); } else { link(top, right); link(left, bottom); } break;
+      }
+    }
+  const loops: Pt[][] = [];
+  const seen = new Set<number>();
+  for (const start of links.keys()) {
+    if (seen.has(start)) continue;
+    const loop: Pt[] = [];
+    let prev = -1, cur = start;
+    while (!seen.has(cur)) {
+      seen.add(cur);
+      loop.push(at(cur));
+      const next = (links.get(cur) ?? []).find((n) => n !== prev && !seen.has(n));
+      if (next === undefined) break;
+      prev = cur;
+      cur = next;
+    }
+    if (loop.length > 2) loops.push(loop);
+  }
+  return loops;
+}
+
 export function shortestPath(from: Pt, to: Pt, pieces: TerrainPiece[], table: { width: number; height: number }, opts?: PathOptions): { length: number; path: Pt[] } {
   const free = opts ? freeCheck(pieces, from, to, opts) : null;
   const clear = (a: Pt, b: Pt) => (free ? clearWith(a, b, free) : segmentClear(a, b, pieces));

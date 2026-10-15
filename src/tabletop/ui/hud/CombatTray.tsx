@@ -7,7 +7,7 @@ import { useUi } from '@tt/store/uiStore';
 import { useGame } from '@tt/store/gameStore';
 import { Stepper } from '../components/Basics';
 import { DieFace, DieTumble } from '../components/DiceRoll';
-import { buildPools, chargeAckId, commandFor, facesFromCount, planAttack, pickSaveOption, planCharge, resultItem, saveOptions, type CombatItem, type Pool, type PoolId } from './combatPools';
+import { buildPools, chargeAckId, commandFor, facesFromCount, planAttack, pickSaveOption, planCharge, resultItem, saveOptions, type ChargeEvent, type CombatItem, type Pool, type PoolId } from './combatPools';
 import { StepIcon } from '../tabletop/StepIcon';
 import { factionPhoto, modelPhoto } from '@data/modelPhotos';
 
@@ -58,7 +58,7 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
       if (ev.kind === 'charge') {
         const mine = items.current.find((i) => i.plan?.kind === 'charge' && i.sent && !i.charge && i.attackerId === ev.unitId);
         if (mine) mine.charge = ev;
-        else if (ev.side === 'ai') items.current.push(resultItem(g, { charge: ev }));
+        else if (ev.side === 'ai' && !items.current.some((i) => i.charge?.id === ev.id)) items.current.push(resultItem(g, { charge: ev }));
       } else if (ev.kind === 'attack') {
         const a = ev.attack;
         const saves = items.current.find((i) => i.pending?.id === a.id);
@@ -68,7 +68,10 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
         if (into) {
           into.attack = a;
           if (!into.ackIds.includes(a.id)) into.ackIds.push(a.id);
-        } else if (a.attacker.side === 'ai') items.current.push(resultItem(g, { attack: a }));
+        } else if (a.attacker.side === 'ai' || !items.current.some((i) => i.plan && i.sent && i.attackerId === a.attacker.unitId)) {
+          // The AI's attacks, and yours the tray did not start: an Auto-Turret's Overwatch, a Seeker Missile.
+          items.current.push(resultItem(g, { attack: a }));
+        }
       }
     }
     refresh();
@@ -137,7 +140,11 @@ export function CombatTray({ g, dispatch, pendingEvent, style, className = '' }:
   // Whatever became of the item (closed, dropped), while the engine waits on your saves there is one for them:
   // without it the game would sit at the saves step with nothing on screen to finish it.
   if (g.pendingSaves && !items.current.some((i) => i.pending?.id === g.pendingSaves!.attack.id || i.attack?.id === g.pendingSaves!.attack.id)) {
-    items.current.push(resultItem(g, { pending: g.pendingSaves.attack }));
+    const ps = g.pendingSaves.attack;
+    // An IMPACT waiting on your saves arrives with the Charge that made it, not yet read by the effect above: they
+    // are one combat, the charge die first, or the charge would queue behind its own IMPACT.
+    const charge = ps.phase === 'Impact' ? (g.events ?? []).filter((e): e is ChargeEvent => e.kind === 'charge' && e.id > seen.current && e.unitId === ps.attacker.unitId).pop() : undefined;
+    items.current.push(resultItem(g, { pending: ps, charge }));
   }
   const cur = items.current[0] ?? null;
   const pools = cur ? buildPools(g, cur) : [];

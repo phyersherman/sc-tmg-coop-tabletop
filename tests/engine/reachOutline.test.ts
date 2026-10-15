@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reachOutline } from '@engine/sense/geometry2d';
+import { reachOutline, reachRegion } from '@engine/sense/geometry2d';
 import type { TerrainPiece } from '@engine/types/terrain';
 
 const table = { width: 36, height: 36 };
@@ -30,5 +30,37 @@ describe('the reach as walked', () => {
     const beyond = radiusAt(pts, from, -Math.PI / 9);
     expect(beyond).toBeLessThan(5.9);
     expect(beyond).toBeGreaterThan(3);
+  });
+});
+
+describe('the reach as ground', () => {
+  const inside = (loops: { x: number; y: number }[][], p: { x: number; y: number }) => {
+    let n = false;
+    for (const poly of loops)
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const a = poly[i]!, b = poly[j]!;
+        if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) n = !n;
+      }
+    return n;
+  };
+  // The Lost Temple Ramp: its plateau climbed only from the ramp's foot on the east side.
+  const ramp: TerrainPiece = { n: 1, catalogId: 'lt-ramp', size: 3, grass: false, label: 'Lost Temple Ramp', x: 10, y: 14, w: 15.9, h: 8.15, accessPoints: [{ x: 25.9, y: 18.075 }] };
+
+  it('is one disc on open ground', () => {
+    const loops = reachRegion({ x: 18, y: 18 }, [], table, 6);
+    expect(loops).toHaveLength(1);
+    expect(inside(loops, { x: 23.8, y: 18 })).toBe(true);
+    expect(inside(loops, { x: 24.3, y: 18 })).toBe(false);
+  });
+  it('leaves out a wall it cannot stand in, and the ground behind it out of reach', () => {
+    const loops = reachRegion({ x: 18, y: 18 }, [wall(1, 21, 8, 1, 20)], table, 6);
+    expect(inside(loops, { x: 21.5, y: 18 })).toBe(false);
+    expect(inside(loops, { x: 23, y: 18 })).toBe(false);
+    expect(inside(loops, { x: 13, y: 18 })).toBe(true);
+  });
+  it('does not climb the cliff: the plateau beside a model at its foot is out of reach', () => {
+    const loops = reachRegion({ x: 7, y: 18 }, [ramp], table, 6);
+    expect(inside(loops, { x: 4, y: 18 })).toBe(true);
+    expect(inside(loops, { x: 12, y: 18 })).toBe(false);
   });
 });

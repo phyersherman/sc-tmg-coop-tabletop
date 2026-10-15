@@ -3,8 +3,12 @@ import type { GameConfig, GameState } from '@engine/types/game';
 import { apply, createGame, normalizePositions, type Command } from '@engine/director/reducer';
 import { deploymentById } from '@data/index';
 import { mapLayout, remixId } from '@engine/terrain/remix';
+import { useUi } from './uiStore';
 
 // Its own saved battle: a simulation save is not a tabletop one.
+/** Commands the player issues by hand: a refusal of one is shown as a toast. */
+const PLAYER_ACTIONS = new Set<Command['t']>(['useAbility', 'useBoost', 'useReward', 'damageReaction', 'playerDeploy', 'playerMove', 'playerHold', 'playerAttack', 'playerCharge', 'playerPlace', 'playerBonusMove', 'playerCloseRanks', 'adjustModel']);
+
 const KEY = 'sctmg.tabletop.save.v1';
 
 interface Saved {
@@ -84,6 +88,11 @@ export const useGame = create<GameStore>((set, get) => ({
     const { game, undo } = get();
     if (!game) return;
     const next = apply(game, cmd);
+    // Something you did that the rules refuse says why on screen, not only in the log.
+    // (A full log drops its oldest line for each new one, so a new line shows as a changed first line too.)
+    const logged = next.log.length > game.log.length || next.log[0] !== game.log[0] && next.log[0]?.text !== game.log[0]?.text;
+    const refused = PLAYER_ACTIONS.has(cmd.t) && logged ? next.log[next.log.length - 1] : undefined;
+    if (refused?.side === 'system' && refused.text.startsWith('Not allowed: ')) useUi.getState().showToast(refused.text.slice('Not allowed: '.length));
     const unitId = game.step.kind === 'AI_ORDER' ? game.step.order.unitId : undefined;
     set({ game: next, undo: [...undo.slice(-19), game], lastCommand: { seq: (get().lastCommand?.seq ?? 0) + 1, cmd, unitId } });
     persist(get);

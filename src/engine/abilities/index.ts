@@ -53,6 +53,10 @@ export interface AbilitySpec {
   rangeFor?: (pu: PlayerUnit) => number;
   /** Short hint for the target picker. */
   targetHint?: string;
+  /** A point ability that sets a model down: its base, drawn under the pointer while you pick the spot. */
+  placeShape?: string;
+  /** A point ability's own rules for the spot, beyond range and the table edge: why it may not go there, or null. */
+  pointCheck?: (state: GameState, pu: PlayerUnit, point: Pt) => string | null;
   /** For card boosts: the active unit must match. */
   needsUnit?: (pu: PlayerUnit) => boolean;
   friendlyFilter?: (pu: PlayerUnit) => boolean;
@@ -617,12 +621,21 @@ export const UNIT_ABILITIES: Record<string, AbilitySpec> = {
     target: 'point',
     range: 6,
     targetHint: 'a spot within 6", outside the Engagement Range of every enemy',
+    placeShape: 'auto_turret',
+    pointCheck: (state, _pu, point) => {
+      const at = shapeAt('auto_turret', point);
+      for (const u of state.army.units.filter((x) => x.location === 'table')) {
+        const gap = Math.min(...unitShapes(state, 'ai', u.id).map((m) => edgeDistance(m, at)));
+        if (gap <= ENGAGEMENT_IN + 0.05) return `Too close to ${u.label}: ${Math.max(0, gap).toFixed(1)}". The Auto-Turret cannot be set Within ${ENGAGEMENT_IN}" (Engagement Range) of an Enemy Unit.`;
+      }
+      if (!baseFits(state, 'players', '', at)) return 'Its base would overlap a model or impassable terrain.';
+      return null;
+    },
     automated: true,
     apply: ({ state, point, unit }) => {
       const pu = unit!;
-      const at = shapeAt('auto_turret', point!);
-      if (state.army.units.some((u) => u.location === 'table' && unitShapes(state, 'ai', u.id).some((m) => edgeDistance(m, at) <= ENGAGEMENT_IN + 0.05))) return '!The Auto-Turret cannot be set Within the Engagement Range of an Enemy Unit.';
-      if (!baseFits(state, 'players', '', at)) return '!The Auto-Turret cannot overlap models or impassable terrain.';
+      const problem = UNIT_ABILITIES['Deploy Auto-Turret']!.pointCheck!(state, pu, point!);
+      if (problem) return `!${problem}`;
       const t = summon(state, 'auto_turret', point!, { expires: true, owner: pu.owner });
       t.name = 'Auto-Turret';
       // Explosive Shrapnel Shells: the turret this Raven sets fires shrapnel.

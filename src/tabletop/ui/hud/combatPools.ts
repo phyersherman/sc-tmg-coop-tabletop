@@ -56,7 +56,7 @@ export interface CombatInput {
   reactions: string[];
 }
 
-type ChargeEvent = Extract<GameEvent, { kind: 'charge' }>;
+export type ChargeEvent = Extract<GameEvent, { kind: 'charge' }>;
 
 /** What was known when the combat opened, so the tray still reads right after the target is destroyed. */
 export interface CombatMeta {

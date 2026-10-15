@@ -6,14 +6,17 @@
  *   node scripts/build-desktop.mjs mac|win   one platform
  *   --edition tabletop                       the tabletop edition alone (what is published): only its own files
  *   --no-install                             leave /Applications alone
+ *   --keep                                   keep the builds in release/
  *
  * On a Mac (not CI), the full app's Mac build is installed to /Applications, replacing the copy there: if it is
  * running it is asked to quit first. Saves live in the user's Library, not in the app, so they carry over.
+ * The full app's Windows zip is then copied to the network share (/Volumes/Mac, or SCTMG_SHARE), and release/ is
+ * emptied: the builds are not kept there. If the share is not mounted the zip stays in release/.
  *
  * Where the full app is not there (the published tabletop branch) the tabletop edition is built either way.
  */
 import { execSync } from 'node:child_process';
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { packager } from '@electron/packager';
 
@@ -66,6 +69,32 @@ for (const t of targets) {
   else execSync(`cd "${out}" && zip -qr "${zip}" "${base}"`, { stdio: 'inherit' });
   console.log(`Done: ${dir}\n      ${zip}`);
   if (t.platform === 'darwin' && !tabletop && process.platform === 'darwin' && !process.env.CI && !args.includes('--no-install')) install(path.join(dir, `${common.name}.app`));
+}
+if (!tabletop && process.platform === 'darwin' && !process.env.CI && !args.includes('--keep')) shipAndClean();
+
+/** The Windows zip to the share, then release/ emptied: the Mac app is installed and the zip is on the share. */
+function shipAndClean() {
+  const share = process.env.SCTMG_SHARE ?? '/Volumes/Mac';
+  const zip = path.join(out, `${common.name}-win32-x64.zip`);
+  let keepZip = false;
+  if (targets.some((t) => t.platform === 'win32') && existsSync(zip)) {
+    if (existsSync(share)) {
+      const dest = path.join(share, path.basename(zip));
+      console.log(`Copying ${path.basename(zip)} to ${share}…`);
+      // Copied under another name and renamed, so the share never holds half a zip under the real one.
+      copyFileSync(zip, `${dest}.partial`);
+      renameSync(`${dest}.partial`, dest);
+      console.log(`Saved: ${dest}`);
+    } else {
+      keepZip = true;
+      console.log(`${share} is not mounted: the Windows zip stays at ${zip}.`);
+    }
+  }
+  for (const f of readdirSync(out)) {
+    if (keepZip && path.join(out, f) === zip) continue;
+    rmSync(path.join(out, f), { recursive: true, force: true, maxRetries: 5 });
+  }
+  console.log('Cleared release/.');
 }
 
 /** Puts the Mac app in /Applications, replacing the one there. */

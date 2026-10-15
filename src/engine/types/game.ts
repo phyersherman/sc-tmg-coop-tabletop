@@ -291,7 +291,7 @@ export interface GameState {
   /** HITS X (Y) waiting to be resolved against AI units (Corrosive Bile, Shadow Strike). */
   /** Damage an ability deals straight out, with no Armour Roll (Psi Lightning), resolved as the ability is used. */
   pendingDamage?: { side: 'ai' | 'players'; id: string; amount: number; source: string }[];
-  pendingHits?: { targetId: string; hits: number; dmgPer: number; source: string; armourMod?: number; /** An Engaged target may make an Evade Roll against them (Seeker Missile). */ evadeIfEngaged?: boolean }[];
+  pendingHits?: { targetId: string; hits: number; dmgPer: number; source: string; armourMod?: number; /** An Engaged target may make an Evade Roll against them (Seeker Missile). */ evadeIfEngaged?: boolean; /** The Unit that made them (the Raven for its Seeker Missile), shown as the attacker. */ fromId?: string }[];
   /**
    * A moment one of your Reactions can answer, held until you use it or decline. `kind` absent (or 'damage'):
    * Damage a unit of yours has just suffered outside an attack (Stimpack). The other kinds hold the game at an
